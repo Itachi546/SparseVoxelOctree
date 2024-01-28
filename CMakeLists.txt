@@ -6,8 +6,12 @@ set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
 project(vox-engine VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
-SET(PRJ_SRC_FILES src/main.cpp)
-SET (PRJ_HEADER_FILES)
+SET(PRJ_SRC_FILES src/main.cpp
+                  src/vulkan.cpp
+                  src/voxel-app.cpp)
+SET (PRJ_HEADER_FILES src/vulkan.h
+                      src/app-window.h
+                      src/voxel-app.h)
 
 add_executable(${PROJECT_NAME} ${PRJ_HEADER_FILES} ${PRJ_SRC_FILES})
 
