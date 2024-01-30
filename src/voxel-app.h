@@ -14,6 +14,8 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void OnUpdate();
 
+    void OnRender();
+
     void OnMouseMove(float x, float y);
     void OnMouseScroll(float x, float y);
     void OnMouseButton(int key, int action);
@@ -21,4 +23,6 @@ struct VoxelApp : AppWindow<VoxelApp> {
     void OnResize(float width, float height);
 
     using Clock = std::chrono::high_resolution_clock;
+
+    gfx::Shader fullscreenShader;
 };

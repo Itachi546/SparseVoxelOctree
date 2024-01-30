@@ -1,15 +1,20 @@
+#include "gfx/opengl.h"
+
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+
+#include <iostream>
+#include <string>
 
 template <typename App>
 struct AppWindow {
 
     AppWindow(const char *title, const glm::vec2 &windowSize) : windowSize(windowSize) {
         glfwInit();
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
         glfwWindowPtr = glfwCreateWindow(static_cast<int>(windowSize.x), static_cast<int>(windowSize.y), title, nullptr, nullptr);
         glfwSetWindowUserPointer(glfwWindowPtr, this);
+        glfwMakeContextCurrent(glfwWindowPtr);
 
         glfwSetCursorPosCallback(glfwWindowPtr, [](GLFWwindow *window, double x, double y) {
             auto &app = *reinterpret_cast<App *>(glfwGetWindowUserPointer(window));
@@ -39,6 +44,19 @@ struct AppWindow {
                 auto &app = *reinterpret_cast<App *>(glfwGetWindowUserPointer(window));
                 app.OnResize(static_cast<float>(sx), static_cast<float>(sy));
             });
+
+        gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+        const char *rendererInfo = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
+        const char *vendorInfo = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
+        const char* openglVersion =  reinterpret_cast<const char *>(glGetString(GL_VERSION));
+
+        std::cout << "Renderer: " << std::string(rendererInfo) << std::endl;
+        std::cout << "Vendor: " << std::string(vendorInfo) << std::endl;
+        std::cout << "OpenGL Version: " << std::string(openglVersion) << std::endl;
+
+        glEnable(GL_DEPTH_TEST);
+        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
     }
 
     ~AppWindow() {
