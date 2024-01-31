@@ -20,7 +20,7 @@ void main()
 {
    InstanceData data = instanceData[gl_InstanceID];
 
-   vec3 worldPos = position * data.w * 0.5 + vec3(data.x, data.y, data.z);
+   vec3 worldPos = position * data.w + vec3(data.x, data.y, data.z);
 
    vNormal = normal;
    vUV = position.xy * normal.z + position.yz * normal.x + position.xz * normal.y;

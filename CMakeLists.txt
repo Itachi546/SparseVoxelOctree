@@ -8,14 +8,21 @@ project(vox-engine VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
 SET(PROJECT_SOURCE_FILES 
-                  "src/main.cpp"
                   "src/gfx/opengl.cpp"
+                  "src/main.cpp"
+                  "src/gfx/mesh.cpp"
+                  "src/gfx/camera.cpp"
+                  "src/voxels/octree.cpp"
                   "src/utils.cpp"
                   "src/voxel-app.cpp")
 SET (PROJECT_HEADER_FILES 
+                   "src/gfx/opengl.h"
                    "src/app-window.h"
                    "src/utils.h"
-                   "src/gfx/opengl.h"
+                   "src/gfx/camera.h"
+                   "src/math-utils.h"
+                   "src/voxels/octree.h"
+                   "src/gfx/mesh.h"
                    "src/voxel-app.h")
 
 add_executable(${PROJECT_NAME} ${PROJECT_HEADER_FILES} ${PROJECT_SOURCE_FILES})
@@ -31,3 +38,6 @@ set(PROJECT_LIBRARIES
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PRIVATE src/)
+target_compile_definitions(${PROJECT_NAME} PRIVATE   
+        GLM_FORCE_XYZW_ONLY
+    ) 

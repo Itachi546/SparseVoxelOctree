@@ -1,6 +1,4 @@
-#include <iostream>
-
-#include "voxel-app.h"
+  #include "voxel-app.h"
 
 int main() {
     VoxelApp app;

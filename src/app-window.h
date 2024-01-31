@@ -1,7 +1,9 @@
-#include "gfx/opengl.h"
+#pragma once
 
+#include "gfx/opengl.h"
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
+
+#include "math-utils.h"
 
 #include <iostream>
 #include <string>
@@ -15,6 +17,7 @@ struct AppWindow {
         glfwWindowPtr = glfwCreateWindow(static_cast<int>(windowSize.x), static_cast<int>(windowSize.y), title, nullptr, nullptr);
         glfwSetWindowUserPointer(glfwWindowPtr, this);
         glfwMakeContextCurrent(glfwWindowPtr);
+        glfwSwapInterval(1);
 
         glfwSetCursorPosCallback(glfwWindowPtr, [](GLFWwindow *window, double x, double y) {
             auto &app = *reinterpret_cast<App *>(glfwGetWindowUserPointer(window));
@@ -49,7 +52,7 @@ struct AppWindow {
 
         const char *rendererInfo = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
         const char *vendorInfo = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
-        const char* openglVersion =  reinterpret_cast<const char *>(glGetString(GL_VERSION));
+        const char *openglVersion = reinterpret_cast<const char *>(glGetString(GL_VERSION));
 
         std::cout << "Renderer: " << std::string(rendererInfo) << std::endl;
         std::cout << "Vendor: " << std::string(vendorInfo) << std::endl;

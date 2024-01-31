@@ -1,6 +1,16 @@
+#pragma once
+
 #include "app-window.h"
 
 #include <chrono>
+
+namespace gfx {
+    struct Mesh;
+    class Camera;
+} // namespace gfx
+
+struct Octree;
+struct OctreeBrick;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -22,7 +32,25 @@ struct VoxelApp : AppWindow<VoxelApp> {
     void OnKey(int key, int action);
     void OnResize(float width, float height);
 
+    void UpdateControls();
+
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Shader fullscreenShader;
+    gfx::Mesh *cubeMesh;
+    gfx::Buffer instanceBuffer;
+
+    gfx::Camera *camera;
+    Octree *octree;
+
+    bool mouseDown;
+    glm::vec2 mouseDelta;
+    glm::vec2 mousePos;
+
+    float dt;
+    float lastFrameTime;
+
+    uint32_t voxelCount;
+    std::vector<glm::vec3> loadList;
+    OctreeBrick *tempBrick;
 };

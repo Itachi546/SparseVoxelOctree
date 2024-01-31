@@ -1,7 +1,7 @@
 #include "utils.h"
 
 #include <fstream>
-#include <cassert>
+#include <assert.h>
 #include <iostream>
 
 namespace utils {
