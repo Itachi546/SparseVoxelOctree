@@ -63,9 +63,13 @@ struct Octree {
 
     Octree(const glm::vec3 &center, float size);
 
+    Octree(const char *filename);
+
     void Insert(OctreeBrick *brick);
 
     void GenerateVoxels(std::vector<glm::vec4> &voxels);
+
+    void Serialize(const char *filename);
 
     std::vector<Node> nodePools;
 

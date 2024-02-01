@@ -5,6 +5,7 @@
 #include "gfx/mesh.h"
 #include "gfx/camera.h"
 #include "voxels/octree.h"
+#include "FastNoiseLite/FastNoiseLite.h"
 
 #include <thread>
 #include <algorithm>
@@ -27,8 +28,10 @@ MessageCallback(GLenum source,
     assert(0);
 }
 
-float SampleDensity(const glm::vec3 &p) {
-    return glm::min(p.y + 12.0f, glm::length(p) - 13.0f);
+const float kFrequency = 100.0f;
+float SampleDensity(FastNoiseLite *noise, glm::vec3 &p) {
+    float offset = (noise->GetNoise(p.x * kFrequency, p.z * kFrequency)) * 0.5f;
+    return glm::min(p.y + 12.0f + offset, glm::length(p) - 13.0f);
 };
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
@@ -41,7 +44,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     cubeMesh = new gfx::Mesh();
     gfx::Mesh::CreateCube(cubeMesh);
 
-    uint32_t maxEntity = 1'000'000;
+    uint32_t maxEntity = 10'000'000;
     instanceBuffer = gfx::CreateBuffer(nullptr, maxEntity * sizeof(glm::vec4), GL_DYNAMIC_STORAGE_BIT);
 
     camera = new gfx::Camera();
@@ -54,11 +57,18 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
 
+#if 1
+    octree = new Octree("../../scene.octree");
+    tempBrick = new OctreeBrick();
+    std::vector<glm::vec4> voxels;
+    octree->GenerateVoxels(voxels);
+    voxelCount = static_cast<uint32_t>(voxels.size());
+    if (voxels.size() > 0)
+        glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
+#else
+    voxelCount = 0;
     const uint32_t kOctreeDims = 32;
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
-    tempBrick = new OctreeBrick();
-    voxelCount = 0;
-
     float halfSize = LEAF_NODE_SCALE * 0.5f;
     int DIMS = kOctreeDims / LEAF_NODE_SCALE;
     for (int x = -DIMS; x < DIMS; ++x)
@@ -71,6 +81,10 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
               [&camPos](const glm::vec3 &p0, const glm::vec3 &p1) {
                   return length(p0 - camPos) > length(p1 - camPos);
               });
+
+    noise = new FastNoiseLite();
+    noise->SetNoiseType(FastNoiseLite::NoiseType::NoiseType_OpenSimplex2);
+#endif
 }
 
 void VoxelApp::Run() {
@@ -103,36 +117,40 @@ void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
-    if (loadList.size() > 0) {
-        glm::vec3 position = loadList.back();
-        loadList.pop_back();
-        tempBrick->position = position;
-        glm::vec3 min = position - LEAF_NODE_SCALE * 0.5f;
-        float size = float(LEAF_NODE_SCALE);
-        bool empty = true;
-        for (int x = 0; x < BRICK_SIZE; ++x) {
-            for (int y = 0; y < BRICK_SIZE; ++y) {
-                for (int z = 0; z < BRICK_SIZE; ++z) {
-                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
-                    glm::vec3 p = min + t01 * size;
-                    float val = SampleDensity(p);
-                    uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
-                    if (val <= 0.0f) {
-                        tempBrick->data[index] = 0xff0000;
-                        empty = false;
-                    } else
-                        tempBrick->data[index] = 0;
+    const uint32_t kNumLoadWork = 4;
+    for (uint32_t workCount = 0; workCount < kNumLoadWork; ++workCount) {
+        if (loadList.size() > 0) {
+            glm::vec3 position = loadList.back();
+            loadList.pop_back();
+            tempBrick->position = position;
+            glm::vec3 min = position - LEAF_NODE_SCALE * 0.5f;
+            float size = float(LEAF_NODE_SCALE);
+            bool empty = true;
+            for (int x = 0; x < BRICK_SIZE; ++x) {
+                for (int y = 0; y < BRICK_SIZE; ++y) {
+                    for (int z = 0; z < BRICK_SIZE; ++z) {
+                        glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
+                        glm::vec3 p = min + t01 * size;
+                        float val = SampleDensity(noise, p);
+                        uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                        if (val <= 0.0f) {
+                            tempBrick->data[index] = 0xff0000;
+                            empty = false;
+                        } else
+                            tempBrick->data[index] = 0;
+                    }
                 }
             }
-        }
-        if (!empty) {
-            octree->Insert(tempBrick);
-            std::vector<glm::vec4> voxels;
-            octree->GenerateVoxels(voxels);
-            voxelCount = static_cast<uint32_t>(voxels.size());
-            if (voxels.size() > 0)
-                glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
-        }
+            if (!empty) {
+                octree->Insert(tempBrick);
+                std::vector<glm::vec4> voxels;
+                octree->GenerateVoxels(voxels);
+                voxelCount = static_cast<uint32_t>(voxels.size());
+                if (voxels.size() > 0)
+                    glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
+            }
+        } else
+            break;
     }
 }
 
@@ -204,6 +222,11 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
+    if (loadList.size() == 0) {
+        octree->Serialize("../../scene.octree");
+    }
+    delete octree;
+
     fullscreenShader.Destroy();
     gfx::DestroyBuffer(instanceBuffer);
     delete cubeMesh;

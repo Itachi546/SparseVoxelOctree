@@ -11,6 +11,7 @@ namespace gfx {
 
 struct Octree;
 struct OctreeBrick;
+class FastNoiseLite;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -42,6 +43,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     gfx::Camera *camera;
     Octree *octree;
+    FastNoiseLite *noise;
 
     bool mouseDown;
     glm::vec2 mouseDelta;

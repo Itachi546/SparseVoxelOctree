@@ -31,13 +31,16 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 
+
 set(PROJECT_LIBRARIES 
     glad::glad
     glm::glm
     glfw)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})
-target_include_directories(${PROJECT_NAME} PRIVATE src/)
+target_include_directories(${PROJECT_NAME} PRIVATE 
+        src/
+        external/)
 target_compile_definitions(${PROJECT_NAME} PRIVATE   
         GLM_FORCE_XYZW_ONLY
     ) 
