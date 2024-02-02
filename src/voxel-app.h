@@ -11,7 +11,7 @@ namespace gfx {
 
 struct Octree;
 struct OctreeBrick;
-class FastNoiseLite;
+struct DensityGenerator;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -35,6 +35,8 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void UpdateControls();
 
+    void ProcessLoadList();
+
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Shader fullscreenShader;
@@ -43,7 +45,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     gfx::Camera *camera;
     Octree *octree;
-    FastNoiseLite *noise;
+    DensityGenerator *generator;
 
     bool mouseDown;
     glm::vec2 mouseDelta;

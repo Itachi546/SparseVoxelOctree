@@ -12,6 +12,7 @@ SET(PROJECT_SOURCE_FILES
                   "src/main.cpp"
                   "src/gfx/mesh.cpp"
                   "src/gfx/camera.cpp"
+                  "src/gfx/debug.cpp"
                   "src/voxels/octree.cpp"
                   "src/utils.cpp"
                   "src/voxel-app.cpp")
@@ -21,7 +22,9 @@ SET (PROJECT_HEADER_FILES
                    "src/utils.h"
                    "src/gfx/camera.h"
                    "src/math-utils.h"
+                   "src/gfx/debug.h"
                    "src/voxels/octree.h"
+                   "src/voxels/density-generator.h"
                    "src/gfx/mesh.h"
                    "src/voxel-app.h")
 

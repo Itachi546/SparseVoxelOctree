@@ -1,5 +1,7 @@
 #include "octree.h"
 
+#include "density-generator.h"
+
 #include <iostream>
 #include <fstream>
 
@@ -84,11 +86,11 @@ uint32_t Octree::FindRegion(const glm::vec3 &center, float size, const glm::vec3
     return ~0u;
 }
 
-void Octree::GenerateVoxels(std::vector<glm::vec4> &voxels) {
-    GenerateVoxels(center, size, 0, voxels);
+void Octree::ListVoxels(std::vector<glm::vec4> &voxels) {
+    ListVoxels(center, size, 0, voxels);
 }
 
-void Octree::GenerateVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels) {
+void Octree::ListVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels) {
     Node node = nodePools[parent];
     uint32_t nodeMask = node.GetNodeMask();
     float halfSize = size * 0.5f;
@@ -97,17 +99,17 @@ void Octree::GenerateVoxels(const glm::vec3 &center, float size, uint32_t parent
         uint32_t firstChild = node.GetChildPtr();
         for (int i = 0; i < 8; ++i) {
             glm::vec3 childPos = center + DIRECTIONS[i] * halfSize;
-            GenerateVoxels(childPos, halfSize, firstChild + i, voxels);
+            ListVoxels(childPos, halfSize, firstChild + i, voxels);
         }
     } else if (nodeMask == NodeMask::LeafNode) {
         voxels.push_back(glm::vec4(center, size));
     } else if (nodeMask == NodeMask::LeafNodeWithPtr) {
         uint32_t brickPtr = node.GetChildPtr() * BRICK_ELEMENT_COUNT;
-        GenerateVoxelsFromBrick(center, brickPtr, voxels);
+        ListVoxelsFromBrick(center, brickPtr, voxels);
     }
 }
 
-void Octree::GenerateVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels) {
+void Octree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels) {
     float voxelHalfSize = (LEAF_NODE_SCALE / float(BRICK_SIZE)) * 0.5f;
     glm::vec3 min = center - LEAF_NODE_SCALE * 0.5f;
     float size = float(LEAF_NODE_SCALE);
@@ -125,6 +127,80 @@ void Octree::GenerateVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr,
             }
         }
     }
+}
+
+bool Octree::IsRegionEmpty(DensityGenerator *generator, const glm::vec3 &min, const glm::vec3 &max) {
+    glm::vec3 size = max - min;
+    for (int x = 0; x < BRICK_SIZE; ++x) {
+        for (int y = 0; y < BRICK_SIZE; ++y) {
+            for (int z = 0; z < BRICK_SIZE; ++z) {
+                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
+                glm::vec3 p = min + t01 * size;
+                float val = generator->Sample(p);
+                uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                if (val <= 0.0f) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void Octree::Generate(DensityGenerator *generator) {
+    Generate(generator, center, size, 0);
+}
+
+void Octree::Generate(DensityGenerator *generator, const glm::vec3 &center, float size, uint32_t parent) {
+    /*
+    if (brickPools.size() > 0 || nodePools.size() > 0) {
+        std::cerr << "Octree is already initialized" << std::endl;
+        return;
+    }
+    */
+    if (size < LEAF_NODE_SCALE) {
+        OctreeBrick brick;
+        glm::vec3 min = center - LEAF_NODE_SCALE * 0.5f;
+        float size = float(LEAF_NODE_SCALE);
+        bool empty = true;
+        for (int x = 0; x < BRICK_SIZE; ++x) {
+            for (int y = 0; y < BRICK_SIZE; ++y) {
+                for (int z = 0; z < BRICK_SIZE; ++z) {
+                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
+                    glm::vec3 p = min + t01 * size;
+                    float val = generator->Sample(p);
+                    uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                    if (val <= 0.0f) {
+                        brick.data[index] = 0xff0000;
+                        empty = false;
+                    } else
+                        brick.data[index] = 0;
+                }
+            }
+        }
+        brick.position = center;
+        if (empty)
+            nodePools[parent] = CreateNode(NodeMask::InternalLeafNode);
+        else
+            InsertBrick(parent, &brick);
+        return;
+    }
+
+    glm::vec3 min = center - size;
+    if (!IsRegionEmpty(generator, center - size, center + size)) {
+        CreateChildren(parent);
+        float halfSize = size * 0.5f;
+
+        uint32_t firstChild = nodePools[parent].GetChildPtr();
+        for (int i = 0; i < 8; ++i) {
+            glm::vec3 childPos = center + DIRECTIONS[i] * halfSize;
+            Generate(generator, childPos, halfSize, firstChild + i);
+        }
+    } else
+        nodePools[parent] = CreateNode(NodeMask::InternalLeafNode);
+}
+
+void Octree::Raycast(const Ray &ray) {
 }
 
 Octree::Octree(const char *filename) {

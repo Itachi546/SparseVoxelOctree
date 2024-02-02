@@ -12,9 +12,11 @@ float getColor(vec2 uv) {
    uv = 1.0 - abs(uv);
    uv = smoothstep(threshold + edge, threshold - edge, fract(uv));
    return (1.0 - uv.x) * (1.0 - uv.y);
+   
 }
 
 void main() {
    vec3 col = vec3(getColor(vUV)) * (vNormal * 0.5 + 0.5);
+   //vec3 col = vec3(getColor(vUV));
    fragColor = vec4(col, 1.0f);
 }

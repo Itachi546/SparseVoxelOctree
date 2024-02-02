@@ -4,6 +4,8 @@
 #include <array>
 #include "math-utils.h"
 
+struct DensityGenerator;
+
 constexpr glm::vec3 DIRECTIONS[] = {
     glm::vec3(-1.0f, -1.0f, -1.0f), // 0 0 0
     glm::vec3(1.0f, -1.0f, -1.0f),  // 0 0 1
@@ -67,7 +69,11 @@ struct Octree {
 
     void Insert(OctreeBrick *brick);
 
-    void GenerateVoxels(std::vector<glm::vec4> &voxels);
+    void ListVoxels(std::vector<glm::vec4> &voxels);
+
+    void Generate(DensityGenerator *generator);
+
+    void Raycast(const Ray &ray);
 
     void Serialize(const char *filename);
 
@@ -84,6 +90,10 @@ struct Octree {
     void InsertBrick(uint32_t parent, OctreeBrick *brick);
     uint32_t FindRegion(const glm::vec3 &center, float size, const glm::vec3 &p);
 
-    void GenerateVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels);
-    void GenerateVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels);
+    void ListVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels);
+    void ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels);
+
+    void Generate(DensityGenerator *generator, const glm::vec3 &min, float size, uint32_t parent);
+
+    bool IsRegionEmpty(DensityGenerator *generator, const glm::vec3 &min, const glm::vec3 &max);
 };
