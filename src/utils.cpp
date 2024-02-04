@@ -1,5 +1,8 @@
 #include "utils.h"
 
+#define OGT_VOX_IMPLEMENTATION
+#include "ogt_vox/ogt_vox.h"
+
 #include <fstream>
 #include <assert.h>
 #include <iostream>

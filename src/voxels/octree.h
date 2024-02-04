@@ -4,7 +4,7 @@
 #include <array>
 #include "math-utils.h"
 
-struct DensityGenerator;
+struct VoxelData;
 
 constexpr glm::vec3 DIRECTIONS[] = {
     glm::vec3(-1.0f, -1.0f, -1.0f), // 0 0 0
@@ -71,9 +71,9 @@ struct Octree {
 
     void ListVoxels(std::vector<glm::vec4> &voxels);
 
-    void Generate(DensityGenerator *generator);
+    void Generate(VoxelData *generator);
 
-    void Raycast(const Ray &ray);
+    bool Raycast(const Ray &ray);
 
     void Serialize(const char *filename);
 
@@ -93,7 +93,8 @@ struct Octree {
     void ListVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels);
     void ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels);
 
-    void Generate(DensityGenerator *generator, const glm::vec3 &min, float size, uint32_t parent);
+    void Generate(VoxelData *generator, const glm::vec3 &min, float size, uint32_t parent);
 
-    bool IsRegionEmpty(DensityGenerator *generator, const glm::vec3 &min, const glm::vec3 &max);
+    bool IsRegionEmpty(VoxelData *generator, const glm::vec3 &min, const glm::vec3 &max);
+    bool Raycast(const Ray &ray, const glm::vec3 &center, float size);
 };

@@ -7,6 +7,7 @@
 #include "gfx/debug.h"
 #include "voxels/octree.h"
 #include "voxels/density-generator.h"
+#include "voxels/voxel-data.h"
 
 #include <thread>
 #include <algorithm>
@@ -33,8 +34,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(MessageCallback, 0);
 
-    fullscreenShader.Create("../../assets/shaders/instanced.vert",
-                            "../../assets/shaders/instanced.frag");
+    fullscreenShader.Create("assets/shaders/instanced.vert",
+                            "assets/shaders/instanced.frag");
 
     Debug::Initialize();
 
@@ -81,11 +82,12 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
                   return length(p0 - camPos) > length(p1 - camPos);
               });
               */
-    generator = new DensityGenerator();
-
+    VoxModelData model;
+    model.Load("assets/models/castle.vox");
     {
+        // generator = new DensityGenerator();
         auto start = std::chrono::high_resolution_clock::now();
-        octree->Generate(generator);
+        octree->Generate(&model);
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
@@ -101,6 +103,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to read/load chunk: " << duration << "ms" << std::endl;
     }
+    model.Destroy();
 #endif
 }
 

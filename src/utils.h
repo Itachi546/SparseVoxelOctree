@@ -11,5 +11,4 @@ namespace utils {
     inline bool HasFlag(T val, T flag) {
         return (val & flag) == flag;
     }
-
 } // namespace utils

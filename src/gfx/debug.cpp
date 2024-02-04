@@ -12,7 +12,8 @@ namespace Debug {
         uint32_t bufferSize = MAX_LINE_COUNT * sizeof(Line);
 
         gLineBuffer = gfx::CreateBuffer(nullptr, bufferSize, GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
-        gLineShader.Create("../../assets/shaders/debug.vert", "../../assets/shaders/debug.frag");
+        gLineShader.Create("assets/shaders/debug.vert",
+                           "assets/shaders/debug.frag");
     }
 
     void InitializeBufferPtr() {

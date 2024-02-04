@@ -1,9 +1,11 @@
 #include "octree.h"
 
-#include "density-generator.h"
+#include "voxel-data.h"
+#include <glm/gtx/component_wise.hpp>
 
 #include <iostream>
 #include <fstream>
+#include <stack>
 
 static Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {
     return Node{childPtr | (nodeMask << 30)};
@@ -129,15 +131,14 @@ void Octree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std
     }
 }
 
-bool Octree::IsRegionEmpty(DensityGenerator *generator, const glm::vec3 &min, const glm::vec3 &max) {
+bool Octree::IsRegionEmpty(VoxelData *voxels, const glm::vec3 &min, const glm::vec3 &max) {
     glm::vec3 size = max - min;
     for (int x = 0; x < BRICK_SIZE; ++x) {
         for (int y = 0; y < BRICK_SIZE; ++y) {
             for (int z = 0; z < BRICK_SIZE; ++z) {
                 glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
                 glm::vec3 p = min + t01 * size;
-                float val = generator->Sample(p);
-                uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                uint32_t val = voxels->Sample(p);
                 if (val <= 0.0f) {
                     return false;
                 }
@@ -147,11 +148,11 @@ bool Octree::IsRegionEmpty(DensityGenerator *generator, const glm::vec3 &min, co
     return true;
 }
 
-void Octree::Generate(DensityGenerator *generator) {
-    Generate(generator, center, size, 0);
+void Octree::Generate(VoxelData *voxels) {
+    Generate(voxels, center, size, 0);
 }
 
-void Octree::Generate(DensityGenerator *generator, const glm::vec3 &center, float size, uint32_t parent) {
+void Octree::Generate(VoxelData *voxels, const glm::vec3 &center, float size, uint32_t parent) {
     /*
     if (brickPools.size() > 0 || nodePools.size() > 0) {
         std::cerr << "Octree is already initialized" << std::endl;
@@ -168,10 +169,10 @@ void Octree::Generate(DensityGenerator *generator, const glm::vec3 &center, floa
                 for (int z = 0; z < BRICK_SIZE; ++z) {
                     glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
                     glm::vec3 p = min + t01 * size;
-                    float val = generator->Sample(p);
+                    uint32_t val = voxels->Sample(p);
                     uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
-                    if (val <= 0.0f) {
-                        brick.data[index] = 0xff0000;
+                    if (val > 0) {
+                        brick.data[index] = val;
                         empty = false;
                     } else
                         brick.data[index] = 0;
@@ -187,20 +188,72 @@ void Octree::Generate(DensityGenerator *generator, const glm::vec3 &center, floa
     }
 
     glm::vec3 min = center - size;
-    if (!IsRegionEmpty(generator, center - size, center + size)) {
+    if (!IsRegionEmpty(voxels, center - size, center + size)) {
         CreateChildren(parent);
         float halfSize = size * 0.5f;
 
         uint32_t firstChild = nodePools[parent].GetChildPtr();
         for (int i = 0; i < 8; ++i) {
             glm::vec3 childPos = center + DIRECTIONS[i] * halfSize;
-            Generate(generator, childPos, halfSize, firstChild + i);
+            Generate(voxels, childPos, halfSize, firstChild + i);
         }
     } else
         nodePools[parent] = CreateNode(NodeMask::InternalLeafNode);
 }
 
-void Octree::Raycast(const Ray &ray) {
+/*
+ * p = r0 + t * rd
+ * t = (p - r0) / rd
+ */
+inline uint32_t dir2Index(glm::vec3 dir) {
+    dir = dir * 0.5f + 0.5f;
+    return int(dir.z) << 2 | int(dir.y) << 1 | int(dir.x);
+}
+
+bool Octree::Raycast(const Ray &ray) {
+    // @TODO handle divide by zero
+    glm::vec3 invRd = 1.0f / (ray.direction + EPSILON);
+    glm::vec3 r0_rd = ray.origin / ray.direction;
+
+    glm::vec3 min = center - size;
+    glm::vec3 max = center + size;
+    glm::vec3 tMin = min * invRd - r0_rd;
+    glm::vec3 tMax = max * invRd - r0_rd;
+    glm::vec2 t = {glm::compMax(tMin), glm::compMin(tMax)};
+
+    if (t.x > t.y || t.y < 0.0f)
+        return false;
+
+    float h = t.y;
+    glm::vec3 tMid = (tMin + tMax) * 0.5f;
+
+    // Find entry node
+    glm::vec3 idx = glm::mix(-glm::sign(ray.direction), glm::sign(ray.direction), glm::lessThanEqual(tMid, glm::vec3(t.x)));
+    size *= 0.5f;
+    glm::vec3 p = min + size * idx * 0.5f;
+    int nodeId = dir2Index(idx);
+
+    const int MAX_ITERATION = 1000;
+    float currentSize = size;
+    for (int i = 0; i < MAX_ITERATION; ++i) {
+        float tCorner = glm::compMin(p * invRd - r0_rd);
+        Node node = nodePools[nodeId];
+        uint32_t nodeMask = node.GetNodeMask();
+
+        if (nodeMask == NodeMask::LeafNode || nodeMask == NodeMask::LeafNodeWithPtr) {
+            // @TODO calculate normals or brick march
+            break;
+        } else if (node.GetNodeMask() == NodeMask::InternalNode) {
+            // @TODO we need to skip the node behind the camera
+            // Push
+
+            continue;
+        }
+
+        // Advance
+
+        // Pop
+    }
 }
 
 Octree::Octree(const char *filename) {
