@@ -3,6 +3,7 @@
 #include "voxel-data.h"
 #include <glm/gtx/component_wise.hpp>
 
+#include <execution>
 #include <iostream>
 #include <fstream>
 #include <stack>
@@ -152,6 +153,26 @@ void Octree::Generate(VoxelData *voxels) {
     Generate(voxels, center, size, 0);
 }
 
+bool Octree::CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size) {
+    bool empty = true;
+    for (int x = 0; x < BRICK_SIZE; ++x) {
+        for (int y = 0; y < BRICK_SIZE; ++y) {
+            for (int z = 0; z < BRICK_SIZE; ++z) {
+                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
+                glm::vec3 p = min + t01 * size;
+                uint32_t val = voxels->Sample(p);
+                uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                if (val > 0) {
+                    brick->data[index] = val;
+                    empty = false;
+                } else
+                    brick->data[index] = 0;
+            }
+        }
+    }
+    return empty;
+}
+
 void Octree::Generate(VoxelData *voxels, const glm::vec3 &center, float size, uint32_t parent) {
     /*
     if (brickPools.size() > 0 || nodePools.size() > 0) {
@@ -160,30 +181,14 @@ void Octree::Generate(VoxelData *voxels, const glm::vec3 &center, float size, ui
     }
     */
     if (size < LEAF_NODE_SCALE) {
-        OctreeBrick brick;
         glm::vec3 min = center - LEAF_NODE_SCALE * 0.5f;
         float size = float(LEAF_NODE_SCALE);
-        bool empty = true;
-        for (int x = 0; x < BRICK_SIZE; ++x) {
-            for (int y = 0; y < BRICK_SIZE; ++y) {
-                for (int z = 0; z < BRICK_SIZE; ++z) {
-                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
-                    glm::vec3 p = min + t01 * size;
-                    uint32_t val = voxels->Sample(p);
-                    uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
-                    if (val > 0) {
-                        brick.data[index] = val;
-                        empty = false;
-                    } else
-                        brick.data[index] = 0;
-                }
-            }
-        }
-        brick.position = center;
+        bool empty = CreateBrick(voxels, &temp, min, size);
+        temp.position = center;
         if (empty)
             nodePools[parent] = CreateNode(NodeMask::InternalLeafNode);
         else
-            InsertBrick(parent, &brick);
+            InsertBrick(parent, &temp);
         return;
     }
 

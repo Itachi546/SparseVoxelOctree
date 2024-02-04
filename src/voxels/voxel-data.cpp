@@ -5,7 +5,9 @@
 
 #include <iostream>
 
-void VoxModelData::Load(const char *filename) {
+void VoxModelData::Load(const char *filename, float scale) {
+    this->scale = scale;
+
     FILE *fp;
     if (fopen_s(&fp, filename, "rb") != 0) {
         std::cerr << "Failed to read file: " << filename << std::endl;
@@ -30,16 +32,12 @@ void VoxModelData::Load(const char *filename) {
     for (uint32_t i = 0; i < scene->num_models; ++i) {
         const ogt_vox_model *model = scene->models[i];
         const ogt_vox_instance *instance = (scene->instances + i);
-        std::cout << "Position[" << instance->transform.m30 << "," << instance->transform.m31 << "," << instance->transform.m32 << "]" << std::endl;
-        std::cout << "Scale[" << instance->transform.m00 << "," << instance->transform.m11 << "," << instance->transform.m22 << "]" << std::endl;
-        std::cout << model->size_x << " " << model->size_y << " " << model->size_z << std::endl;
 
-        glm::vec3 p = glm::vec3(instance->transform.m30, instance->transform.m31, instance->transform.m32);
-        glm::vec3 size = glm::vec3{model->size_x, model->size_y, model->size_z} - 1.0f;
-        min = glm::min(min, p);
-        max = glm::max(max, p + size);
+        glm::vec3 currentMin = glm::vec3(instance->transform.m30, instance->transform.m31, instance->transform.m32);
+        glm::vec3 currentMax = currentMin + glm::vec3{model->size_x, model->size_y, model->size_z};
+        min = glm::min(min, currentMin);
+        max = glm::max(max, currentMax);
     }
-
     translation = (min + max) * 0.5f;
 }
 
@@ -48,18 +46,22 @@ uint32_t packColor(ogt_vox_rgba color) {
 }
 
 uint32_t VoxModelData::Sample(glm::vec3 p) {
+    p = {p.x, -p.z, p.y};
     for (uint32_t i = 0; i < scene->num_models; ++i) {
-        p = {p.x, -p.z, p.y};
         const ogt_vox_model *model = scene->models[i];
         const ogt_vox_instance *instance = (scene->instances + i);
 
-        AABB aabb;
-        aabb.min = glm::vec3(instance->transform.m30, instance->transform.m31, instance->transform.m32) - translation;
-        aabb.max = aabb.min + glm::vec3{model->size_x, model->size_y, model->size_z} - 1.0f;
-        int maxIndex = model->size_x * model->size_y * model->size_z;
+        glm::vec3 min = glm::vec3(instance->transform.m30, instance->transform.m31, instance->transform.m32) - translation;
+        glm::vec3 size = glm::vec3{model->size_x, model->size_y, model->size_z};
 
+        AABB aabb = {
+            min * scale,
+            (min + size - 0.1f) * scale};
+
+        int maxIndex = model->size_x * model->size_y * model->size_z;
         if (aabb.ContainPoint(p)) {
-            glm::ivec3 ip = static_cast<glm::ivec3>(glm::floor(p) - aabb.min);
+            glm::vec3 p01 = (p - aabb.min) / (aabb.CalculateSize());
+            glm::ivec3 ip = static_cast<glm::ivec3>(glm::floor(p01 * size));
             int index = ip.x + (ip.y * model->size_x) + (ip.z * model->size_x * model->size_y);
             assert(index >= 0 && index <= maxIndex);
             uint8_t color = model->voxel_data[index];

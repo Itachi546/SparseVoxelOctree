@@ -6,7 +6,7 @@ namespace Debug {
     static uint32_t gLineBufferOffset = 0;
     static Line *gLineBufferPtr = nullptr;
     static gfx::Shader gLineShader;
-    static const int MAX_LINE_COUNT = 100'000;
+    static const int MAX_LINE_COUNT = 100'00'000;
 
     void Initialize() {
         uint32_t bufferSize = MAX_LINE_COUNT * sizeof(Line);

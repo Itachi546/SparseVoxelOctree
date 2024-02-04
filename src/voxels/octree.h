@@ -97,4 +97,8 @@ struct Octree {
 
     bool IsRegionEmpty(VoxelData *generator, const glm::vec3 &min, const glm::vec3 &max);
     bool Raycast(const Ray &ray, const glm::vec3 &center, float size);
+
+    bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
+
+    OctreeBrick temp;
 };

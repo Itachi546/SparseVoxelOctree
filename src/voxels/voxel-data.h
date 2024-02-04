@@ -13,7 +13,7 @@ struct VoxelData {
 
 struct VoxModelData : public VoxelData {
 
-    void Load(const char *filename);
+    void Load(const char *filename, float scale = 1.0f);
 
     uint32_t Sample(glm::vec3 p) override;
 
@@ -22,4 +22,5 @@ struct VoxModelData : public VoxelData {
     ogt_vox_scene const *scene;
 
     glm::vec3 translation;
+    float scale;
 };

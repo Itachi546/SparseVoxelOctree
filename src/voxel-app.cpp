@@ -55,56 +55,35 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
 
-#if 0
-    octree = new Octree("../../scenex4.octree");
-    std::vector<glm::vec4> voxels;
-    octree->GenerateVoxels(voxels);
-    voxelCount = static_cast<uint32_t>(voxels.size());
-    if (voxels.size() > 0)
-        glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
+#if 1
+    octree = new Octree("suzanne.octree");
 #else
     voxelCount = 0;
-    const uint32_t kOctreeDims = 32;
-    float halfSize = LEAF_NODE_SCALE * 0.5f;
-
+    const uint32_t kOctreeDims = 64;
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
-    /*
-    tempBrick = new OctreeBrick();
-    int DIMS = kOctreeDims / LEAF_NODE_SCALE;
-    for (int x = -DIMS; x < DIMS; ++x)
-        for (int y = -DIMS; y < DIMS; ++y)
-            for (int z = -DIMS; z < DIMS; ++z)
-                loadList.push_back(glm::vec3{x, y, z} * float(LEAF_NODE_SCALE) + halfSize);
-
-    glm::vec3 camPos = camera->GetPosition();
-    std::sort(loadList.begin(), loadList.end(),
-              [&camPos](const glm::vec3 &p0, const glm::vec3 &p1) {
-                  return length(p0 - camPos) > length(p1 - camPos);
-              });
-              */
     VoxModelData model;
-    model.Load("assets/models/castle.vox");
+    model.Load("assets/models/pieta.vox", 0.25f);
     {
-        // generator = new DensityGenerator();
         auto start = std::chrono::high_resolution_clock::now();
         octree->Generate(&model);
+        octree->Serialize("pieta.octree");
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
     }
     {
         auto start = std::chrono::high_resolution_clock::now();
-        std::vector<glm::vec4> voxels;
-        octree->ListVoxels(voxels);
-        voxelCount = static_cast<uint32_t>(voxels.size());
-        if (voxels.size() > 0)
-            glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to read/load chunk: " << duration << "ms" << std::endl;
     }
     model.Destroy();
 #endif
+    std::vector<glm::vec4> voxels;
+    octree->ListVoxels(voxels);
+    voxelCount = static_cast<uint32_t>(voxels.size());
+    if (voxels.size() > 0)
+        glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
 }
 
 void VoxelApp::Run() {
@@ -132,7 +111,7 @@ void VoxelApp::Run() {
         mouseDelta = {0.0f, 0.0f};
     }
 }
-
+/*
 void VoxelApp::ProcessLoadList() {
     const uint32_t kNumLoadWork = 8;
     for (uint32_t workCount = 0; workCount < kNumLoadWork && loadList.size() > 0; ++workCount) {
@@ -167,13 +146,13 @@ void VoxelApp::ProcessLoadList() {
     if (voxels.size() > 0)
         glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
 }
-
+*/
 void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
-    if (loadList.size() > 0)
-        ProcessLoadList();
+    // if (loadList.size() > 0)
+    // ProcessLoadList();
 
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
 }
@@ -247,9 +226,6 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
-    if (loadList.size() == 0) {
-        octree->Serialize("../../scenex4.octree");
-    }
     delete octree;
 
     fullscreenShader.Destroy();
