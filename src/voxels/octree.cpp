@@ -1,12 +1,15 @@
 #include "octree.h"
 
 #include "voxel-data.h"
-#include <glm/gtx/component_wise.hpp>
+#include "gfx/debug.h"
 
+#include <glm/gtx/component_wise.hpp>
 #include <execution>
 #include <iostream>
 #include <fstream>
 #include <stack>
+
+#include "gfx/debug.h"
 
 static Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {
     return Node{childPtr | (nodeMask << 30)};
@@ -206,61 +209,6 @@ void Octree::Generate(VoxelData *voxels, const glm::vec3 &center, float size, ui
         nodePools[parent] = CreateNode(NodeMask::InternalLeafNode);
 }
 
-/*
- * p = r0 + t * rd
- * t = (p - r0) / rd
- */
-inline uint32_t dir2Index(glm::vec3 dir) {
-    dir = dir * 0.5f + 0.5f;
-    return int(dir.z) << 2 | int(dir.y) << 1 | int(dir.x);
-}
-
-bool Octree::Raycast(const Ray &ray) {
-    // @TODO handle divide by zero
-    glm::vec3 invRd = 1.0f / (ray.direction + EPSILON);
-    glm::vec3 r0_rd = ray.origin / ray.direction;
-
-    glm::vec3 min = center - size;
-    glm::vec3 max = center + size;
-    glm::vec3 tMin = min * invRd - r0_rd;
-    glm::vec3 tMax = max * invRd - r0_rd;
-    glm::vec2 t = {glm::compMax(tMin), glm::compMin(tMax)};
-
-    if (t.x > t.y || t.y < 0.0f)
-        return false;
-
-    float h = t.y;
-    glm::vec3 tMid = (tMin + tMax) * 0.5f;
-
-    // Find entry node
-    glm::vec3 idx = glm::mix(-glm::sign(ray.direction), glm::sign(ray.direction), glm::lessThanEqual(tMid, glm::vec3(t.x)));
-    size *= 0.5f;
-    glm::vec3 p = min + size * idx * 0.5f;
-    int nodeId = dir2Index(idx);
-
-    const int MAX_ITERATION = 1000;
-    float currentSize = size;
-    for (int i = 0; i < MAX_ITERATION; ++i) {
-        float tCorner = glm::compMin(p * invRd - r0_rd);
-        Node node = nodePools[nodeId];
-        uint32_t nodeMask = node.GetNodeMask();
-
-        if (nodeMask == NodeMask::LeafNode || nodeMask == NodeMask::LeafNodeWithPtr) {
-            // @TODO calculate normals or brick march
-            break;
-        } else if (node.GetNodeMask() == NodeMask::InternalNode) {
-            // @TODO we need to skip the node behind the camera
-            // Push
-
-            continue;
-        }
-
-        // Advance
-
-        // Pop
-    }
-}
-
 Octree::Octree(const char *filename) {
     std::ifstream inFile(filename, std::ios::binary);
     if (!inFile) {
@@ -298,4 +246,175 @@ void Octree::Serialize(const char *filename) {
     uint32_t brickCount = static_cast<uint32_t>(brickPools.size() / BRICK_ELEMENT_COUNT);
     outFile.write(reinterpret_cast<const char *>(&brickCount), sizeof(uint32_t));
     outFile.write(reinterpret_cast<const char *>(brickPools.data()), sizeof(uint32_t) * brickCount * BRICK_ELEMENT_COUNT);
+}
+
+using namespace glm;
+int FindEntryNode(vec3 &p, float scale, float t, vec3 tM) {
+    ivec3 mask = vec3(step(vec3(t), tM));
+    p -= glm::vec3(mask) * scale;
+    return mask.x | (mask.y << 1) | (mask.z << 2);
+}
+
+#define REFLECT(p, c) 2.0f * c - p
+struct StackData {
+    vec3 position;
+    uint firstSibling;
+    int idx;
+    float tMax;
+    float size;
+};
+
+glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
+    if (dir.x < 0.0) {
+        p.x = REFLECT(p.x, c.x);
+    }
+    if (dir.y < 0.0) {
+        p.y = REFLECT(p.y, c.y);
+    }
+    if (dir.z < 0.0) {
+        p.z = REFLECT(p.z, c.z);
+    }
+    return p;
+}
+
+bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::vector<AABB> &aabb) {
+    vec3 r0_orig = r0;
+    int octaneMask = 7;
+    if (rd.x < 0.0) {
+        octaneMask ^= 1;
+        r0.x = REFLECT(r0.x, center.x);
+    }
+    if (rd.y < 0.0) {
+        octaneMask ^= 2;
+        r0.y = REFLECT(r0.y, center.y);
+    }
+    if (rd.z < 0.0) {
+        octaneMask ^= 4;
+        r0.z = REFLECT(r0.z, center.z);
+    }
+
+    vec3 d = abs(rd);
+    vec3 invRayDir = 1.0f / (d + EPSILON);
+    vec3 r0_rd = r0 * invRayDir;
+
+    glm::vec3 aabbMin = center - size;
+    glm::vec3 aabbMax = center + size;
+    vec3 tMin = aabbMin * invRayDir - r0_rd;
+    vec3 tMax = aabbMax * invRayDir - r0_rd;
+
+    vec2 t = vec2(max(tMin.x, max(tMin.y, tMin.z)), min(tMax.x, min(tMax.y, tMax.z)));
+    if (t.x > t.y || t.y < 0.0)
+        return false;
+
+    float currentSize = size;
+
+    // Determine Entry Node
+    vec3 p = aabbMax;
+    vec3 tM = (tMin + tMax) * 0.5f;
+
+    bool processChild = true;
+    int idx = FindEntryNode(p, currentSize, t.x, tM);
+
+    uint32_t firstSibling = nodePools[0].GetChildPtr();
+    vec3 col = vec3(0.5, 0.7, 1.0);
+    vec3 n = vec3(0.0);
+    int i = 0;
+    std::stack<StackData> stacks;
+
+    // @TEMP
+    bool hasIntersect = false;
+    for (; i < 1000; ++i) {
+        {
+            glm::vec3 dMin = Reflect(p - currentSize, center, rd);
+            glm::vec3 dMax = Reflect(p, center, rd);
+            aabb.emplace_back(AABB{dMin, dMax});
+        }
+
+        uint32_t nodeIndex = firstSibling + (idx ^ octaneMask);
+        Node nodeDescriptor = nodePools[nodeIndex];
+        vec3 tCorner = p * invRayDir - r0_rd;
+        float tcMax = min(min(tCorner.x, tCorner.y), tCorner.z);
+
+        if (processChild) {
+            uint32_t mask = nodeDescriptor.GetNodeMask();
+            if (mask == LeafNode) {
+                intersection = r0_orig + t.x * rd;
+                hasIntersect = true;
+                break;
+            } else if (mask == LeafNodeWithPtr) {
+                intersection = r0_orig + t.x * rd;
+                // BrickMarch
+                // if intersect break
+                hasIntersect = true;
+                break;
+            }
+
+            if (mask == InternalNode) {
+
+                // Intersect with t-span of cube
+                float tvMax = min(t.y, tcMax);
+                float halfSize = currentSize * 0.5f;
+                vec3 tCenter = (p - halfSize) * invRayDir - r0_rd;
+
+                if (t.x <= tvMax) {
+                    StackData stackData;
+                    stackData.position = p;
+                    stackData.firstSibling = firstSibling;
+                    stackData.idx = idx;
+                    stackData.tMax = t.y;
+                    stackData.size = currentSize;
+                    stacks.push(stackData);
+                }
+
+                // Find Entry Node
+                currentSize = halfSize;
+                idx = FindEntryNode(p, currentSize, t.x, tCenter);
+                firstSibling = nodeDescriptor.GetChildPtr();
+                t.y = tvMax;
+                continue;
+            }
+        }
+        processChild = true;
+
+        // Advance
+        int lastSibling = idx ^ octaneMask;
+        ivec3 stepDir = ivec3(step(tCorner, vec3(tcMax)));
+        int stepMask = stepDir.x | (stepDir.y << 1) | (stepDir.z << 2);
+        p += glm::vec3(stepDir) * currentSize;
+        t.x = tcMax;
+        idx ^= stepMask;
+        // If the idx is set for corresponding direction and stepMask is also
+        // in same direction then we are exiting parent
+        // E.g.
+        /*
+         * +-----------+
+         * |  10 |  11 |
+         * +-----------+
+         * |  00 |  01 |
+         * +-----------+
+         * if we are currently at 10 and stepMask is 01
+         *  Conclusion: Valid because X is currently 0 and can take the step to 11
+         * if we are currently at 10 and stepMask is 10
+         *  Conclusion: Invalid because we have already taken a step in Y-Axis
+         */
+
+        if ((idx & stepMask) != 0) {
+            // Pop operation
+            if (stacks.size() > 0) {
+                StackData stackData = stacks.top();
+                stacks.pop();
+                p = stackData.position;
+                firstSibling = stackData.firstSibling;
+                t.y = stackData.tMax;
+                idx = stackData.idx;
+                currentSize = stackData.size;
+            } else
+                currentSize = currentSize * 2.0f;
+            processChild = false;
+        }
+
+        if (currentSize > size)
+            break;
+    }
+    return hasIntersect;
 }

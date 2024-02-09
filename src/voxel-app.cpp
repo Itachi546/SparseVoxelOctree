@@ -8,6 +8,7 @@
 #include "voxels/octree.h"
 #include "voxels/density-generator.h"
 #include "voxels/voxel-data.h"
+#include "voxels/octree-raycaster.h"
 
 #include <thread>
 #include <algorithm>
@@ -59,14 +60,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     octree = new Octree("suzanne.octree");
 #else
     voxelCount = 0;
-    const uint32_t kOctreeDims = 64;
+    const uint32_t kOctreeDims = 32;
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData model;
-    model.Load("assets/models/pieta.vox", 0.25f);
+    model.Load("assets/models/pieta.vox", 0.4f);
     {
         auto start = std::chrono::high_resolution_clock::now();
         octree->Generate(&model);
-        octree->Serialize("pieta.octree");
+        // octree->Serialize("pieta.octree");
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
@@ -79,11 +80,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     }
     model.Destroy();
 #endif
+
     std::vector<glm::vec4> voxels;
     octree->ListVoxels(voxels);
     voxelCount = static_cast<uint32_t>(voxels.size());
     if (voxels.size() > 0)
         glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
+    raycaster = new OctreeRaycaster();
+    raycaster->Initialize(octree);
 }
 
 void VoxelApp::Run() {
@@ -147,18 +151,56 @@ void VoxelApp::ProcessLoadList() {
         glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
 }
 */
+std::vector<AABB> aabbs;
+int debugIndex = 1;
+struct Key {
+    bool wasDown;
+    bool isDown;
+} keyUp, keyDown;
 void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
+    const glm::vec3 r0 = glm::vec3(32.0f);
+    const glm::vec3 rd = normalize(-r0);
+    Ray ray{r0, rd};
+    /*
+    glm::vec2 mouseCoord = {
+        (mousePos.x / windowSize.x) * 2.0f - 1.0f,
+        1.0f - 2.0f * (mousePos.y / windowSize.y)};
+    camera->GenerateCameraRay(&ray, mouseCoord);
+    */
+    Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
+    glm::vec3 intersection, normal;
+
+    if (octree->Raycast(ray.origin, ray.direction, intersection, normal, aabbs)) {
+        AABB &aabb = aabbs.back();
+        Debug::AddRect(aabb.min, aabb.max, glm::vec3{1.0f});
+    }
+    keyUp.wasDown = keyUp.isDown;
+    keyUp.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_E) == GLFW_PRESS;
+    if (!keyUp.wasDown && keyUp.isDown)
+        debugIndex++;
+
+    keyDown.wasDown = keyDown.isDown;
+    keyDown.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_R) == GLFW_PRESS;
+    if (!keyDown.wasDown && keyDown.isDown)
+        debugIndex--;
+
+    debugIndex = std::min(std::max(debugIndex, 0), (int)aabbs.size() - 1);
+    for (int i = 0; i < debugIndex; ++i) {
+        Debug::AddRect(aabbs[i].min, aabbs[i].max, COLORS[i % 4]);
+    }
+    aabbs.clear();
+
     // if (loadList.size() > 0)
     // ProcessLoadList();
-
-    Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
+    Debug::AddLine(ray.origin, ray.GetPointAt(200.0f));
 }
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
+#if 0
     if (voxelCount > 0) {
         fullscreenShader.Bind();
         fullscreenShader.SetUniformMat4("uVP", &VP[0][0]);
@@ -166,6 +208,9 @@ void VoxelApp::OnRender() {
         cubeMesh->DrawInstanced(voxelCount);
         fullscreenShader.Unbind();
     }
+#else
+    raycaster->Render(camera);
+#endif
     Debug::Render(VP);
 }
 

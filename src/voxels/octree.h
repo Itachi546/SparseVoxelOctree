@@ -73,9 +73,9 @@ struct Octree {
 
     void Generate(VoxelData *generator);
 
-    bool Raycast(const Ray &ray);
-
     void Serialize(const char *filename);
+
+    bool Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::vec3 &normal, std::vector<AABB> &aabb);
 
     std::vector<Node> nodePools;
 
@@ -96,9 +96,7 @@ struct Octree {
     void Generate(VoxelData *generator, const glm::vec3 &min, float size, uint32_t parent);
 
     bool IsRegionEmpty(VoxelData *generator, const glm::vec3 &min, const glm::vec3 &max);
-    bool Raycast(const Ray &ray, const glm::vec3 &center, float size);
 
     bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
-
     OctreeBrick temp;
 };

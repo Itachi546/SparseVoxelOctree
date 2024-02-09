@@ -24,7 +24,7 @@ namespace gfx {
         glGetShaderInfoLog(shader, sizeof(buffer), &length, buffer);
         if (length > 0) {
             std::cerr << "Error loading file: " << file << std::endl;
-            // std::cerr << buffer << std::endl;
+            std::cerr << buffer << std::endl;
             assert(0);
             return InvalidShader;
         }
@@ -93,14 +93,14 @@ namespace gfx {
     void Shader::SetUniformFloat2(const char *name, float *val) {
         GLint location = GetUniformLocation(handle, name);
         if (location != InvalidShaderLocation) {
-            glUniform1fv(location, 2, val);
+            glUniform2fv(location, 1, val);
         }
     }
 
     void Shader::SetUniformFloat3(const char *name, float *val) {
         GLint location = GetUniformLocation(handle, name);
         if (location != InvalidShaderLocation) {
-            glUniform1fv(location, 3, val);
+            glUniform3fv(location, 1, val);
         }
     }
 

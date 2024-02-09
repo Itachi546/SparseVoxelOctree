@@ -12,6 +12,7 @@ namespace gfx {
 struct Octree;
 struct OctreeBrick;
 struct DensityGenerator;
+struct OctreeRaycaster;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -45,6 +46,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     gfx::Camera *camera;
     Octree *octree;
+    OctreeRaycaster *raycaster;
     DensityGenerator *generator;
 
     bool mouseDown;
