@@ -10,6 +10,8 @@
 #include "voxels/voxel-data.h"
 #include "voxels/octree-raycaster.h"
 
+#include <glm/gtx/component_wise.hpp>
+
 #include <thread>
 #include <algorithm>
 
@@ -29,6 +31,39 @@ MessageCallback(GLenum source,
             (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
             type, severity, message);
     assert(0);
+}
+
+std::vector<uint32_t> brick;
+bool RaycastDDA(std::vector<AABB> &aabbs) {
+    // const glm::vec3 r0 = glm::vec3(18.5f, 10.0f, 5.0f);
+    const glm::vec3 r0 = glm::vec3(0.0f, 3.0f, 2.5f);
+    const glm::vec3 rd = normalize(glm::vec3(1.0f, 1.0f, 0.5f));
+    Debug::AddLine(r0, r0 + rd * 30.0f, glm::vec3(1.0f));
+
+    glm::vec3 min = glm::vec3(0.0f);
+    glm::vec3 max = glm::vec3(16.0f);
+    Debug::AddRect(min, max);
+
+    glm::vec3 stepDir = glm::sign(rd);
+    glm::vec3 tStep = 1.0f / (glm::abs(rd) + 0.0001f);
+
+    glm::vec3 fp = r0;
+    glm::vec3 p = glm::floor(r0);
+    glm::vec3 t = (fp - p) * tStep;
+    const int iteration = 20;
+    for (int i = 0; i < iteration; ++i) {
+        glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
+        p += nearestAxis * stepDir;
+        t += nearestAxis * tStep;
+
+        aabbs.push_back(AABB{p, p + 1.0f});
+        if (p.x >= 0.0f && p.x < 16.0f && p.y >= 0.0f && p.y < 16.0f && p.z >= 0.0f && p.z < 16.0f) {
+            uint32_t voxelIndex = int(p.x) * BRICK_SIZE * BRICK_SIZE + int(p.y) * BRICK_SIZE + int(p.z);
+            if (brick[voxelIndex] > 0)
+                return true;
+        }
+    }
+    return false;
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
@@ -56,14 +91,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
 
-#if 1
+#if 0
     octree = new Octree("suzanne.octree");
 #else
     voxelCount = 0;
     const uint32_t kOctreeDims = 32;
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData model;
-    model.Load("assets/models/pieta.vox", 0.4f);
+    model.Load("assets/models/suzanne.vox", 0.4f);
     {
         auto start = std::chrono::high_resolution_clock::now();
         octree->Generate(&model);
@@ -80,8 +115,22 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     }
     model.Destroy();
 #endif
-
     std::vector<glm::vec4> voxels;
+    /*
+     for (int x = 0; x < 16; ++x) {
+         for (int y = 0; y < 16; ++y) {
+             for (int z = 0; z < 16; ++z) {
+                 glm::vec3 p = glm::vec3(x, y, z);
+                 float len = glm::length(p - 8.0f) - 6.0f;
+                 if (len < 0.0f) {
+                     brick.push_back(0xff);
+                     voxels.push_back(glm::vec4(p + 0.5f, 0.5f));
+                 } else
+                     brick.push_back(0);
+             }
+         }
+     }
+     */
     octree->ListVoxels(voxels);
     voxelCount = static_cast<uint32_t>(voxels.size());
     if (voxels.size() > 0)
@@ -115,61 +164,22 @@ void VoxelApp::Run() {
         mouseDelta = {0.0f, 0.0f};
     }
 }
-/*
-void VoxelApp::ProcessLoadList() {
-    const uint32_t kNumLoadWork = 8;
-    for (uint32_t workCount = 0; workCount < kNumLoadWork && loadList.size() > 0; ++workCount) {
-        glm::vec3 position = loadList.back();
-        loadList.pop_back();
-        tempBrick->position = position;
-        glm::vec3 min = position - LEAF_NODE_SCALE * 0.5f;
-        float size = float(LEAF_NODE_SCALE);
-        bool empty = true;
-        for (int x = 0; x < BRICK_SIZE; ++x) {
-            for (int y = 0; y < BRICK_SIZE; ++y) {
-                for (int z = 0; z < BRICK_SIZE; ++z) {
-                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 16.0f;
-                    glm::vec3 p = min + t01 * size;
-                    float val = generator->Sample(p);
-                    uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
-                    if (val <= 0.0f) {
-                        tempBrick->data[index] = 0xff0000;
-                        empty = false;
-                    } else
-                        tempBrick->data[index] = 0;
-                }
-            }
-        }
-        if (!empty) {
-            octree->Insert(tempBrick);
-        }
-    }
-    std::vector<glm::vec4> voxels;
-    octree->ListVoxels(voxels);
-    voxelCount = static_cast<uint32_t>(voxels.size());
-    if (voxels.size() > 0)
-        glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
-}
-*/
+
 std::vector<AABB> aabbs;
 int debugIndex = 1;
 struct Key {
     bool wasDown;
     bool isDown;
-} keyUp, keyDown;
+} keyUp, keyDown, keyHide;
+bool showMesh = true;
+
 void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
-    const glm::vec3 r0 = glm::vec3(32.0f);
+    const glm::vec3 r0 = glm::vec3(35.5f, 30.5f, 30.5f);
     const glm::vec3 rd = normalize(-r0);
     Ray ray{r0, rd};
-    /*
-    glm::vec2 mouseCoord = {
-        (mousePos.x / windowSize.x) * 2.0f - 1.0f,
-        1.0f - 2.0f * (mousePos.y / windowSize.y)};
-    camera->GenerateCameraRay(&ray, mouseCoord);
-    */
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
     glm::vec3 intersection, normal;
 
@@ -177,6 +187,7 @@ void VoxelApp::OnUpdate() {
         AABB &aabb = aabbs.back();
         Debug::AddRect(aabb.min, aabb.max, glm::vec3{1.0f});
     }
+
     keyUp.wasDown = keyUp.isDown;
     keyUp.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_E) == GLFW_PRESS;
     if (!keyUp.wasDown && keyUp.isDown)
@@ -187,21 +198,30 @@ void VoxelApp::OnUpdate() {
     if (!keyDown.wasDown && keyDown.isDown)
         debugIndex--;
 
+    keyHide.wasDown = keyHide.isDown;
+    keyHide.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_H) == GLFW_PRESS;
+    if (!keyHide.wasDown && keyHide.isDown)
+        showMesh = !showMesh;
+
     debugIndex = std::min(std::max(debugIndex, 0), (int)aabbs.size() - 1);
     for (int i = 0; i < debugIndex; ++i) {
         Debug::AddRect(aabbs[i].min, aabbs[i].max, COLORS[i % 4]);
     }
-    aabbs.clear();
+
+    // RaycastDDA(aabbs);
+    // for (int i = 0; i < aabbs.size(); ++i)
+    // Debug::AddRect(aabbs[i].min, aabbs[i].max);
+    // aabbs.clear();
 
     // if (loadList.size() > 0)
     // ProcessLoadList();
-    Debug::AddLine(ray.origin, ray.GetPointAt(200.0f));
+    Debug::AddLine(ray.origin, ray.GetPointAt(200.0f), glm::vec3(1.0f));
 }
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
-#if 0
-    if (voxelCount > 0) {
+#if 1
+    if (voxelCount > 0 && showMesh) {
         fullscreenShader.Bind();
         fullscreenShader.SetUniformMat4("uVP", &VP[0][0]);
         fullscreenShader.SetBuffer(0, instanceBuffer);
@@ -271,7 +291,7 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
-    delete octree;
+    //  delete octree;
 
     fullscreenShader.Destroy();
     gfx::DestroyBuffer(instanceBuffer);

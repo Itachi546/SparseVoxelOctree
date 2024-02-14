@@ -61,6 +61,11 @@ struct OctreeBrick {
     }
 };
 
+struct RayHit {
+    float t;
+    bool intersect;
+};
+
 struct Octree {
 
     Octree(const glm::vec3 &center, float size);
@@ -97,6 +102,7 @@ struct Octree {
 
     bool IsRegionEmpty(VoxelData *generator, const glm::vec3 &min, const glm::vec3 &max);
 
+    RayHit RaycastDDA(const glm::vec3 &intesection, const glm::vec3 &rd, int octaneMask, uint32_t brickStart, std::vector<AABB> &aabbs);
     bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
     OctreeBrick temp;
 };

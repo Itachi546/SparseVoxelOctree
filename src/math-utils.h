@@ -42,6 +42,12 @@ inline float Reflect(float p, float c) {
 }
 
 template <typename T>
+T Remap(T p, T a0, T a1, T b0, T b1) {
+    T t = (p - a0) / (a1 - a0);
+    return b0 + t * (b1 - b0);
+}
+
+template <typename T>
 bool IsBitSet(T data, int index) {
     T mask = 1 << index;
     return (data & mask) == mask;

@@ -277,6 +277,52 @@ glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
     return p;
 }
 
+RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMask, uint32_t brickStart, std::vector<AABB> &aabbs) {
+    glm::vec3 stepDir = glm::sign(rd);
+    glm::vec3 tStep = 1.0f / (rd + EPSILON);
+    glm::vec3 p = glm::floor(r0);
+
+    uint32_t voxelIndex = int(p.x) * BRICK_SIZE * BRICK_SIZE + int(p.y) * BRICK_SIZE + int(p.z);
+    RayHit rayHit = {false, 0.0f};
+    if (brickPools[brickStart + voxelIndex] > 0) {
+        rayHit.intersect = true;
+        rayHit.t = length(p - r0);
+        return rayHit;
+    }
+
+    vec3 t = (1.0f - fract(r0)) * tStep;
+
+    const int iteration = 40;
+
+    for (int i = 0; i < iteration; ++i) {
+        if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
+            break;
+        aabbs.push_back(AABB{p, p + 1.0f});
+
+        glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
+        p += nearestAxis * stepDir;
+        t += nearestAxis * tStep;
+
+        glm::vec3 ip = p;
+
+        if (!IsBitSet<int>(octaneMask, 0))
+            ip.x = 15.0f - ip.x;
+        if (!IsBitSet<int>(octaneMask, 1))
+            ip.y = 15.0f - ip.y;
+        if (!IsBitSet<int>(octaneMask, 2))
+            ip.z = 15.0f - ip.z;
+
+        uint32_t voxelIndex = int(ip.x) * BRICK_SIZE * BRICK_SIZE + int(ip.y) * BRICK_SIZE + int(ip.z);
+        if (brickPools[brickStart + voxelIndex] > 0) {
+            rayHit.intersect = true;
+            vec3 t = (p - r0 - .5f) * tStep;
+            rayHit.t = max(max(t.x, t.y), t.z);
+            break;
+        }
+    }
+    return rayHit;
+}
+
 bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::vector<AABB> &aabb) {
     vec3 r0_orig = r0;
     int octaneMask = 7;
@@ -327,7 +373,7 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
         {
             glm::vec3 dMin = Reflect(p - currentSize, center, rd);
             glm::vec3 dMax = Reflect(p, center, rd);
-            aabb.emplace_back(AABB{dMin, dMax});
+            // aabb.emplace_back(AABB{dMin, dMax});
         }
 
         uint32_t nodeIndex = firstSibling + (idx ^ octaneMask);
@@ -342,11 +388,33 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
                 hasIntersect = true;
                 break;
             } else if (mask == LeafNodeWithPtr) {
-                intersection = r0_orig + t.x * rd;
-                // BrickMarch
-                // if intersect break
-                hasIntersect = true;
-                break;
+                glm::vec3 dMin = Reflect(p - currentSize, center, rd);
+                glm::vec3 dMax = Reflect(p, center, rd);
+                aabb.emplace_back(AABB{dMin, dMax});
+                glm::vec3 intersection = r0 + t.x * d;
+                Debug::AddRect(intersection - 0.05f, intersection + 0.05f, glm::vec3(1.0f));
+                glm::vec3 brickMax = glm::vec3(BRICK_SIZE);
+                glm::vec3 brickPos = Remap(intersection, p - currentSize, p, glm::vec3(0.0f), brickMax);
+                brickPos = glm::max(brickPos, 0.0f);
+                std::vector<AABB> intersectedNodes;
+                RayHit rayHit = RaycastDDA(brickPos, d, octaneMask, nodeDescriptor.GetChildPtr() * BRICK_ELEMENT_COUNT, intersectedNodes);
+                // Check intersection
+                for (auto &grid : intersectedNodes) {
+                    aabb.push_back(AABB{
+                        Reflect(Remap(grid.min, glm::vec3(0.0f), brickMax, p - currentSize, p), center, rd),
+                        Reflect(Remap(grid.max, glm::vec3(0.0f), brickMax, p - currentSize, p), center, rd),
+                    });
+                }
+
+                if (rayHit.intersect) {
+                    // Debug draw nodes
+                    glm::vec3 bP = brickPos + rayHit.t * d;
+                    bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
+                    bP = Reflect(bP, center, rd);
+                    aabb.push_back(AABB{bP, bP + 0.25f});
+                    hasIntersect = true;
+                    break;
+                }
             }
 
             if (mask == InternalNode) {
