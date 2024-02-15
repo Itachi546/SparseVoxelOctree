@@ -282,18 +282,26 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMa
     glm::vec3 tStep = 1.0f / (rd + EPSILON);
     glm::vec3 p = glm::floor(r0);
 
-    uint32_t voxelIndex = int(p.x) * BRICK_SIZE * BRICK_SIZE + int(p.y) * BRICK_SIZE + int(p.z);
+    glm::vec3 ip = p;
+    if (!IsBitSet<int>(octaneMask, 0))
+        ip.x = 15.0f - p.x;
+    if (!IsBitSet<int>(octaneMask, 1))
+        ip.y = 15.0f - p.y;
+    if (!IsBitSet<int>(octaneMask, 2))
+        ip.z = 15.0f - p.z;
+
+    uint32_t voxelIndex = int(ip.x) * BRICK_SIZE * BRICK_SIZE + int(ip.y) * BRICK_SIZE + int(ip.z);
     RayHit rayHit = {false, 0.0f};
     if (brickPools[brickStart + voxelIndex] > 0) {
         rayHit.intersect = true;
-        rayHit.t = length(p - r0);
+        vec3 t = (p - r0) * tStep;
+        rayHit.t = max(max(t.x, t.y), t.z);
         return rayHit;
     }
 
     vec3 t = (1.0f - fract(r0)) * tStep;
 
     const int iteration = 40;
-
     for (int i = 0; i < iteration; ++i) {
         if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
             break;
@@ -304,18 +312,17 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMa
         t += nearestAxis * tStep;
 
         glm::vec3 ip = p;
-
         if (!IsBitSet<int>(octaneMask, 0))
-            ip.x = 15.0f - ip.x;
+            ip.x = 15.0f - p.x;
         if (!IsBitSet<int>(octaneMask, 1))
-            ip.y = 15.0f - ip.y;
+            ip.y = 15.0f - p.y;
         if (!IsBitSet<int>(octaneMask, 2))
-            ip.z = 15.0f - ip.z;
+            ip.z = 15.0f - p.z;
 
         uint32_t voxelIndex = int(ip.x) * BRICK_SIZE * BRICK_SIZE + int(ip.y) * BRICK_SIZE + int(ip.z);
         if (brickPools[brickStart + voxelIndex] > 0) {
             rayHit.intersect = true;
-            vec3 t = (p - r0 - .5f) * tStep;
+            vec3 t = (p - r0) * tStep;
             rayHit.t = max(max(t.x, t.y), t.z);
             break;
         }
@@ -411,7 +418,7 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
                     glm::vec3 bP = brickPos + rayHit.t * d;
                     bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
                     bP = Reflect(bP, center, rd);
-                    aabb.push_back(AABB{bP, bP + 0.25f});
+                    aabb.push_back(AABB{bP - 0.125f, bP + 0.125f});
                     hasIntersect = true;
                     break;
                 }

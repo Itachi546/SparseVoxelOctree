@@ -177,7 +177,7 @@ void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
-    const glm::vec3 r0 = glm::vec3(35.5f, 30.5f, 30.5f);
+    const glm::vec3 r0 = -glm::vec3(35.5f, 10.5f, 30.5f);
     const glm::vec3 rd = normalize(-r0);
     Ray ray{r0, rd};
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
