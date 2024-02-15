@@ -39,7 +39,6 @@ void Octree::InsertBrick(uint32_t parent, OctreeBrick *brick) {
             uint32_t address = static_cast<uint32_t>((brickPools.size() / BRICK_ELEMENT_COUNT));
             node = CreateNode(NodeMask::LeafNodeWithPtr, address);
         }
-        uint32_t address = nodePools[parent].GetChildPtr();
         brickPools.insert(brickPools.end(), brick->data.begin(), brick->data.end());
     }
     nodePools[parent] = node;
@@ -279,7 +278,7 @@ glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
 
 RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMask, uint32_t brickStart, std::vector<AABB> &aabbs) {
     glm::vec3 stepDir = glm::sign(rd);
-    glm::vec3 tStep = 1.0f / (rd + EPSILON);
+    glm::vec3 tStep = 1.0f / rd;
     glm::vec3 p = glm::floor(r0);
 
     glm::vec3 ip = p;
@@ -303,14 +302,12 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMa
 
     const int iteration = 40;
     for (int i = 0; i < iteration; ++i) {
-        if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
-            break;
-        aabbs.push_back(AABB{p, p + 1.0f});
-
         glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
         p += nearestAxis * stepDir;
         t += nearestAxis * tStep;
-
+        if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
+            break;
+        aabbs.push_back(AABB{p, p + 1.0f});
         glm::vec3 ip = p;
         if (!IsBitSet<int>(octaneMask, 0))
             ip.x = 15.0f - p.x;
@@ -399,7 +396,6 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
                 glm::vec3 dMax = Reflect(p, center, rd);
                 aabb.emplace_back(AABB{dMin, dMax});
                 glm::vec3 intersection = r0 + t.x * d;
-                Debug::AddRect(intersection - 0.05f, intersection + 0.05f, glm::vec3(1.0f));
                 glm::vec3 brickMax = glm::vec3(BRICK_SIZE);
                 glm::vec3 brickPos = Remap(intersection, p - currentSize, p, glm::vec3(0.0f), brickMax);
                 brickPos = glm::max(brickPos, 0.0f);
@@ -418,13 +414,11 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
                     glm::vec3 bP = brickPos + rayHit.t * d;
                     bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
                     bP = Reflect(bP, center, rd);
-                    aabb.push_back(AABB{bP - 0.125f, bP + 0.125f});
+                    aabb.push_back(AABB{bP - 0.05f, bP + 0.05f});
                     hasIntersect = true;
                     break;
                 }
-            }
-
-            if (mask == InternalNode) {
+            } else if (mask == InternalNode) {
 
                 // Intersect with t-span of cube
                 float tvMax = min(t.y, tcMax);

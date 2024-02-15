@@ -4,17 +4,14 @@ layout(location = 0) out vec4 fragColor;
 
 layout(location = 0) in vec2 uv;
 
-layout(binding = 0) readonly buffer NodeBuffer { uint nodePools[]; };
+layout(std430, binding = 0) readonly buffer NodeBuffer { uint nodePools[]; };
+layout(std430, binding = 1) readonly buffer BrickBuffer { uint brickPools[]; };
 
 uniform vec3 uCamPos;
 uniform mat4 uInvP;
 uniform mat4 uInvV;
 uniform vec3 uAABBMin;
 uniform vec3 uAABBMax;
-
-#define EPSILON 10e-7f
-const vec3 ld = normalize(vec3(0.01, 1.0, -0.5));
-#define MAX_ITERATIONS 1000
 
 const int MAX_LEVELS = 10;
 struct StackData {
@@ -32,15 +29,22 @@ void stack_push(StackData data) { stack[stackPtr++] = data; }
 StackData stack_pop() { return stack[--stackPtr]; }
 bool stack_empty() { return stackPtr == 0; }
 
+const vec3 ld = normalize(vec3(0.01, 1.0, -0.5));
 vec3 GenerateCameraRay(vec2 uv) {
     vec4 clipPos = uInvP * vec4(uv, -1.0, 0.0);
     vec4 worldPos = uInvV * vec4(clipPos.x, clipPos.y, -1.0, 0.0);
     return normalize(worldPos.xyz);
 }
 
-#define REFLECT(p, c) 2.0f * c - p
-#define GET_MASK(p) p >> 30
-#define GET_FIRST_CHILD(p) p & 0x3fffffff
+#define EPSILON 10e-7f
+#define MAX_ITERATIONS 1000
+#define BRICK_SIZE 16
+#define BRICK_SIZE2 256
+#define BRICK_SIZE3 4096
+
+#define REFLECT(p, c) (2.0f * c - p)
+#define GET_MASK(p) (p >> 30)
+#define GET_FIRST_CHILD(p) (p & 0x3fffffff)
 #define InternalLeafNode 0
 #define InternalNode 1
 #define LeafNode 2
@@ -52,7 +56,84 @@ int FindEntryNode(inout vec3 p, float scale, float t, vec3 tM) {
     return mask.x | (mask.y << 1) | (mask.z << 2);
 }
 
-bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal) {
+vec3 Remap(vec3 p, vec3 a0, vec3 a1, vec3 b0, vec3 b1) {
+    vec3 t = (p - a0) / (a1 - a0);
+    return b0 + t * (b1 - b0);
+}
+
+bool IsBitSet(int data, int index) {
+    int mask = 1 << index;
+    return (data & mask) == mask;
+}
+
+struct RayHit {
+    float t;
+    bool intersect;
+};
+
+RayHit RaycastDDA(vec3 r0, vec3 rd, int octaneMask, uint brickStart) {
+    vec3 stepDir = sign(rd);
+    vec3 tStep = 1.0f / rd;
+
+    vec3 p = floor(r0);
+
+    vec3 ip = p;
+    if (!IsBitSet(octaneMask, 0))
+        ip.x = 15 - ip.x;
+    if (!IsBitSet(octaneMask, 1))
+        ip.y = 15 - ip.y;
+    if (!IsBitSet(octaneMask, 2))
+        ip.z = 15 - ip.z;
+    uint voxelIndex = brickStart + int(ip.x) * BRICK_SIZE2 + int(ip.y) * BRICK_SIZE + int(ip.z);
+
+    RayHit rayHit;
+    rayHit.intersect = false;
+    rayHit.t = 0.0f;
+
+    if (brickPools[voxelIndex] > 0) {
+        rayHit.intersect = true;
+        vec3 t = (p - r0) * tStep;
+        rayHit.t = max(max(t.x, t.y), t.z);
+        return rayHit;
+    }
+
+    vec3 t = (1.0f - fract(r0)) * tStep;
+    const int iteration = 40;
+    for (int i = 0; i < iteration; ++i) {
+        vec3 nearestAxis = step(t, t.yzx) * step(t, t.zxy);
+        p += nearestAxis * stepDir;
+        t += nearestAxis * tStep;
+        if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
+            break;
+
+        ivec3 ip = ivec3(p);
+        if (!IsBitSet(octaneMask, 0))
+            ip.x = 15 - ip.x;
+        if (!IsBitSet(octaneMask, 1))
+            ip.y = 15 - ip.y;
+        if (!IsBitSet(octaneMask, 2))
+            ip.z = 15 - ip.z;
+
+        uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
+        if (brickPools[voxelIndex] > 0) {
+            rayHit.intersect = true;
+            // vec3 t = (p - r0) * tStep;
+            // rayHit.t = max(max(t.x, t.y), t.z);
+            break;
+        }
+    }
+    return rayHit;
+}
+
+vec3 uintToColor(uint color) {
+    vec3 result = vec3(0.0f);
+    result.x = float(color & 0xff) / 255.0f;
+    result.y = float((color >> 8) & 0xff) / 255.0f;
+    result.z = float((color >> 16) & 0xff) / 255.0f;
+    return result;
+}
+
+bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int iteration) {
     vec3 r0_orig = r0;
     int octaneMask = 7;
     vec3 aabbMin = uAABBMin;
@@ -95,7 +176,7 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal) {
 
     uint firstSibling = GET_FIRST_CHILD(nodePools[0]);
     vec3 col = vec3(0.5, 0.7, 1.0);
-    vec3 n = vec3(0.0);
+    vec3 n = vec3(1.0);
     int i = 0;
 
     bool hasIntersect = false;
@@ -112,14 +193,23 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal) {
                 hasIntersect = true;
                 break;
             } else if (mask == LeafNodeWithPtr) {
-                intersection = r0_orig + t.x * rd;
-                // BrickMarch
-                // if intersect break
-                hasIntersect = true;
-                break;
-            }
-
-            if (mask == InternalNode) {
+                uint brickPointer = GET_FIRST_CHILD(nodeDescriptor) * BRICK_SIZE3;
+                vec3 intersectPos = r0 + t.x * d;
+                vec3 brickMax = vec3(BRICK_SIZE);
+                vec3 brickPos = Remap(intersectPos, p - currentSize, p, vec3(0.0f), brickMax);
+                brickPos = max(brickPos, 0.0f);
+                RayHit rayHit = RaycastDDA(brickPos, d, octaneMask, brickPointer);
+                if (rayHit.intersect) {
+                    // Debug draw nodes
+                    // vec3 bP = brickPos + rayHit.t * d;
+                    // bP = Remap(bP, vec3(0.0f), brickMax, p - currentSize, p);
+                    // bP = REFLECT(bP, center, rd);
+                    // intersection = bP;
+                    normal = vec3(1.0f);
+                    hasIntersect = true;
+                    break;
+                }
+            } else if (mask == InternalNode) {
 
                 // Intersect with t-span of cube
                 float tvMax = min(t.y, tcMax);
@@ -184,6 +274,7 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal) {
         if (currentSize > octreeSize)
             break;
     }
+    iteration = i;
     return hasIntersect;
 }
 
@@ -202,7 +293,8 @@ void main() {
     vec3 n = vec3(0.0f);
     vec3 p = vec3(0.0f);
     vec3 col = vec3(0.0f);
-    if (Trace(r0, rd, p, n)) {
+    int iteration = 0;
+    if (Trace(r0, rd, p, n, iteration)) {
         /*
         vec3 _unused, _unused2;
         stack_reset();
@@ -215,13 +307,13 @@ void main() {
         col /= (1.0 + col);
         // col = vec3(shadow);
         */
-        col = vec3(1.0);
+        col = vec3(n);
     }
 
 #if 1
     fragColor = vec4(col, 1.0f);
 #else
-    float iteration = (float(i) / MAX_ITERATIONS);
-    fragColor = vec4(iteration, iteration, iteration, 1.0);
+    float iter = (float(iteration) / MAX_ITERATIONS);
+    fragColor = vec4(vec3(iter), 1.0);
 #endif
 }

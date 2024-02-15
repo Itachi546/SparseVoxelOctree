@@ -38,6 +38,8 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void ProcessLoadList();
 
+    void DebugRenderOctree(uint32_t width, uint32_t height);
+
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Shader fullscreenShader;

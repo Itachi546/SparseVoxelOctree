@@ -23,6 +23,7 @@ void OctreeRaycaster::Render(gfx::Camera *camera) {
 
     shader.Bind();
     shader.SetBuffer(0, nodesBuffer);
+    shader.SetBuffer(1, brickBuffer);
     shader.SetUniformMat4("uInvP", &invP[0][0]);
     shader.SetUniformMat4("uInvV", &invV[0][0]);
     shader.SetUniformFloat3("uCamPos", &cameraPosition[0]);
@@ -38,4 +39,3 @@ void OctreeRaycaster::Shutdown() {
     gfx::DestroyBuffer(nodesBuffer);
     gfx::DestroyBuffer(brickBuffer);
 }
-

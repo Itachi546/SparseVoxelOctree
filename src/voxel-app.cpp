@@ -66,6 +66,46 @@ bool RaycastDDA(std::vector<AABB> &aabbs) {
     return false;
 }
 
+#include <fstream>
+void VoxelApp::DebugRenderOctree(uint32_t width, uint32_t height) {
+    std::vector<uint8_t> pixels(width * height * 3);
+    uint8_t *p = pixels.data();
+
+    Ray ray;
+    glm::vec3 intersection, normal;
+
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            std::vector<AABB> aabb;
+            glm::vec2 uv = glm::vec2(x / float(width), y / float(height));
+            uv = uv * 2.0f - 1.0f;
+            camera->GenerateCameraRay(&ray, uv);
+            if (octree->Raycast(ray.origin, ray.direction, intersection, normal, aabb)) {
+                *p++ = rand() % 255;
+                *p++ = rand() % 255;
+                *p++ = rand() % 255;
+            } else {
+                *p++ = 0;
+                *p++ = 0;
+                *p++ = 0;
+            }
+        }
+    }
+
+    static unsigned char tga[18];
+    tga[2] = 2;
+    tga[12] = 255 & width;
+    tga[13] = 255 & (width >> 8);
+    tga[14] = 255 & height;
+    tga[15] = 255 & (height >> 8);
+    tga[16] = 24;
+    tga[17] = 32;
+
+    std::ofstream outFile("output.tga", std::ios::binary);
+    outFile.write(reinterpret_cast<const char *>(tga), 18);
+    outFile.write(reinterpret_cast<const char *>(pixels.data()), width * height * 3);
+}
+
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(MessageCallback, 0);
@@ -98,7 +138,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     const uint32_t kOctreeDims = 32;
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData model;
-    model.Load("assets/models/suzanne.vox", 0.4f);
+    model.Load("assets/models/suzanne.vox", 1.0f);
     {
         auto start = std::chrono::high_resolution_clock::now();
         octree->Generate(&model);
@@ -137,6 +177,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree);
+
+    // DebugRenderOctree(1920, 1080);
 }
 
 void VoxelApp::Run() {
@@ -177,9 +219,16 @@ void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
-    const glm::vec3 r0 = -glm::vec3(35.5f, 10.5f, 30.5f);
-    const glm::vec3 rd = normalize(-r0);
-    Ray ray{r0, rd};
+    Ray ray;
+#if 0
+    ray.origin = -glm::vec3(35.5f, 10.5f, 30.5f);
+    ray.direction = normalize(-r0);
+#else
+    glm::vec2 mouseCoord = mousePos / windowSize;
+    mouseCoord.x = mouseCoord.x * 2.0f - 1.0f;
+    mouseCoord.y = 1.0f - 2.0f * mouseCoord.y;
+    camera->GenerateCameraRay(&ray, mouseCoord);
+#endif
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
     glm::vec3 intersection, normal;
 
@@ -211,7 +260,7 @@ void VoxelApp::OnUpdate() {
     // RaycastDDA(aabbs);
     // for (int i = 0; i < aabbs.size(); ++i)
     // Debug::AddRect(aabbs[i].min, aabbs[i].max);
-    // aabbs.clear();
+    aabbs.clear();
 
     // if (loadList.size() > 0)
     // ProcessLoadList();
@@ -220,17 +269,14 @@ void VoxelApp::OnUpdate() {
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
-#if 1
     if (voxelCount > 0 && showMesh) {
         fullscreenShader.Bind();
         fullscreenShader.SetUniformMat4("uVP", &VP[0][0]);
         fullscreenShader.SetBuffer(0, instanceBuffer);
         cubeMesh->DrawInstanced(voxelCount);
         fullscreenShader.Unbind();
-    }
-#else
-    raycaster->Render(camera);
-#endif
+    } else
+        raycaster->Render(camera);
     Debug::Render(VP);
 }
 
