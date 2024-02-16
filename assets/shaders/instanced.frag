@@ -15,7 +15,7 @@ float getColor(vec2 uv) {
 }
 
 void main() {
-    vec3 col = vNormal * 0.5 + 0.5f;
+    vec3 col = (vNormal * 0.5 + 0.5f) * getColor(vUV);
     // vec3 col = vec3(getColor(vUV));
     fragColor = vec4(col, 1.0f);
 }

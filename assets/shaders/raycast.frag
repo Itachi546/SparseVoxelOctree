@@ -72,7 +72,15 @@ struct RayHit {
     float t;
     bool intersect;
     vec3 normal;
+    uint color;
 };
+
+vec3 uintToRGB(uint color) {
+    return vec3((color >> 16) & 0xff,
+                (color >> 8) & 0xff,
+                color & 0xff) /
+           255.0f;
+}
 
 RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     vec3 stepDir = sign(rd);
@@ -92,7 +100,9 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     for (int i = 0; i < iteration; ++i) {
         ivec3 ip = ivec3(mix(15 - p, p, dirMask));
         uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
-        if (brickPools[voxelIndex] > 0) {
+
+        uint color = brickPools[voxelIndex];
+        if (color > 0) {
             vec3 id = p;
             vec3 t = (p - r0) * tStep;
             float tMax = max(max(t.x, t.y), t.z);
@@ -100,6 +110,7 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
             rayHit.normal = -nearestAxis;
             rayHit.t = tMax * INV_LEAF_NODE_SIZE;
             rayHit.intersect = true;
+            rayHit.color = color;
             break;
         }
 
@@ -112,15 +123,7 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     return rayHit;
 }
 
-vec3 uintToColor(uint color) {
-    vec3 result = vec3(0.0f);
-    result.x = float(color & 0xff) / 255.0f;
-    result.y = float((color >> 8) & 0xff) / 255.0f;
-    result.z = float((color >> 16) & 0xff) / 255.0f;
-    return result;
-}
-
-bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int iteration) {
+bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint color, out int iteration) {
     vec3 r0_orig = r0;
     int octaneMask = 7;
     vec3 aabbMin = uAABBMin;
@@ -178,6 +181,7 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int ite
                 intersection = r0_orig + t.x * rd;
                 vec3 dir = p - (r0 + t.x * d);
                 normal = -step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz) * sign(rd);
+                color = GET_FIRST_CHILD(nodeDescriptor);
                 // normal = ((intersection - p - 0.5f) * 2.0f) * sign(rd);
                 hasIntersect = true;
                 break;
@@ -193,6 +197,7 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int ite
                     intersectPos = r0_orig + (t.x + rayHit.t) * rd;
                     normal = rayHit.normal * sign(rd);
                     hasIntersect = true;
+                    color = rayHit.color;
                     break;
                 }
             } else if (mask == InternalNode) {
@@ -264,12 +269,13 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int ite
     return hasIntersect;
 }
 
-vec3 hash33(vec3 p) {
-    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
-             dot(p, vec3(269.5, 183.3, 246.1)),
-             dot(p, vec3(113.5, 271.9, 124.6)));
-
-    return fract(sin(p) * 43758.5453123);
+vec3 ACES(vec3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
 void main() {
@@ -280,20 +286,17 @@ void main() {
     vec3 p = vec3(0.0f);
     vec3 col = vec3(0.5f);
     int iteration = 0;
-    if (Trace(r0, rd, p, n, iteration)) {
-        /*
-        vec3 _unused, _unused2;
-        stack_reset();
-        float shadow = Trace(p + n, ld, _unused, _unused2) ? 0.0f : 1.0f;
-        col = max(dot(n, ld), 0.0) * vec3(1.28, 1.20, 0.99) * shadow;
-        col += (n.y * 0.5 + 0.5) * vec3(0.16, 0.20, 0.28);
-        // col *= (n * 0.5 + 0.5);
-        col *= hash33(floor(p));
+    uint color = 0;
+    if (Trace(r0, rd, p, n, color, iteration)) {
+        vec3 diffuseColor = uintToRGB(color);
+        vec3 ld = normalize(vec3(-0.5f, 1.0f, 0.5f));
+        col = max(dot(n, ld), 0.0f) * vec3(1.) * vec3(1.28, 1.20, 0.99) * diffuseColor;
+        col += (n.y * 0.5f + 0.5f) * 0.2 * vec3(0.16, 0.20, 0.28);
+
+        vec3 h = normalize(ld - rd);
+        col += pow(max(dot(n, h), 0.0f), 32.0f) * vec3(0.16, 0.20, 0.28);
+        col = ACES(col);
         col = pow(col, vec3(0.4545));
-        col /= (1.0 + col);
-        // col = vec3(shadow);
-        */
-        col = normalize(n) * 0.5f + 0.5f;
     }
 
 #if 1

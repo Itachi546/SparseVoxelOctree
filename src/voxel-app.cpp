@@ -132,17 +132,17 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     lastFrameTime = static_cast<float>(glfwGetTime());
 
 #if 1
-    octree = new Octree("pieta.octree");
+    octree = new Octree("monu7x32.octree");
 #else
     voxelCount = 0;
     const uint32_t kOctreeDims = 32;
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData model;
-    model.Load("assets/models/suzanne.vox", 1.0f);
+    model.Load("assets/models/monu7.vox", 0.5f);
     {
         auto start = std::chrono::high_resolution_clock::now();
         octree->Generate(&model);
-        // octree->Serialize("pieta.octree");
+        octree->Serialize("monu7x32.octree");
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
@@ -232,10 +232,7 @@ void VoxelApp::OnUpdate() {
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
     glm::vec3 intersection, normal;
 
-    if (octree->Raycast(ray.origin, ray.direction, intersection, normal, aabbs)) {
-        AABB &aabb = aabbs.back();
-        Debug::AddRect(aabb.min, aabb.max, glm::vec3{1.0f});
-    }
+    octree->Raycast(ray.origin, ray.direction, intersection, normal, aabbs);
 
     keyUp.wasDown = keyUp.isDown;
     keyUp.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_E) == GLFW_PRESS;

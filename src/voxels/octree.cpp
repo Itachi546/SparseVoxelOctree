@@ -33,7 +33,8 @@ void Octree::InsertBrick(uint32_t parent, OctreeBrick *brick) {
         if (mask == NodeMask::LeafNodeWithPtr) {
             // @TODO reuse the free brick
         }
-        node = CreateNode(NodeMask::LeafNode, brick->data[0]);
+        uint32_t color = (brick->data[0] >> 8);
+        node = CreateNode(NodeMask::LeafNode, color);
     } else {
         if (mask == NodeMask::LeafNode || NodeMask::InternalNode) {
             uint32_t address = static_cast<uint32_t>((brickPools.size() / BRICK_ELEMENT_COUNT));
@@ -413,7 +414,7 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
                     // Debug draw nodes
                     glm::vec3 bP = r0_orig + (rayHit.t * 0.25f + t.x) * rd;
                     // bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
-                    //bP = Reflect(bP, center, rd);
+                    // bP = Reflect(bP, center, rd);
                     aabb.push_back(AABB{bP - 0.05f, bP + 0.05f});
                     hasIntersect = true;
                     break;

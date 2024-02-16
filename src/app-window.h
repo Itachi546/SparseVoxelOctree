@@ -12,12 +12,13 @@ template <typename App>
 struct AppWindow {
 
     AppWindow(const char *title, const glm::vec2 &windowSize) : windowSize(windowSize) {
+        glfwWindowHint(GLFW_SAMPLES, 4);
         glfwInit();
 
         glfwWindowPtr = glfwCreateWindow(static_cast<int>(windowSize.x), static_cast<int>(windowSize.y), title, nullptr, nullptr);
         glfwSetWindowUserPointer(glfwWindowPtr, this);
         glfwMakeContextCurrent(glfwWindowPtr);
-        glfwSwapInterval(1);
+        // glfwSwapInterval(1);
 
         glfwSetCursorPosCallback(glfwWindowPtr, [](GLFWwindow *window, double x, double y) {
             auto &app = *reinterpret_cast<App *>(glfwGetWindowUserPointer(window));

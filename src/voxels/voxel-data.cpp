@@ -42,7 +42,7 @@ void VoxModelData::Load(const char *filename, float scale) {
 }
 
 uint32_t packColor(ogt_vox_rgba color) {
-    return color.r << 24 | color.g << 16 | color.b << 8 | color.a;
+    return color.a << 24 | color.r << 16 | color.g << 8 | color.b;
 }
 
 uint32_t VoxModelData::Sample(glm::vec3 p) {
