@@ -50,7 +50,7 @@ bool RaycastDDA(std::vector<AABB> &aabbs) {
     glm::vec3 fp = r0;
     glm::vec3 p = glm::floor(r0);
     glm::vec3 t = (fp - p) * tStep;
-    const int iteration = 20;
+    const int iteration = 40;
     for (int i = 0; i < iteration; ++i) {
         glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
         p += nearestAxis * stepDir;
@@ -131,8 +131,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
 
-#if 0
-    octree = new Octree("suzanne.octree");
+#if 1
+    octree = new Octree("pieta.octree");
 #else
     voxelCount = 0;
     const uint32_t kOctreeDims = 32;
@@ -221,8 +221,8 @@ void VoxelApp::OnUpdate() {
 
     Ray ray;
 #if 0
-    ray.origin = -glm::vec3(35.5f, 10.5f, 30.5f);
-    ray.direction = normalize(-r0);
+    ray.origin = -glm::vec3(10.5f, 10.5f, 10.5f);
+    ray.direction = normalize(-ray.origin);
 #else
     glm::vec2 mouseCoord = mousePos / windowSize;
     mouseCoord.x = mouseCoord.x * 2.0f - 1.0f;

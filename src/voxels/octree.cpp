@@ -411,9 +411,9 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
 
                 if (rayHit.intersect) {
                     // Debug draw nodes
-                    glm::vec3 bP = brickPos + rayHit.t * d;
-                    bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
-                    bP = Reflect(bP, center, rd);
+                    glm::vec3 bP = r0_orig + (rayHit.t * 0.25f + t.x) * rd;
+                    // bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
+                    //bP = Reflect(bP, center, rd);
                     aabb.push_back(AABB{bP - 0.05f, bP + 0.05f});
                     hasIntersect = true;
                     break;

@@ -41,6 +41,8 @@ vec3 GenerateCameraRay(vec2 uv) {
 #define BRICK_SIZE 16
 #define BRICK_SIZE2 256
 #define BRICK_SIZE3 4096
+#define LEAF_NODE_SIZE 4
+#define INV_LEAF_NODE_SIZE 1.0f / float(LEAF_NODE_SIZE)
 
 #define REFLECT(p, c) (2.0f * c - p)
 #define GET_MASK(p) (p >> 30)
@@ -69,58 +71,43 @@ bool IsBitSet(int data, int index) {
 struct RayHit {
     float t;
     bool intersect;
+    vec3 normal;
 };
 
-RayHit RaycastDDA(vec3 r0, vec3 rd, int octaneMask, uint brickStart) {
+RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     vec3 stepDir = sign(rd);
-    vec3 tStep = 1.0f / rd;
+    vec3 tStep = 1.0f / (rd + EPSILON);
 
     vec3 p = floor(r0);
-
-    vec3 ip = p;
-    if (!IsBitSet(octaneMask, 0))
-        ip.x = 15 - ip.x;
-    if (!IsBitSet(octaneMask, 1))
-        ip.y = 15 - ip.y;
-    if (!IsBitSet(octaneMask, 2))
-        ip.z = 15 - ip.z;
-    uint voxelIndex = brickStart + int(ip.x) * BRICK_SIZE2 + int(ip.y) * BRICK_SIZE + int(ip.z);
-
     RayHit rayHit;
     rayHit.intersect = false;
     rayHit.t = 0.0f;
 
-    if (brickPools[voxelIndex] > 0) {
-        rayHit.intersect = true;
-        vec3 t = (p - r0) * tStep;
-        rayHit.t = max(max(t.x, t.y), t.z);
-        return rayHit;
-    }
-
     vec3 t = (1.0f - fract(r0)) * tStep;
     const int iteration = 40;
+
+    vec3 dir = p - r0;
+    vec3 nearestAxis = step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz);
+
     for (int i = 0; i < iteration; ++i) {
-        vec3 nearestAxis = step(t, t.yzx) * step(t, t.zxy);
+        ivec3 ip = ivec3(mix(15 - p, p, dirMask));
+        uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
+        if (brickPools[voxelIndex] > 0) {
+            vec3 id = p;
+            vec3 t = (p - r0) * tStep;
+            float tMax = max(max(t.x, t.y), t.z);
+            vec3 p = r0 + tMax * rd;
+            rayHit.normal = -nearestAxis;
+            rayHit.t = tMax * INV_LEAF_NODE_SIZE;
+            rayHit.intersect = true;
+            break;
+        }
+
+        nearestAxis = step(t, t.yzx) * step(t, t.zxy);
         p += nearestAxis * stepDir;
         t += nearestAxis * tStep;
         if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
             break;
-
-        ivec3 ip = ivec3(p);
-        if (!IsBitSet(octaneMask, 0))
-            ip.x = 15 - ip.x;
-        if (!IsBitSet(octaneMask, 1))
-            ip.y = 15 - ip.y;
-        if (!IsBitSet(octaneMask, 2))
-            ip.z = 15 - ip.z;
-
-        uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
-        if (brickPools[voxelIndex] > 0) {
-            rayHit.intersect = true;
-            // vec3 t = (p - r0) * tStep;
-            // rayHit.t = max(max(t.x, t.y), t.z);
-            break;
-        }
     }
     return rayHit;
 }
@@ -139,7 +126,6 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int ite
     vec3 aabbMin = uAABBMin;
     vec3 aabbMax = uAABBMax;
     vec3 center = (aabbMin + aabbMax) * 0.5f;
-
     if (rd.x < 0.0) {
         octaneMask ^= 1;
         r0.x = REFLECT(r0.x, center.x);
@@ -190,6 +176,9 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int ite
             uint mask = GET_MASK(nodeDescriptor);
             if (mask == LeafNode) {
                 intersection = r0_orig + t.x * rd;
+                vec3 dir = p - (r0 + t.x * d);
+                normal = -step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz) * sign(rd);
+                // normal = ((intersection - p - 0.5f) * 2.0f) * sign(rd);
                 hasIntersect = true;
                 break;
             } else if (mask == LeafNodeWithPtr) {
@@ -198,14 +187,11 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out int ite
                 vec3 brickMax = vec3(BRICK_SIZE);
                 vec3 brickPos = Remap(intersectPos, p - currentSize, p, vec3(0.0f), brickMax);
                 brickPos = max(brickPos, 0.0f);
-                RayHit rayHit = RaycastDDA(brickPos, d, octaneMask, brickPointer);
+                RayHit rayHit = RaycastDDA(brickPos, d, ivec3(greaterThan(rd, vec3(0.0f))), brickPointer);
                 if (rayHit.intersect) {
                     // Debug draw nodes
-                    // vec3 bP = brickPos + rayHit.t * d;
-                    // bP = Remap(bP, vec3(0.0f), brickMax, p - currentSize, p);
-                    // bP = REFLECT(bP, center, rd);
-                    // intersection = bP;
-                    normal = vec3(1.0f);
+                    intersectPos = r0_orig + (t.x + rayHit.t) * rd;
+                    normal = rayHit.normal * sign(rd);
                     hasIntersect = true;
                     break;
                 }
@@ -292,7 +278,7 @@ void main() {
 
     vec3 n = vec3(0.0f);
     vec3 p = vec3(0.0f);
-    vec3 col = vec3(0.0f);
+    vec3 col = vec3(0.5f);
     int iteration = 0;
     if (Trace(r0, rd, p, n, iteration)) {
         /*
@@ -307,7 +293,7 @@ void main() {
         col /= (1.0 + col);
         // col = vec3(shadow);
         */
-        col = vec3(n);
+        col = normalize(n) * 0.5f + 0.5f;
     }
 
 #if 1
