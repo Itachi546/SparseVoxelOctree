@@ -1,5 +1,5 @@
 #include "voxel-app.h"
-
+#include "input.h"
 #include "math-utils.h"
 
 #include "gfx/mesh.h"
@@ -33,77 +33,25 @@ MessageCallback(GLenum source,
     assert(0);
 }
 
-std::vector<uint32_t> brick;
-bool RaycastDDA(std::vector<AABB> &aabbs) {
-    // const glm::vec3 r0 = glm::vec3(18.5f, 10.0f, 5.0f);
-    const glm::vec3 r0 = glm::vec3(0.0f, 3.0f, 2.5f);
-    const glm::vec3 rd = normalize(glm::vec3(1.0f, 1.0f, 0.5f));
-    Debug::AddLine(r0, r0 + rd * 30.0f, glm::vec3(1.0f));
-
-    glm::vec3 min = glm::vec3(0.0f);
-    glm::vec3 max = glm::vec3(16.0f);
-    Debug::AddRect(min, max);
-
-    glm::vec3 stepDir = glm::sign(rd);
-    glm::vec3 tStep = 1.0f / (glm::abs(rd) + 0.0001f);
-
-    glm::vec3 fp = r0;
-    glm::vec3 p = glm::floor(r0);
-    glm::vec3 t = (fp - p) * tStep;
-    const int iteration = 40;
-    for (int i = 0; i < iteration; ++i) {
-        glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
-        p += nearestAxis * stepDir;
-        t += nearestAxis * tStep;
-
-        aabbs.push_back(AABB{p, p + 1.0f});
-        if (p.x >= 0.0f && p.x < 16.0f && p.y >= 0.0f && p.y < 16.0f && p.z >= 0.0f && p.z < 16.0f) {
-            uint32_t voxelIndex = int(p.x) * BRICK_SIZE * BRICK_SIZE + int(p.y) * BRICK_SIZE + int(p.z);
-            if (brick[voxelIndex] > 0)
-                return true;
-        }
+void VoxelApp::LoadFromFile(const char *filename, float scale) {
+    const uint32_t kOctreeDims = 32;
+    octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
+    VoxModelData model;
+    model.Load(filename, scale);
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+        octree->Generate(&model);
+        auto end = std::chrono::high_resolution_clock::now();
+        float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
+        std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
     }
-    return false;
-}
-
-#include <fstream>
-void VoxelApp::DebugRenderOctree(uint32_t width, uint32_t height) {
-    std::vector<uint8_t> pixels(width * height * 3);
-    uint8_t *p = pixels.data();
-
-    Ray ray;
-    glm::vec3 intersection, normal;
-
-    for (uint32_t y = 0; y < height; ++y) {
-        for (uint32_t x = 0; x < width; ++x) {
-            std::vector<AABB> aabb;
-            glm::vec2 uv = glm::vec2(x / float(width), y / float(height));
-            uv = uv * 2.0f - 1.0f;
-            camera->GenerateCameraRay(&ray, uv);
-            if (octree->Raycast(ray.origin, ray.direction, intersection, normal, aabb)) {
-                *p++ = rand() % 255;
-                *p++ = rand() % 255;
-                *p++ = rand() % 255;
-            } else {
-                *p++ = 0;
-                *p++ = 0;
-                *p++ = 0;
-            }
-        }
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+        auto end = std::chrono::high_resolution_clock::now();
+        float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
+        std::cout << "Total time to read/load chunk: " << duration << "ms" << std::endl;
     }
-
-    static unsigned char tga[18];
-    tga[2] = 2;
-    tga[12] = 255 & width;
-    tga[13] = 255 & (width >> 8);
-    tga[14] = 255 & height;
-    tga[15] = 255 & (height >> 8);
-    tga[16] = 24;
-    tga[17] = 32;
-
-    std::ofstream outFile("output.tga", std::ios::binary);
-    outFile.write(reinterpret_cast<const char *>(tga), 18);
-    outFile.write(reinterpret_cast<const char *>(pixels.data()), width * height * 3);
+    model.Destroy();
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
@@ -124,61 +72,24 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     camera = new gfx::Camera();
     camera->SetPosition(glm::vec3{0.0f, 0.0f, 32.0f});
 
-    mouseDown = false;
-    mouseDelta = glm::vec2(0.0f, 0.0f);
-    mousePos = glm::vec2(0.0f, 0.0f);
-
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
+    voxelCount = 0;
 
+    Input::GetInstance()->Initialize();
 #if 1
     octree = new Octree("monu7x32.octree");
 #else
-    voxelCount = 0;
-    const uint32_t kOctreeDims = 32;
-    octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
-    VoxModelData model;
-    model.Load("assets/models/monu7.vox", 0.5f);
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        octree->Generate(&model);
-        octree->Serialize("monu7x32.octree");
-        auto end = std::chrono::high_resolution_clock::now();
-        float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
-        std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
-    }
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        auto end = std::chrono::high_resolution_clock::now();
-        float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
-        std::cout << "Total time to read/load chunk: " << duration << "ms" << std::endl;
-    }
-    model.Destroy();
+    LoadFromFile("monu7x32.vox", 0.5f);
 #endif
+
     std::vector<glm::vec4> voxels;
-    /*
-     for (int x = 0; x < 16; ++x) {
-         for (int y = 0; y < 16; ++y) {
-             for (int z = 0; z < 16; ++z) {
-                 glm::vec3 p = glm::vec3(x, y, z);
-                 float len = glm::length(p - 8.0f) - 6.0f;
-                 if (len < 0.0f) {
-                     brick.push_back(0xff);
-                     voxels.push_back(glm::vec4(p + 0.5f, 0.5f));
-                 } else
-                     brick.push_back(0);
-             }
-         }
-     }
-     */
     octree->ListVoxels(voxels);
     voxelCount = static_cast<uint32_t>(voxels.size());
     if (voxels.size() > 0)
         glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree);
-
-    // DebugRenderOctree(1920, 1080);
 }
 
 void VoxelApp::Run() {
@@ -202,71 +113,48 @@ void VoxelApp::Run() {
         char buffer[64];
         sprintf_s(buffer, "frameTime: %.2fms", dt * 1000.0f);
         glfwSetWindowTitle(glfwWindowPtr, buffer);
-
-        mouseDelta = {0.0f, 0.0f};
     }
 }
-
-std::vector<AABB> aabbs;
-int debugIndex = 1;
-struct Key {
-    bool wasDown;
-    bool isDown;
-} keyUp, keyDown, keyHide;
-bool showMesh = true;
 
 void VoxelApp::OnUpdate() {
     UpdateControls();
     camera->Update(dt);
 
+    Input *input = Input::GetInstance();
+
     Ray ray;
-#if 0
+#if 1
     ray.origin = -glm::vec3(10.5f, 10.5f, 10.5f);
     ray.direction = normalize(-ray.origin);
 #else
-    glm::vec2 mouseCoord = mousePos / windowSize;
-    mouseCoord.x = mouseCoord.x * 2.0f - 1.0f;
-    mouseCoord.y = 1.0f - 2.0f * mouseCoord.y;
+    glm::vec2 mouseCoord = GetNormalizeMouseCoord(input->GetMousePos(), windowSize);
     camera->GenerateCameraRay(&ray, mouseCoord);
 #endif
-    Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
     glm::vec3 intersection, normal;
-
+    std::vector<AABB> aabbs;
+    aabbs.emplace_back(octree->center - octree->size, octree->center + octree->size);
     octree->Raycast(ray.origin, ray.direction, intersection, normal, aabbs);
 
-    keyUp.wasDown = keyUp.isDown;
-    keyUp.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_E) == GLFW_PRESS;
-    if (!keyUp.wasDown && keyUp.isDown)
+    if (input->WasKeyPressed(GLFW_KEY_E))
         debugIndex++;
-
-    keyDown.wasDown = keyDown.isDown;
-    keyDown.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_R) == GLFW_PRESS;
-    if (!keyDown.wasDown && keyDown.isDown)
+    if (input->WasKeyPressed(GLFW_KEY_R))
         debugIndex--;
+    if (input->WasKeyPressed(GLFW_KEY_H))
+        enableRasterizer = !enableRasterizer;
 
-    keyHide.wasDown = keyHide.isDown;
-    keyHide.isDown = glfwGetKey(AppWindow::glfwWindowPtr, GLFW_KEY_H) == GLFW_PRESS;
-    if (!keyHide.wasDown && keyHide.isDown)
-        showMesh = !showMesh;
-
-    debugIndex = std::min(std::max(debugIndex, 0), (int)aabbs.size() - 1);
-    for (int i = 0; i < debugIndex; ++i) {
-        Debug::AddRect(aabbs[i].min, aabbs[i].max, COLORS[i % 4]);
+    if (aabbs.size() > 0) {
+        debugIndex = std::min(std::max(debugIndex, 0u), (uint32_t)aabbs.size() - 1);
+        for (uint32_t i = 0; i < debugIndex; ++i) {
+            Debug::AddRect(aabbs[i].min, aabbs[i].max, COLORS[i % 4]);
+        }
     }
-
-    // RaycastDDA(aabbs);
-    // for (int i = 0; i < aabbs.size(); ++i)
-    // Debug::AddRect(aabbs[i].min, aabbs[i].max);
-    aabbs.clear();
-
-    // if (loadList.size() > 0)
-    // ProcessLoadList();
     Debug::AddLine(ray.origin, ray.GetPointAt(200.0f), glm::vec3(1.0f));
+    input->Update();
 }
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
-    if (voxelCount > 0 && showMesh) {
+    if (voxelCount > 0 && enableRasterizer) {
         fullscreenShader.Bind();
         fullscreenShader.SetUniformMat4("uVP", &VP[0][0]);
         fullscreenShader.SetBuffer(0, instanceBuffer);
@@ -274,28 +162,24 @@ void VoxelApp::OnRender() {
         fullscreenShader.Unbind();
     } else
         raycaster->Render(camera);
+
     Debug::Render(VP);
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
-    mouseDelta = {x - mousePos.x, y - mousePos.y};
-    mousePos = {x, y};
+    Input::GetInstance()->SetMousePos(glm::vec2{x, y});
 }
 
 void VoxelApp::OnMouseScroll(float x, float y) {}
 
 void VoxelApp::OnMouseButton(int button, int action) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (action == GLFW_RELEASE)
-            mouseDown = false;
-        else
-            mouseDown = true;
-    }
+    Input::GetInstance()->SetKeyState(button, action != GLFW_RELEASE);
 }
 
 void VoxelApp::OnKey(int key, int action) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(glfwWindowPtr, true);
+    Input::GetInstance()->SetKeyState(key, action != GLFW_RELEASE);
 }
 
 void VoxelApp::OnResize(float width, float height) {
@@ -310,26 +194,30 @@ void VoxelApp::OnResize(float width, float height) {
 void VoxelApp::UpdateControls() {
 
     const float rotateSpeed = 2.0f;
-    if (mouseDown)
+
+    Input *input = Input::GetInstance();
+    if (input->GetKey(GLFW_MOUSE_BUTTON_LEFT)->isDown) {
+        glm::vec2 mouseDelta = input->GetMouseDelta();
         camera->Rotate(-mouseDelta.y * rotateSpeed, -mouseDelta.x * rotateSpeed, dt);
+    }
 
     float walkSpeed = dt * 4.0f;
-    if (glfwGetKey(glfwWindowPtr, GLFW_KEY_LEFT_SHIFT) != GLFW_RELEASE)
+    if (input->GetKey(GLFW_KEY_LEFT_SHIFT)->isDown)
         walkSpeed *= 4.0f;
 
-    if (glfwGetKey(glfwWindowPtr, GLFW_KEY_W) != GLFW_RELEASE)
+    if (input->GetKey(GLFW_KEY_W)->isDown)
         camera->Walk(-walkSpeed);
-    else if (glfwGetKey(glfwWindowPtr, GLFW_KEY_S) != GLFW_RELEASE)
+    else if (input->GetKey(GLFW_KEY_S)->isDown)
         camera->Walk(walkSpeed);
 
-    if (glfwGetKey(glfwWindowPtr, GLFW_KEY_A) != GLFW_RELEASE)
+    if (input->GetKey(GLFW_KEY_A)->isDown)
         camera->Strafe(-walkSpeed);
-    else if (glfwGetKey(glfwWindowPtr, GLFW_KEY_D) != GLFW_RELEASE)
+    else if (input->GetKey(GLFW_KEY_D)->isDown)
         camera->Strafe(walkSpeed);
 
-    if (glfwGetKey(glfwWindowPtr, GLFW_KEY_1) != GLFW_RELEASE)
+    if (input->GetKey(GLFW_KEY_1)->isDown)
         camera->Lift(walkSpeed);
-    else if (glfwGetKey(glfwWindowPtr, GLFW_KEY_2) != GLFW_RELEASE)
+    else if (input->GetKey(GLFW_KEY_2)->isDown)
         camera->Lift(-walkSpeed);
 }
 

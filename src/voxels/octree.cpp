@@ -378,7 +378,7 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
         {
             glm::vec3 dMin = Reflect(p - currentSize, center, rd);
             glm::vec3 dMax = Reflect(p, center, rd);
-            // aabb.emplace_back(AABB{dMin, dMax});
+            aabb.emplace_back(AABB{dMin, dMax});
         }
 
         uint32_t nodeIndex = firstSibling + (idx ^ octaneMask);

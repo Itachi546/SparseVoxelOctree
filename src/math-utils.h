@@ -61,3 +61,10 @@ inline bool IntersectAABB(const AABB &a, const AABB &b) {
            a.min.z <= b.max.z &&
            a.max.z >= b.min.z;
 }
+
+inline glm::vec2 GetNormalizeMouseCoord(const glm::vec2 &mousePos, const glm::vec2 &windowSize) {
+    glm::vec2 ndcCoord = mousePos / windowSize;
+    ndcCoord.x = mousePos.x * 2.0f - 1.0f;
+    ndcCoord.y = 1.0f - 2.0f * mousePos.y;
+    return ndcCoord;
+}

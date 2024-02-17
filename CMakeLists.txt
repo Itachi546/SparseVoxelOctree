@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 20)
 SET(PROJECT_SOURCE_FILES 
                   "src/gfx/opengl.cpp"
                   "src/main.cpp"
+                  "src/input.cpp"
                   "src/gfx/mesh.cpp"
                   "src/gfx/camera.cpp"
                   "src/gfx/debug.cpp"
@@ -20,6 +21,7 @@ SET (PROJECT_HEADER_FILES
                    "src/gfx/opengl.h"
                    "src/app-window.h"
                    "src/utils.h"
+                   "src/input.h"
                    "src/gfx/camera.h"
                    "src/math-utils.h"
                    "src/gfx/debug.h"

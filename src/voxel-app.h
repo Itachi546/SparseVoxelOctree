@@ -36,9 +36,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void UpdateControls();
 
-    void ProcessLoadList();
-
-    void DebugRenderOctree(uint32_t width, uint32_t height);
+    void LoadFromFile(const char *filename, float scale);
 
     using Clock = std::chrono::high_resolution_clock;
 
@@ -51,14 +49,14 @@ struct VoxelApp : AppWindow<VoxelApp> {
     OctreeRaycaster *raycaster;
     DensityGenerator *generator;
 
-    bool mouseDown;
-    glm::vec2 mouseDelta;
-    glm::vec2 mousePos;
-
     float dt;
     float lastFrameTime;
 
     uint32_t voxelCount;
     std::vector<glm::vec3> loadList;
     OctreeBrick *tempBrick;
+
+    // Debug Variables
+    bool enableRasterizer = false;
+    uint32_t debugIndex = 0;
 };
