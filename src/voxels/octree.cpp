@@ -290,6 +290,7 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMa
     if (!IsBitSet<int>(octaneMask, 2))
         ip.z = 15.0f - p.z;
 
+    aabbs.push_back(AABB{p, p + 1.0f});
     uint32_t voxelIndex = int(ip.x) * BRICK_SIZE * BRICK_SIZE + int(ip.y) * BRICK_SIZE + int(ip.z);
     RayHit rayHit = {false, 0.0f};
     if (brickPools[brickStart + voxelIndex] > 0) {
@@ -301,7 +302,7 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMa
 
     vec3 t = (1.0f - fract(r0)) * tStep;
 
-    const int iteration = 40;
+    const int iteration = 50;
     for (int i = 0; i < iteration; ++i) {
         glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
         p += nearestAxis * stepDir;
@@ -386,7 +387,7 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
         vec3 tCorner = p * invRayDir - r0_rd;
         float tcMax = min(min(tCorner.x, tCorner.y), tCorner.z);
 
-        if (processChild) {
+        if (processChild && tcMax >= 0.0f) {
             uint32_t mask = nodeDescriptor.GetNodeMask();
             if (mask == LeafNode) {
                 intersection = r0_orig + t.x * rd;
@@ -396,7 +397,8 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
                 glm::vec3 dMin = Reflect(p - currentSize, center, rd);
                 glm::vec3 dMax = Reflect(p, center, rd);
                 aabb.emplace_back(AABB{dMin, dMax});
-                glm::vec3 intersection = r0 + t.x * d;
+
+                glm::vec3 intersection = r0 + max(t.x, 0.0f) * d;
                 glm::vec3 brickMax = glm::vec3(BRICK_SIZE);
                 glm::vec3 brickPos = Remap(intersection, p - currentSize, p, glm::vec3(0.0f), brickMax);
                 brickPos = glm::max(brickPos, 0.0f);
@@ -412,10 +414,10 @@ bool Octree::Raycast(vec3 r0, vec3 rd, vec3 &intersection, vec3 &normal, std::ve
 
                 if (rayHit.intersect) {
                     // Debug draw nodes
-                    glm::vec3 bP = r0_orig + (rayHit.t * 0.25f + t.x) * rd;
+                    glm::vec3 bP = r0_orig + (rayHit.t * 0.25f + max(t.x, 0.0f)) * rd;
                     // bP = Remap(bP, glm::vec3(0.0f), brickMax, p - currentSize, p);
                     // bP = Reflect(bP, center, rd);
-                    aabb.push_back(AABB{bP - 0.05f, bP + 0.05f});
+                    Debug::AddRect(bP - 0.05f, bP + 0.05f, glm::vec3(1.0f));
                     hasIntersect = true;
                     break;
                 }

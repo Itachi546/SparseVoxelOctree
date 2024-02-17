@@ -43,6 +43,7 @@ vec3 GenerateCameraRay(vec2 uv) {
 #define BRICK_SIZE3 4096
 #define LEAF_NODE_SIZE 4
 #define INV_LEAF_NODE_SIZE 1.0f / float(LEAF_NODE_SIZE)
+#define GRID_MARCH_MAX_ITERATION 50
 
 #define REFLECT(p, c) (2.0f * c - p)
 #define GET_MASK(p) (p >> 30)
@@ -59,7 +60,7 @@ int FindEntryNode(inout vec3 p, float scale, float t, vec3 tM) {
 }
 
 vec3 Remap(vec3 p, vec3 a0, vec3 a1, vec3 b0, vec3 b1) {
-    vec3 t = (p - a0) / (a1 - a0);
+    vec3 t = clamp((p - a0) / (a1 - a0), 0.0f, 1.0f);
     return b0 + t * (b1 - b0);
 }
 
@@ -92,12 +93,11 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     rayHit.t = 0.0f;
 
     vec3 t = (1.0f - fract(r0)) * tStep;
-    const int iteration = 40;
 
     vec3 dir = p - r0;
     vec3 nearestAxis = step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz);
 
-    for (int i = 0; i < iteration; ++i) {
+    for (int i = 0; i < GRID_MARCH_MAX_ITERATION; ++i) {
         ivec3 ip = ivec3(mix(15 - p, p, dirMask));
         uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
 
@@ -175,7 +175,7 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint co
         vec3 tCorner = p * invRayDir - r0_rd;
         float tcMax = min(min(tCorner.x, tCorner.y), tCorner.z);
 
-        if (processChild) {
+        if (processChild && tcMax >= 0.0f) {
             uint mask = GET_MASK(nodeDescriptor);
             if (mask == LeafNode) {
                 intersection = r0_orig + t.x * rd;
@@ -187,14 +187,14 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint co
                 break;
             } else if (mask == LeafNodeWithPtr) {
                 uint brickPointer = GET_FIRST_CHILD(nodeDescriptor) * BRICK_SIZE3;
-                vec3 intersectPos = r0 + t.x * d;
+                vec3 intersectPos = r0 + max(t.x, 0.0f) * d;
                 vec3 brickMax = vec3(BRICK_SIZE);
                 vec3 brickPos = Remap(intersectPos, p - currentSize, p, vec3(0.0f), brickMax);
-                brickPos = max(brickPos, 0.0f);
+                // brickPos = max(brickPos, 0.0f);
                 RayHit rayHit = RaycastDDA(brickPos, d, ivec3(greaterThan(rd, vec3(0.0f))), brickPointer);
                 if (rayHit.intersect) {
                     // Debug draw nodes
-                    intersectPos = r0_orig + (t.x + rayHit.t) * rd;
+                    intersectPos = r0_orig + (max(t.x, 0.0f) + rayHit.t) * rd;
                     normal = rayHit.normal * sign(rd);
                     hasIntersect = true;
                     color = rayHit.color;

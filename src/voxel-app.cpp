@@ -124,10 +124,10 @@ void VoxelApp::OnUpdate() {
 
     Ray ray;
 #if 1
-    ray.origin = -glm::vec3(10.5f, 10.5f, 10.5f);
-    ray.direction = normalize(-ray.origin);
+    ray.origin = glm::vec3(-20.2887f, -8.80858f, 16.536f);
+    ray.direction = glm::vec3(0.585578f, -0.553956f, -0.591803f);
 #else
-    glm::vec2 mouseCoord = GetNormalizeMouseCoord(input->GetMousePos(), windowSize);
+    glm::vec2 mouseCoord = ConvertFromWindowToNDC(input->mousePos, windowSize);
     camera->GenerateCameraRay(&ray, mouseCoord);
 #endif
     glm::vec3 intersection, normal;
@@ -143,7 +143,7 @@ void VoxelApp::OnUpdate() {
         enableRasterizer = !enableRasterizer;
 
     if (aabbs.size() > 0) {
-        debugIndex = std::min(std::max(debugIndex, 0u), (uint32_t)aabbs.size() - 1);
+        debugIndex = std::min(std::max(debugIndex, 0u), (uint32_t)aabbs.size());
         for (uint32_t i = 0; i < debugIndex; ++i) {
             Debug::AddRect(aabbs[i].min, aabbs[i].max, COLORS[i % 4]);
         }
