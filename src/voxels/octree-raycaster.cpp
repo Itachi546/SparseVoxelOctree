@@ -1,6 +1,7 @@
 #include "octree-raycaster.h"
 #include "octree.h"
 #include "gfx/camera.h"
+#include "gfx/gpu-timer.h"
 
 void OctreeRaycaster::Initialize(Octree *octree) {
     shader.Create("assets/shaders/raycast.vert", "assets/shaders/raycast.frag");
@@ -21,6 +22,7 @@ void OctreeRaycaster::Render(gfx::Camera *camera) {
     glm::mat4 invV = camera->GetInvViewMatrix();
     glm::vec3 cameraPosition = camera->GetPosition();
 
+    GpuTimer::Begin("Raycast");
     shader.Bind();
     shader.SetBuffer(0, nodesBuffer);
     shader.SetBuffer(1, brickBuffer);
@@ -31,7 +33,7 @@ void OctreeRaycaster::Render(gfx::Camera *camera) {
     shader.SetUniformFloat3("uAABBMax", &maxBound[0]);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     shader.Unbind();
-    // GpuProfiler::End();
+    GpuTimer::End();
 }
 
 void OctreeRaycaster::Shutdown() {

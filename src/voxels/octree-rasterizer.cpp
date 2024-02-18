@@ -3,6 +3,7 @@
 #include "octree.h"
 #include "gfx/mesh.h"
 #include "gfx/camera.h"
+#include "gfx/gpu-timer.h"
 
 #include <vector>
 
@@ -24,12 +25,14 @@ void OctreeRasterizer::Initialize(Octree *octree) {
 
 void OctreeRasterizer::Render(gfx::Camera *camera) {
     if (voxelCount > 0) {
+        GpuTimer::Begin("Rasterizer");
         glm::mat4 VP = camera->GetViewProjectionMatrix();
         shader.Bind();
         shader.SetUniformMat4("uVP", &VP[0][0]);
         shader.SetBuffer(0, instanceBuffer);
         cubeMesh->DrawInstanced(voxelCount);
         shader.Unbind();
+        GpuTimer::End();
     }
 }
 

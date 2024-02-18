@@ -291,11 +291,8 @@ void main() {
     if (Trace(r0, rd, p, n, color, iteration)) {
         vec3 diffuseColor = uintToRGB(color);
         vec3 ld = normalize(vec3(-0.5f, 1.0f, 0.5f));
-        col = max(dot(n, ld), 0.0f) * vec3(1.) * vec3(1.28, 1.20, 0.99) * diffuseColor;
+        col = max(dot(n, ld), 0.0f) * diffuseColor;
         col += (n.y * 0.5f + 0.5f) * vec3(0.16, 0.20, 0.28);
-
-        vec3 h = normalize(ld - rd);
-        col += pow(max(dot(n, h), 0.0f), 32.0f) * vec3(0.16, 0.20, 0.28);
         //col = ACES(col);
         //col = pow(col, vec3(0.4545));
     }

@@ -12,8 +12,10 @@ template <typename App>
 struct AppWindow {
 
     AppWindow(const char *title, const glm::vec2 &windowSize) : windowSize(windowSize) {
-        glfwWindowHint(GLFW_SAMPLES, 4);
         glfwInit();
+
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
         glfwWindowPtr = glfwCreateWindow(static_cast<int>(windowSize.x), static_cast<int>(windowSize.y), title, nullptr, nullptr);
         glfwSetWindowUserPointer(glfwWindowPtr, this);

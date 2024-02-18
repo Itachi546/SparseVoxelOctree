@@ -37,5 +37,4 @@ namespace gfx {
     inline void CopyToBuffer(Buffer buffer, void *data, uint32_t size, GLenum usage) { glNamedBufferData(buffer, size, data, usage); }
 
     inline void DestroyBuffer(Buffer buffer) { glDeleteBuffers(1, &buffer); }
-
 } // namespace gfx

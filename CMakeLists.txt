@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 SET(PROJECT_SOURCE_FILES 
                   "src/gfx/opengl.cpp"
+                  "src/gfx/gpu-timer.cpp"
+                  "src/gfx/imgui-service.cpp"
                   "src/main.cpp"
                   "src/input.cpp"
                   "src/gfx/mesh.cpp"
@@ -20,6 +22,8 @@ SET(PROJECT_SOURCE_FILES
                   "src/voxel-app.cpp")
 SET (PROJECT_HEADER_FILES 
                    "src/gfx/opengl.h"
+                   "src/gfx/imgui-service.h"
+                   "src/gfx/gpu-timer.h"
                    "src/app-window.h"
                    "src/utils.h"
                    "src/input.h"
@@ -39,11 +43,13 @@ add_executable(${PROJECT_NAME} ${PROJECT_HEADER_FILES} ${PROJECT_SOURCE_FILES})
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 
 set(PROJECT_LIBRARIES 
     glad::glad
     glm::glm
+    imgui::imgui
     glfw)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})

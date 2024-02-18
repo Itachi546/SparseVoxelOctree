@@ -4,13 +4,14 @@
 
 #include "gfx/camera.h"
 #include "gfx/debug.h"
+#include "gfx/imgui-service.h"
+#include "gfx/gpu-timer.h"
 #include "voxels/octree.h"
 #include "voxels/voxel-data.h"
 #include "voxels/octree-raycaster.h"
 #include "voxels/octree-rasterizer.h"
 
 #include <glm/gtx/component_wise.hpp>
-
 #include <thread>
 #include <algorithm>
 
@@ -58,14 +59,15 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     glDebugMessageCallback(MessageCallback, 0);
 
     Debug::Initialize();
+    GpuTimer::Initialize();
+    Input::GetInstance()->Initialize();
+    ImGuiService::Initialize(glfwWindowPtr);
 
     camera = new gfx::Camera();
     camera->SetPosition(glm::vec3{0.0f, 0.0f, 32.0f});
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
-
-    Input::GetInstance()->Initialize();
 #if 1
     octree = new Octree("monu7x32.octree");
 #else
@@ -104,7 +106,11 @@ void VoxelApp::Run() {
 }
 
 void VoxelApp::OnUpdate() {
-    UpdateControls();
+    ImGuiService::NewFrame();
+
+    if (!ImGuiService::IsFocused())
+        UpdateControls();
+
     camera->Update(dt);
 
     Input *input = Input::GetInstance();
@@ -121,17 +127,19 @@ void VoxelApp::OnUpdate() {
         enableRasterizer = !enableRasterizer;
 
     input->Update();
+    GpuTimer::AddUI();
 }
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
     if (enableRasterizer) {
         rasterizer->Render(camera);
-
     } else
         raycaster->Render(camera);
 
     Debug::Render(VP);
+    ImGuiService::Render();
+    GpuTimer::Reset();
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
@@ -190,6 +198,8 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
+    ImGuiService::Shutdown();
+    GpuTimer::Shutdown();
     if (octree)
         delete octree;
     delete raycaster;
