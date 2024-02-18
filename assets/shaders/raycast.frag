@@ -74,6 +74,7 @@ struct RayHit {
     bool intersect;
     vec3 normal;
     uint color;
+    int iteration;
 };
 
 vec3 uintToRGB(uint color) {
@@ -83,36 +84,36 @@ vec3 uintToRGB(uint color) {
            255.0f;
 }
 
-RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
-    vec3 stepDir = sign(rd);
-    vec3 tStep = 1.0f / (rd + EPSILON);
+const int gridEndMargin = BRICK_SIZE - 1;
+RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
+    vec3 stepDir = mix(vec3(-1.0f), vec3(1.0f), dirMask);
+    vec3 tStep = invRd;
 
     vec3 p = floor(r0);
+    p = mix(gridEndMargin - p, p, dirMask);
+
     RayHit rayHit;
     rayHit.intersect = false;
     rayHit.t = 0.0f;
-
+    rayHit.iteration = 0;
     vec3 t = (1.0f - fract(r0)) * tStep;
 
     vec3 dir = p - r0;
     vec3 nearestAxis = step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz);
-
-    const int gridEndMargin = BRICK_SIZE - 1;
     for (int i = 0; i < GRID_MARCH_MAX_ITERATION; ++i) {
-        ivec3 ip = ivec3(mix(gridEndMargin - p, p, dirMask));
-        uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
-
+        uint voxelIndex = brickStart + uint(p.x * BRICK_SIZE2 + p.y * BRICK_SIZE + p.z);
         uint color = brickPools[voxelIndex];
         if (color > 0) {
-            vec3 id = p;
+            // Undo the reflection
+            p = mix(gridEndMargin - p, p, dirMask);
             vec3 t = (p - r0) * tStep;
             float tMax = max(max(t.x, t.y), t.z);
-            vec3 p = r0 + tMax * rd;
             rayHit.normal = -nearestAxis;
             rayHit.t = tMax * INV_LEAF_NODE_SIZE;
             rayHit.intersect = true;
             rayHit.color = color;
-            break;
+            rayHit.iteration = i;
+            return rayHit;
         }
 
         nearestAxis = step(t, t.yzx) * step(t, t.zxy);
@@ -124,12 +125,13 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     return rayHit;
 }
 
-bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint color, out int iteration) {
+RayHit Trace(vec3 r0, vec3 rd) {
     vec3 r0_orig = r0;
-    int octaneMask = 7;
     vec3 aabbMin = uAABBMin;
     vec3 aabbMax = uAABBMax;
     vec3 center = (aabbMin + aabbMax) * 0.5f;
+
+    int octaneMask = 7;
     if (rd.x < 0.0) {
         octaneMask ^= 1;
         r0.x = REFLECT(r0.x, center.x);
@@ -150,9 +152,13 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint co
     vec3 tMin = aabbMin * invRayDir - r0_rd;
     vec3 tMax = aabbMax * invRayDir - r0_rd;
 
+    RayHit rayHit;
+    rayHit.intersect = false;
+    rayHit.iteration = 0;
+
     vec2 t = vec2(max(tMin.x, max(tMin.y, tMin.z)), min(tMax.x, min(tMax.y, tMax.z)));
     if (t.x > t.y || t.y < 0.0)
-        return false;
+        return rayHit;
 
     float currentSize = (uAABBMax.x - uAABBMin.x) * 0.5f;
     float octreeSize = currentSize;
@@ -165,11 +171,7 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint co
     int idx = FindEntryNode(p, currentSize, t.x, tM);
 
     uint firstSibling = GET_FIRST_CHILD(nodePools[0]);
-    vec3 col = vec3(0.5, 0.7, 1.0);
-    vec3 n = vec3(1.0);
     int i = 0;
-
-    bool hasIntersect = false;
     for (; i < 1000; ++i) {
         uint nodeIndex = firstSibling + (idx ^ octaneMask);
         uint nodeDescriptor = nodePools[nodeIndex];
@@ -179,26 +181,26 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint co
         if (processChild && tcMax >= 0.0f) {
             uint mask = GET_MASK(nodeDescriptor);
             if (mask == LeafNode) {
-                intersection = r0_orig + t.x * rd;
                 vec3 dir = p - (r0 + t.x * d);
-                normal = -step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz) * sign(rd);
-                color = GET_FIRST_CHILD(nodeDescriptor);
-                // normal = ((intersection - p - 0.5f) * 2.0f) * sign(rd);
-                hasIntersect = true;
+                rayHit.normal = -step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz) * sign(rd);
+                rayHit.intersect = true;
+                rayHit.t = t.x;
+                rayHit.color = GET_FIRST_CHILD(nodeDescriptor);
                 break;
             } else if (mask == LeafNodeWithPtr) {
                 uint brickPointer = GET_FIRST_CHILD(nodeDescriptor) * BRICK_SIZE3;
                 vec3 intersectPos = r0 + max(t.x, 0.0f) * d;
                 vec3 brickMax = vec3(BRICK_SIZE);
                 vec3 brickPos = Remap(intersectPos, p - currentSize, p, vec3(0.0f), brickMax);
-                // brickPos = max(brickPos, 0.0f);
-                RayHit rayHit = RaycastDDA(brickPos, d, ivec3(greaterThan(rd, vec3(0.0f))), brickPointer);
-                if (rayHit.intersect) {
+
+                RayHit brickHit = RaycastDDA(brickPos, invRayDir, ivec3(greaterThan(rd, vec3(0.0f))), brickPointer);
+                if (brickHit.intersect) {
                     // Debug draw nodes
-                    intersectPos = r0_orig + (max(t.x, 0.0f) + rayHit.t) * rd;
-                    normal = rayHit.normal * sign(rd);
-                    hasIntersect = true;
-                    color = rayHit.color;
+                    rayHit.normal = brickHit.normal * sign(rd);
+                    rayHit.intersect = true;
+                    rayHit.t = max(t.x, 0.0f) + brickHit.t;
+                    rayHit.color = brickHit.color;
+                    rayHit.iteration = brickHit.iteration;
                     break;
                 }
             } else if (mask == InternalNode) {
@@ -266,8 +268,9 @@ bool Trace(vec3 r0, vec3 rd, out vec3 intersection, out vec3 normal, out uint co
         if (currentSize > octreeSize)
             break;
     }
-    iteration = i;
-    return hasIntersect;
+
+    rayHit.iteration += i;
+    return rayHit;
 }
 
 vec3 ACES(vec3 x) {
@@ -283,24 +286,24 @@ void main() {
     vec3 r0 = uCamPos;
     vec3 rd = GenerateCameraRay(uv * 2.0 - 1.0);
 
-    vec3 n = vec3(0.0f);
-    vec3 p = vec3(0.0f);
+    RayHit hit = Trace(r0, rd);
     vec3 col = vec3(0.5f);
-    int iteration = 0;
-    uint color = 0;
-    if (Trace(r0, rd, p, n, color, iteration)) {
-        vec3 diffuseColor = uintToRGB(color);
-        vec3 ld = normalize(vec3(-0.5f, 1.0f, 0.5f));
+    if (hit.intersect) {
+        vec3 diffuseColor = uintToRGB(hit.color);
+        vec3 n = normalize(hit.normal);
+        vec3 ld = normalize(vec3(-0.5f, 1.0f, 0.1f));
+        vec3 p = r0 + hit.t * rd;
         col = max(dot(n, ld), 0.0f) * diffuseColor;
         col += (n.y * 0.5f + 0.5f) * vec3(0.16, 0.20, 0.28);
-        //col = ACES(col);
-        //col = pow(col, vec3(0.4545));
+        // col = ACES(col);
+        // col = pow(col, vec3(0.4545));
     }
 
 #if 1
     fragColor = vec4(col, 1.0f);
 #else
-    float iter = (float(iteration) / MAX_ITERATIONS);
+    // float iter = (float(hit.iteration) / (MAX_ITERATIONS * 0.5f));
+    float iter = hit.t / 100.0f;
     fragColor = vec4(vec3(iter), 1.0);
 #endif
 }
