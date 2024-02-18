@@ -19,7 +19,7 @@ struct OctreeRaycaster {
 
     void Shutdown();
 
-    ~OctreeRaycaster() = default;
+    virtual ~OctreeRaycaster() = default;
 
     gfx::Shader shader;
     gfx::Buffer nodesBuffer;

@@ -38,11 +38,11 @@ vec3 GenerateCameraRay(vec2 uv) {
 
 #define EPSILON 10e-7f
 #define MAX_ITERATIONS 1000
-#define BRICK_SIZE 16
-#define BRICK_SIZE2 256
-#define BRICK_SIZE3 4096
-#define LEAF_NODE_SIZE 4
-#define INV_LEAF_NODE_SIZE 1.0f / float(LEAF_NODE_SIZE)
+#define BRICK_SIZE 8
+#define BRICK_SIZE2 64
+#define BRICK_SIZE3 512
+#define LEAF_NODE_SIZE 1
+#define INV_LEAF_NODE_SIZE (1.0f / float(LEAF_NODE_SIZE))
 #define GRID_MARCH_MAX_ITERATION 50
 
 #define REFLECT(p, c) (2.0f * c - p)
@@ -97,8 +97,9 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
     vec3 dir = p - r0;
     vec3 nearestAxis = step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz);
 
+    const int gridEndMargin = BRICK_SIZE - 1;
     for (int i = 0; i < GRID_MARCH_MAX_ITERATION; ++i) {
-        ivec3 ip = ivec3(mix(15 - p, p, dirMask));
+        ivec3 ip = ivec3(mix(gridEndMargin - p, p, dirMask));
         uint voxelIndex = brickStart + (ip.x * BRICK_SIZE2 + ip.y * BRICK_SIZE + ip.z);
 
         uint color = brickPools[voxelIndex];
@@ -117,7 +118,7 @@ RayHit RaycastDDA(vec3 r0, vec3 rd, vec3 dirMask, uint brickStart) {
         nearestAxis = step(t, t.yzx) * step(t, t.zxy);
         p += nearestAxis * stepDir;
         t += nearestAxis * tStep;
-        if (p.x < 0.0f || p.x > 15.0f || p.y < 0.0f || p.y > 15.0f || p.z < 0.0f || p.z > 15.0f)
+        if (p.x < 0.0f || p.x > gridEndMargin || p.y < 0.0f || p.y > gridEndMargin || p.z < 0.0f || p.z > gridEndMargin)
             break;
     }
     return rayHit;
@@ -291,7 +292,7 @@ void main() {
         vec3 diffuseColor = uintToRGB(color);
         vec3 ld = normalize(vec3(-0.5f, 1.0f, 0.5f));
         col = max(dot(n, ld), 0.0f) * vec3(1.) * vec3(1.28, 1.20, 0.99) * diffuseColor;
-        col += (n.y * 0.5f + 0.5f) * 0.2 * vec3(0.16, 0.20, 0.28);
+        col += (n.y * 0.5f + 0.5f) * vec3(0.16, 0.20, 0.28);
 
         vec3 h = normalize(ld - rd);
         col += pow(max(dot(n, h), 0.0f), 32.0f) * vec3(0.16, 0.20, 0.28);

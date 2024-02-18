@@ -15,6 +15,7 @@ SET(PROJECT_SOURCE_FILES
                   "src/voxels/octree.cpp"
                   "src/voxels/voxel-data.cpp"
                   "src/voxels/octree-raycaster.cpp"
+                  "src/voxels/octree-rasterizer.cpp"
                   "src/utils.cpp"
                   "src/voxel-app.cpp")
 SET (PROJECT_HEADER_FILES 
@@ -26,6 +27,7 @@ SET (PROJECT_HEADER_FILES
                    "src/math-utils.h"
                    "src/gfx/debug.h"
                    "src/voxels/octree.h"
+                   "src/voxels/octree-rasterizer.h"
                    "src/voxels/octree-raycaster.h"
                    "src/voxels/density-generator.h"
                    "src/voxels/voxel-data.h"

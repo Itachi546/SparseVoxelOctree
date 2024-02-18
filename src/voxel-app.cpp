@@ -2,13 +2,12 @@
 #include "input.h"
 #include "math-utils.h"
 
-#include "gfx/mesh.h"
 #include "gfx/camera.h"
 #include "gfx/debug.h"
 #include "voxels/octree.h"
-#include "voxels/density-generator.h"
 #include "voxels/voxel-data.h"
 #include "voxels/octree-raycaster.h"
+#include "voxels/octree-rasterizer.h"
 
 #include <glm/gtx/component_wise.hpp>
 
@@ -58,38 +57,26 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(MessageCallback, 0);
 
-    fullscreenShader.Create("assets/shaders/instanced.vert",
-                            "assets/shaders/instanced.frag");
-
     Debug::Initialize();
-
-    cubeMesh = new gfx::Mesh();
-    gfx::Mesh::CreateCube(cubeMesh);
-
-    uint32_t maxEntity = 10'000'000;
-    instanceBuffer = gfx::CreateBuffer(nullptr, maxEntity * sizeof(glm::vec4), GL_DYNAMIC_STORAGE_BIT);
 
     camera = new gfx::Camera();
     camera->SetPosition(glm::vec3{0.0f, 0.0f, 32.0f});
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
-    voxelCount = 0;
 
     Input::GetInstance()->Initialize();
 #if 1
     octree = new Octree("monu7x32.octree");
 #else
-    LoadFromFile("monu7x32.vox", 0.5f);
+    LoadFromFile("assets/models/monu7.vox", 0.5f);
+    // octree->Serialize("monu7x32.octree");
 #endif
-
-    std::vector<glm::vec4> voxels;
-    octree->ListVoxels(voxels);
-    voxelCount = static_cast<uint32_t>(voxels.size());
-    if (voxels.size() > 0)
-        glNamedBufferSubData(instanceBuffer, 0, sizeof(glm::vec4) * voxels.size(), voxels.data());
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree);
+
+    rasterizer = new OctreeRasterizer();
+    rasterizer->Initialize(octree);
 }
 
 void VoxelApp::Run() {
@@ -121,45 +108,26 @@ void VoxelApp::OnUpdate() {
     camera->Update(dt);
 
     Input *input = Input::GetInstance();
-
+#if 0
     Ray ray;
-#if 1
-    ray.origin = glm::vec3(-20.2887f, -8.80858f, 16.536f);
-    ray.direction = glm::vec3(0.585578f, -0.553956f, -0.591803f);
-#else
     glm::vec2 mouseCoord = ConvertFromWindowToNDC(input->mousePos, windowSize);
     camera->GenerateCameraRay(&ray, mouseCoord);
-#endif
     glm::vec3 intersection, normal;
-    std::vector<AABB> aabbs;
     aabbs.emplace_back(octree->center - octree->size, octree->center + octree->size);
-    octree->Raycast(ray.origin, ray.direction, intersection, normal, aabbs);
+    octree->Raycast(ray.origin, ray.direction, intersection, normal);
+#endif
 
-    if (input->WasKeyPressed(GLFW_KEY_E))
-        debugIndex++;
-    if (input->WasKeyPressed(GLFW_KEY_R))
-        debugIndex--;
     if (input->WasKeyPressed(GLFW_KEY_H))
         enableRasterizer = !enableRasterizer;
 
-    if (aabbs.size() > 0) {
-        debugIndex = std::min(std::max(debugIndex, 0u), (uint32_t)aabbs.size());
-        for (uint32_t i = 0; i < debugIndex; ++i) {
-            Debug::AddRect(aabbs[i].min, aabbs[i].max, COLORS[i % 4]);
-        }
-    }
-    Debug::AddLine(ray.origin, ray.GetPointAt(200.0f), glm::vec3(1.0f));
     input->Update();
 }
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
-    if (voxelCount > 0 && enableRasterizer) {
-        fullscreenShader.Bind();
-        fullscreenShader.SetUniformMat4("uVP", &VP[0][0]);
-        fullscreenShader.SetBuffer(0, instanceBuffer);
-        cubeMesh->DrawInstanced(voxelCount);
-        fullscreenShader.Unbind();
+    if (enableRasterizer) {
+        rasterizer->Render(camera);
+
     } else
         raycaster->Render(camera);
 
@@ -222,9 +190,8 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
-    //  delete octree;
-
-    fullscreenShader.Destroy();
-    gfx::DestroyBuffer(instanceBuffer);
-    delete cubeMesh;
+    if (octree)
+        delete octree;
+    delete raycaster;
+    delete rasterizer;
 }

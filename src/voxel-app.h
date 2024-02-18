@@ -5,14 +5,13 @@
 #include <chrono>
 
 namespace gfx {
-    struct Mesh;
     class Camera;
 } // namespace gfx
 
 struct Octree;
 struct OctreeBrick;
-struct DensityGenerator;
 struct OctreeRaycaster;
+struct OctreeRasterizer;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -40,23 +39,14 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     using Clock = std::chrono::high_resolution_clock;
 
-    gfx::Shader fullscreenShader;
-    gfx::Mesh *cubeMesh;
-    gfx::Buffer instanceBuffer;
-
     gfx::Camera *camera;
     Octree *octree;
     OctreeRaycaster *raycaster;
-    DensityGenerator *generator;
+    OctreeRasterizer *rasterizer;
 
     float dt;
     float lastFrameTime;
 
-    uint32_t voxelCount;
-    std::vector<glm::vec3> loadList;
-    OctreeBrick *tempBrick;
-
     // Debug Variables
     bool enableRasterizer = false;
-    uint32_t debugIndex = 0;
 };
