@@ -296,8 +296,8 @@ void main() {
 
         vec3 h = normalize(ld - rd);
         col += pow(max(dot(n, h), 0.0f), 32.0f) * vec3(0.16, 0.20, 0.28);
-        col = ACES(col);
-        col = pow(col, vec3(0.4545));
+        //col = ACES(col);
+        //col = pow(col, vec3(0.4545));
     }
 
 #if 1
