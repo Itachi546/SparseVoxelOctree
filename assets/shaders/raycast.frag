@@ -310,7 +310,7 @@ void main() {
     fragColor = vec4(col, 1.0f);
 #else
     // float iter = (float(hit.iteration) / (MAX_ITERATIONS * 0.5f));
-    float iter = hit.t / 500.0f;
+    float iter = hit.t / 200.0f;
     fragColor = vec4(vec3(iter), 1.0);
 #endif
 }
