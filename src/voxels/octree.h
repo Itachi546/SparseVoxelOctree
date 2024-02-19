@@ -43,9 +43,9 @@ struct Node {
     }
 };
 
-constexpr const uint32_t BRICK_SIZE = 8;
+constexpr const uint32_t BRICK_SIZE = 16;
 constexpr const uint32_t BRICK_ELEMENT_COUNT = BRICK_SIZE * BRICK_SIZE * BRICK_SIZE;
-constexpr const uint32_t LEAF_NODE_SCALE = 1;
+constexpr const uint32_t LEAF_NODE_SCALE = 2;
 
 struct OctreeBrick {
     std::array<uint32_t, BRICK_ELEMENT_COUNT> data;
@@ -64,6 +64,9 @@ struct OctreeBrick {
 struct RayHit {
     float t;
     bool intersect;
+    glm::vec3 normal;
+    uint32_t color;
+    int iteration;
 };
 
 struct Octree {
@@ -80,7 +83,7 @@ struct Octree {
 
     void Serialize(const char *filename);
 
-    bool Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::vec3 &normal);
+    RayHit Raycast(glm::vec3 r0, glm::vec3 rd);
 
     std::vector<Node> nodePools;
 
@@ -102,7 +105,7 @@ struct Octree {
 
     bool IsRegionEmpty(VoxelData *generator, const glm::vec3 &min, const glm::vec3 &max);
 
-    RayHit RaycastDDA(const glm::vec3 &intesection, const glm::vec3 &rd, int octaneMask, uint32_t brickStart);
+    RayHit RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, const glm::vec3 &dirMask, uint32_t brickStart);
     bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
     OctreeBrick temp;
 };

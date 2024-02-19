@@ -68,11 +68,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
+    lightPosition = glm::vec3(0.0f, 32.0f, 32.0f);
+    origin = glm::vec3(32.0f);
+    target = glm::vec3(0.0f);
 #if 1
-    octree = new Octree("monu7x32.octree");
+    octree = new Octree("monu3x16.octree");
 #else
-    LoadFromFile("assets/models/monu7.vox", 0.5f);
-    // octree->Serialize("monu7x32.octree");
+    LoadFromFile("assets/models/monu3.vox", 0.5f);
+    octree->Serialize("monu3x16.octree");
 #endif
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree);
@@ -90,6 +93,7 @@ void VoxelApp::Run() {
         if (!AppWindow::minimized) {
             OnUpdate();
             OnRender();
+            OnRenderUI();
         } else
             std::this_thread::sleep_for(1ms);
 
@@ -114,32 +118,53 @@ void VoxelApp::OnUpdate() {
     camera->Update(dt);
 
     Input *input = Input::GetInstance();
-#if 0
+#if 1
     Ray ray;
-    glm::vec2 mouseCoord = ConvertFromWindowToNDC(input->mousePos, windowSize);
-    camera->GenerateCameraRay(&ray, mouseCoord);
-    glm::vec3 intersection, normal;
-    aabbs.emplace_back(octree->center - octree->size, octree->center + octree->size);
-    octree->Raycast(ray.origin, ray.direction, intersection, normal);
+    // glm::vec2 mouseCoord = ConvertFromWindowToNDC(input->mousePos, windowSize);
+    // camera->GenerateCameraRay(&ray, mouseCoord);
+    ray.origin = origin;
+    ray.direction = glm::normalize(target - origin);
+    Debug::AddLine(ray.origin, ray.GetPointAt(500.0f));
+
+    RayHit hit = octree->Raycast(ray.origin, ray.direction);
+    if (hit.intersect) {
+        ImGui::Text("Intersect");
+        ImGui::Text("Hit distance: %.2f", hit.t);
+        glm::vec3 p = ray.GetPointAt(hit.t);
+        Debug::AddRect(p - 0.005f, p + 0.005f, glm::vec3(1.0f));
+    }
 #endif
-
-    if (input->WasKeyPressed(GLFW_KEY_H))
-        enableRasterizer = !enableRasterizer;
-
     input->Update();
+}
+
+void VoxelApp::OnRenderUI() {
+    ImGui::Text("Total Voxel: %d", rasterizer->voxelCount);
+    ImGui::Checkbox("Show", &show);
+
+    if (show)
+        ImGui::Checkbox("Rasterizer", &enableRasterizer);
+
+    ImGui::SliderFloat3("Ray origin", &origin[0], -64.0f, 64.0f);
+    ImGui::SliderFloat3("Ray target", &target[0], -64.0f, 64.0f);
+
+    ImGui::DragFloat3("Light Position", &lightPosition[0], 0.1f, -100.0f, 100.0f);
+    Debug::AddRect(lightPosition - 0.5f, lightPosition + 0.5f, glm::vec3(1.0f));
+
     GpuTimer::AddUI();
+
+    ImGuiService::Render();
+    GpuTimer::Reset();
 }
 
 void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetViewProjectionMatrix();
-    if (enableRasterizer) {
-        rasterizer->Render(camera);
-    } else
-        raycaster->Render(camera);
-
+    if (show) {
+        if (enableRasterizer) {
+            rasterizer->Render(camera);
+        } else
+            raycaster->Render(camera, lightPosition);
+    }
     Debug::Render(VP);
-    ImGuiService::Render();
-    GpuTimer::Reset();
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {

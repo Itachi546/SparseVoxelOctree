@@ -25,6 +25,8 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void OnUpdate();
 
+    void OnRenderUI();
+
     void OnRender();
 
     void OnMouseMove(float x, float y);
@@ -49,4 +51,9 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     // Debug Variables
     bool enableRasterizer = false;
+    bool show = true;
+
+    glm::vec3 origin;
+    glm::vec3 target;
+    glm::vec3 lightPosition;
 };

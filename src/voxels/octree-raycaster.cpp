@@ -16,7 +16,7 @@ void OctreeRaycaster::Initialize(Octree *octree) {
     brickBuffer = gfx::CreateBuffer(octree->brickPools.data(), brickPoolSize, GL_DYNAMIC_STORAGE_BIT);
 }
 
-void OctreeRaycaster::Render(gfx::Camera *camera) {
+void OctreeRaycaster::Render(gfx::Camera *camera, glm::vec3 lightPosition) {
     // GpuProfiler::Begin("Raycast");
     glm::mat4 invP = camera->GetInvProjectionMatrix();
     glm::mat4 invV = camera->GetInvViewMatrix();
@@ -31,6 +31,7 @@ void OctreeRaycaster::Render(gfx::Camera *camera) {
     shader.SetUniformFloat3("uCamPos", &cameraPosition[0]);
     shader.SetUniformFloat3("uAABBMin", &minBound[0]);
     shader.SetUniformFloat3("uAABBMax", &maxBound[0]);
+    shader.SetUniformFloat3("uLightPos", &lightPosition[0]);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     shader.Unbind();
     GpuTimer::End();

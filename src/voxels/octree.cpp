@@ -278,60 +278,54 @@ glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
     return p;
 }
 
-RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, int octaneMask, uint32_t brickStart) {
-    glm::vec3 stepDir = glm::sign(rd);
-    glm::vec3 tStep = 1.0f / rd;
-    glm::vec3 p = glm::floor(r0);
+RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm::vec3 &dirMask, uint32_t brickStart) {
+    const int gridEndMargin = BRICK_SIZE - 1;
+    glm::vec3 stepDir = mix(glm::vec3(-1.0f), glm::vec3(1.0f), dirMask);
+    glm::vec3 tStep = invRd;
 
-    glm::vec3 ip = p;
-    uint32_t brickEdge = BRICK_SIZE - 1;
-    if (!IsBitSet<int>(octaneMask, 0))
-        ip.x = brickEdge - p.x;
-    if (!IsBitSet<int>(octaneMask, 1))
-        ip.y = brickEdge - p.y;
-    if (!IsBitSet<int>(octaneMask, 2))
-        ip.z = brickEdge - p.z;
+    glm::vec3 p = floor(r0);
+    p = glm::mix(glm::vec3(gridEndMargin) - p, p, dirMask);
 
-    uint32_t voxelIndex = int(ip.x) * BRICK_SIZE * BRICK_SIZE + int(ip.y) * BRICK_SIZE + int(ip.z);
-    RayHit rayHit = {false, 0.0f};
-    if (brickPools[brickStart + voxelIndex] > 0) {
-        rayHit.intersect = true;
-        glm::vec3 t = (p - r0) * tStep;
-        rayHit.t = std::max(std::max(t.x, t.y), t.z) * (1.0f / float(BRICK_SIZE));
-        return rayHit;
-    }
-
+    RayHit rayHit;
+    rayHit.intersect = false;
+    rayHit.t = 0.0f;
+    rayHit.iteration = 0;
     glm::vec3 t = (1.0f - fract(r0)) * tStep;
 
-    const int iteration = 50;
-    for (int i = 0; i < iteration; ++i) {
-        glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) * glm::step(t, glm::vec3(t.z, t.x, t.y));
+    glm::vec3 dir = p - r0;
+    glm::vec3 nearestAxis = glm::step(glm::vec3(dir.y, dir.z, dir.x), dir) *
+                            glm::step(glm::vec3(dir.z, dir.x, dir.y), dir);
+    for (int i = 0; i < 100; ++i) {
+        uint32_t voxelIndex = brickStart + uint32_t(p.x * BRICK_SIZE * BRICK_SIZE + p.y * BRICK_SIZE + p.z);
+        uint32_t color = brickPools[voxelIndex];
+        if (color > 0) {
+            // Undo the reflection
+            p = glm::mix(glm::vec3(gridEndMargin) - p, p, dirMask);
+            glm::vec3 t = (p - r0) * tStep;
+            float tMax = glm::max(glm::max(t.x, t.y), t.z);
+            rayHit.normal = -nearestAxis;
+            rayHit.t = tMax * (1.0f / float(BRICK_SIZE));
+            rayHit.intersect = true;
+            rayHit.color = color;
+            rayHit.iteration = i;
+            return rayHit;
+        }
+
+        nearestAxis = glm::step(glm::vec3(dir.y, dir.z, dir.x), dir) *
+                      glm::step(glm::vec3(dir.z, dir.x, dir.y), dir);
         p += nearestAxis * stepDir;
         t += nearestAxis * tStep;
-        if (p.x < 0.0f || p.x > brickEdge || p.y < 0.0f || p.y > brickEdge || p.z < 0.0f || p.z > brickEdge)
+        if (p.x < 0.0f || p.x > gridEndMargin || p.y < 0.0f || p.y > gridEndMargin || p.z < 0.0f || p.z > gridEndMargin)
             break;
-
-        glm::vec3 ip = p;
-        if (!IsBitSet<int>(octaneMask, 0))
-            ip.x = brickEdge - p.x;
-        if (!IsBitSet<int>(octaneMask, 1))
-            ip.y = brickEdge - p.y;
-        if (!IsBitSet<int>(octaneMask, 2))
-            ip.z = brickEdge - p.z;
-
-        uint32_t voxelIndex = int(ip.x) * BRICK_SIZE * BRICK_SIZE + int(ip.y) * BRICK_SIZE + int(ip.z);
-        if (brickPools[brickStart + voxelIndex] > 0) {
-            rayHit.intersect = true;
-            glm::vec3 t = (p - r0) * tStep;
-            rayHit.t = std::max(std::max(t.x, t.y), t.z);
-            break;
-        }
     }
     return rayHit;
 }
 
-bool Octree::Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::vec3 &normal) {
-    glm::vec3 r0_orig = r0;
+RayHit Octree::Raycast(glm::vec3 r0, glm::vec3 rd) {
+    glm::vec3 aabbMin = center - size;
+    glm::vec3 aabbMax = center + size;
+    glm::vec3 center = (aabbMin + aabbMax) * 0.5f;
+
     int octaneMask = 7;
     if (rd.x < 0.0) {
         octaneMask ^= 1;
@@ -346,21 +340,24 @@ bool Octree::Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::v
         r0.z = REFLECT(r0.z, center.z);
     }
 
-    glm::vec3 d = abs(rd);
+    glm::vec3 d = glm::abs(rd);
     glm::vec3 invRayDir = 1.0f / (d + EPSILON);
     glm::vec3 r0_rd = r0 * invRayDir;
 
-    glm::vec3 aabbMin = center - size;
-    glm::vec3 aabbMax = center + size;
     glm::vec3 tMin = aabbMin * invRayDir - r0_rd;
     glm::vec3 tMax = aabbMax * invRayDir - r0_rd;
 
-    glm::vec2 t = glm::vec2(std::max(tMin.x, std::max(tMin.y, tMin.z)),
-                            std::min(tMax.x, std::min(tMax.y, tMax.z)));
+    RayHit rayHit;
+    rayHit.intersect = false;
+    rayHit.iteration = 0;
+
+    glm::vec2 t = glm::vec2(glm::max(tMin.x, glm::max(tMin.y, tMin.z)),
+                            glm::min(tMax.x, glm::min(tMax.y, tMax.z)));
     if (t.x > t.y || t.y < 0.0)
-        return false;
+        return rayHit;
 
     float currentSize = size;
+    float octreeSize = currentSize;
 
     // Determine Entry Node
     glm::vec3 p = aabbMax;
@@ -370,61 +367,44 @@ bool Octree::Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::v
     int idx = FindEntryNode(p, currentSize, t.x, tM);
 
     uint32_t firstSibling = nodePools[0].GetChildPtr();
-    glm::vec3 col{0.5, 0.7, 1.0};
-    glm::vec3 n{0.0};
     int i = 0;
     std::stack<StackData> stacks;
-
-    // @TEMP
-    bool hasIntersect = false;
     for (; i < 1000; ++i) {
-
-#if DEBUG_OCTREE_TRAVERSAL
-        {
-            glm::vec3 dMin = Reflect(p - currentSize, center, rd);
-            glm::vec3 dMax = Reflect(p, center, rd);
-            uint32_t depth = static_cast<uint32_t>(stacks.size() % std::size(COLORS));
-            Debug::AddRect(dMin, dMax, COLORS[depth]);
-        }
-#endif
         uint32_t nodeIndex = firstSibling + (idx ^ octaneMask);
         Node nodeDescriptor = nodePools[nodeIndex];
         glm::vec3 tCorner = p * invRayDir - r0_rd;
-        float tcMax = std::min(std::min(tCorner.x, tCorner.y), tCorner.z);
+        float tcMax = glm::min(glm::min(tCorner.x, tCorner.y), tCorner.z);
 
         if (processChild && tcMax >= 0.0f) {
             uint32_t mask = nodeDescriptor.GetNodeMask();
             if (mask == LeafNode) {
-                intersection = r0_orig + t.x * rd;
-                hasIntersect = true;
+                glm::vec3 dir = p - (r0 + t.x * d);
+                rayHit.normal = -glm::step(glm::vec3(dir.y, dir.z, dir.x), dir) *
+                                glm::step(glm::vec3(dir.z, dir.x, dir.y), dir) * sign(rd);
+                rayHit.intersect = true;
+                rayHit.t = t.x;
+                rayHit.color = nodeDescriptor.GetChildPtr();
                 break;
             } else if (mask == LeafNodeWithPtr) {
-#if DEBUG_OCTREE_TRAVERSAL
-                glm::vec3 dMin = Reflect(p - currentSize, center, rd);
-                glm::vec3 dMax = Reflect(p, center, rd);
+                uint32_t brickPointer = nodeDescriptor.GetChildPtr() * BRICK_ELEMENT_COUNT;
+                glm::vec3 intersectPos = r0 + glm::max(t.x, 0.0f) * d;
+                glm::vec3 brickMax = glm::vec3(BRICK_SIZE);
+                glm::vec3 brickPos = Remap<glm::vec3>(intersectPos, p - currentSize, p, glm::vec3(0.0f), brickMax);
 
-                uint32_t depth = static_cast<uint32_t>(stacks.size() % std::size(COLORS));
-                Debug::AddRect(dMin, dMax, COLORS[depth]);
-#endif
-                glm::vec3 intersection = r0 + std::max(t.x, 0.0f) * d;
-                glm::vec3 brickMax{BRICK_SIZE};
-                glm::vec3 brickPos = Remap(intersection, p - currentSize, p, glm::vec3(0.0f), brickMax);
-                brickPos = glm::max(brickPos, 0.0f);
-                RayHit rayHit = RaycastDDA(brickPos, d, octaneMask, nodeDescriptor.GetChildPtr() * BRICK_ELEMENT_COUNT);
-                // Check intersection
-                if (rayHit.intersect) {
+                RayHit brickHit = RaycastDDA(brickPos, invRayDir, glm::ivec3(glm::greaterThan(rd, glm::vec3(0.0f))), brickPointer);
+                if (brickHit.intersect) {
                     // Debug draw nodes
-                    glm::vec3 bP = r0_orig + (rayHit.t + std::max(t.x, 0.0f)) * rd;
-#if DEBUG_OCTREE_TRAVERSAL
-                    Debug::AddRect(bP - 0.05f, bP + 0.05f, glm::vec3(1.0f));
-#endif
-                    hasIntersect = true;
+                    rayHit.normal = brickHit.normal * sign(rd);
+                    rayHit.intersect = true;
+                    rayHit.t = glm::max(t.x, 0.0f) + brickHit.t;
+                    rayHit.color = brickHit.color;
+                    rayHit.iteration = brickHit.iteration;
                     break;
                 }
             } else if (mask == InternalNode) {
 
                 // Intersect with t-span of cube
-                float tvMax = std::min(t.y, tcMax);
+                float tvMax = glm::min(t.y, tcMax);
                 float halfSize = currentSize * 0.5f;
                 glm::vec3 tCenter = (p - halfSize) * invRayDir - r0_rd;
 
@@ -449,8 +429,7 @@ bool Octree::Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::v
         processChild = true;
 
         // Advance
-        int lastSibling = idx ^ octaneMask;
-        glm::ivec3 stepDir{glm::step(tCorner, glm::vec3(tcMax))};
+        glm::ivec3 stepDir = glm::ivec3(step(tCorner, glm::vec3(tcMax)));
         int stepMask = stepDir.x | (stepDir.y << 1) | (stepDir.z << 2);
         p += glm::vec3(stepDir) * currentSize;
         t.x = tcMax;
@@ -485,8 +464,10 @@ bool Octree::Raycast(glm::vec3 r0, glm::vec3 rd, glm::vec3 &intersection, glm::v
             processChild = false;
         }
 
-        if (currentSize > size)
+        if (currentSize > octreeSize)
             break;
     }
-    return hasIntersect;
+
+    rayHit.iteration += i;
+    return rayHit;
 }

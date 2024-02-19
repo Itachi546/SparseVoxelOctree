@@ -8,12 +8,13 @@ layout(std430, binding = 0) readonly buffer NodeBuffer { uint nodePools[]; };
 layout(std430, binding = 1) readonly buffer BrickBuffer { uint brickPools[]; };
 
 uniform vec3 uCamPos;
+uniform vec3 uLightPos;
 uniform mat4 uInvP;
 uniform mat4 uInvV;
 uniform vec3 uAABBMin;
 uniform vec3 uAABBMax;
 
-const int MAX_LEVELS = 10;
+const int MAX_LEVELS = 12;
 struct StackData {
     vec3 position;
     uint firstSibling;
@@ -29,7 +30,6 @@ void stack_push(StackData data) { stack[stackPtr++] = data; }
 StackData stack_pop() { return stack[--stackPtr]; }
 bool stack_empty() { return stackPtr == 0; }
 
-const vec3 ld = normalize(vec3(0.01, 1.0, -0.5));
 vec3 GenerateCameraRay(vec2 uv) {
     vec4 clipPos = uInvP * vec4(uv, -1.0, 0.0);
     vec4 worldPos = uInvV * vec4(clipPos.x, clipPos.y, -1.0, 0.0);
@@ -38,12 +38,12 @@ vec3 GenerateCameraRay(vec2 uv) {
 
 #define EPSILON 10e-7f
 #define MAX_ITERATIONS 1000
-#define BRICK_SIZE 8
-#define BRICK_SIZE2 64
-#define BRICK_SIZE3 512
-#define LEAF_NODE_SIZE 1
-#define INV_LEAF_NODE_SIZE (1.0f / float(LEAF_NODE_SIZE))
-#define GRID_MARCH_MAX_ITERATION 50
+#define BRICK_SIZE 16
+#define LEAF_NODE_SIZE 2
+#define BRICK_SIZE2 (BRICK_SIZE * BRICK_SIZE)
+#define BRICK_SIZE3 (BRICK_SIZE2 * BRICK_SIZE)
+#define UNIT_BRICK_SIZE (float(LEAF_NODE_SIZE) / float(BRICK_SIZE))
+#define GRID_MARCH_MAX_ITERATION 100
 
 #define REFLECT(p, c) (2.0f * c - p)
 #define GET_MASK(p) (p >> 30)
@@ -109,7 +109,7 @@ RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
             vec3 t = (p - r0) * tStep;
             float tMax = max(max(t.x, t.y), t.z);
             rayHit.normal = -nearestAxis;
-            rayHit.t = tMax * INV_LEAF_NODE_SIZE;
+            rayHit.t = tMax * UNIT_BRICK_SIZE;
             rayHit.intersect = true;
             rayHit.color = color;
             rayHit.iteration = i;
@@ -289,21 +289,28 @@ void main() {
     RayHit hit = Trace(r0, rd);
     vec3 col = vec3(0.5f);
     if (hit.intersect) {
-        vec3 diffuseColor = uintToRGB(hit.color);
+        vec3 diffuseColor = pow(uintToRGB(hit.color), vec3(2.2f));
         vec3 n = normalize(hit.normal);
-        vec3 ld = normalize(vec3(-0.5f, 1.0f, 0.1f));
         vec3 p = r0 + hit.t * rd;
-        col = max(dot(n, ld), 0.0f) * diffuseColor;
-        col += (n.y * 0.5f + 0.5f) * vec3(0.16, 0.20, 0.28);
-        // col = ACES(col);
-        // col = pow(col, vec3(0.4545));
+        vec3 ld = normalize(uLightPos - p);
+
+        stack_reset();
+        float shadow = 1.0f;
+        RayHit shadowHit = Trace(p + n * UNIT_BRICK_SIZE * 0.5f, ld);
+        if (shadowHit.intersect) {
+            shadow = 0.1f;
+        }
+        col = max(dot(n, ld), 0.0f) * diffuseColor * shadow;
+        col += 0.05f;
+        col = ACES(col);
+        col = pow(col, vec3(0.4545));
     }
 
 #if 1
     fragColor = vec4(col, 1.0f);
 #else
     // float iter = (float(hit.iteration) / (MAX_ITERATIONS * 0.5f));
-    float iter = hit.t / 100.0f;
+    float iter = hit.t / 500.0f;
     fragColor = vec4(vec3(iter), 1.0);
 #endif
 }
