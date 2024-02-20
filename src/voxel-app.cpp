@@ -33,8 +33,7 @@ MessageCallback(GLenum source,
     assert(0);
 }
 
-void VoxelApp::LoadFromFile(const char *filename, float scale) {
-    const uint32_t kOctreeDims = 32;
+void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
     octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData model;
     model.Load(filename, scale);
@@ -74,7 +73,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 #if 1
     octree = new Octree("monu3x16.octree");
 #else
-    LoadFromFile("assets/models/monu3.vox", 0.5f);
+    constexpr uint32_t kOctreeDims = 32;
+    LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
     octree->Serialize("monu3x16.octree");
 #endif
     raycaster = new OctreeRaycaster();

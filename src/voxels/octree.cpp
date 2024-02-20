@@ -139,13 +139,13 @@ void Octree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std
 
 bool Octree::IsRegionEmpty(VoxelData *voxels, const glm::vec3 &min, const glm::vec3 &max) {
     glm::vec3 size = max - min;
-    for (int x = 0; x < BRICK_SIZE; ++x) {
-        for (int y = 0; y < BRICK_SIZE; ++y) {
-            for (int z = 0; z < BRICK_SIZE; ++z) {
-                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(BRICK_SIZE - 1);
+    for (int x = 0; x < 32; ++x) {
+        for (int y = 0; y < 32; ++y) {
+            for (int z = 0; z < 32; ++z) {
+                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / 31.0f;
                 glm::vec3 p = min + t01 * size;
                 uint32_t val = voxels->Sample(p);
-                if (val <= 0.0f) {
+                if (val > 0) {
                     return false;
                 }
             }
@@ -197,7 +197,6 @@ void Octree::Generate(VoxelData *voxels, const glm::vec3 &center, float size, ui
         return;
     }
 
-    glm::vec3 min = center - size;
     if (!IsRegionEmpty(voxels, center - size, center + size)) {
         CreateChildren(parent);
         float halfSize = size * 0.5f;
@@ -278,7 +277,7 @@ glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
     return p;
 }
 
-RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm::vec3 &dirMask, uint32_t brickStart, std::vector<AABB>& traversedNodes) {
+RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm::vec3 &dirMask, uint32_t brickStart, std::vector<AABB> &traversedNodes) {
     const int gridEndMargin = BRICK_SIZE - 1;
     glm::vec3 stepDir = mix(glm::vec3(-1.0f), glm::vec3(1.0f), dirMask);
     glm::vec3 tStep = invRd;
@@ -292,14 +291,14 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm
     rayHit.iteration = 0;
     glm::vec3 t = (1.0f - fract(r0)) * tStep;
 
-    glm::vec3 dir = p - r0;
-    glm::vec3 nearestAxis = glm::step(glm::vec3(dir.y, dir.z, dir.x), dir) *
-                            glm::step(glm::vec3(dir.z, dir.x, dir.y), dir);
+    glm::vec3 nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) *
+                            glm::step(t, glm::vec3(t.z, t.x, t.y));
+
     for (int i = 0; i < 100; ++i) {
-        #if DEBUG_OCTREE_TRAVERSAL
+#if DEBUG_OCTREE_TRAVERSAL
         glm::vec3 dp = glm::mix(glm::vec3(gridEndMargin) - p, p, dirMask);
         traversedNodes.push_back(AABB{dp, dp + 1.0f});
-        #endif
+#endif
         uint32_t voxelIndex = brickStart + uint32_t(p.x * BRICK_SIZE * BRICK_SIZE + p.y * BRICK_SIZE + p.z);
         uint32_t color = brickPools[voxelIndex];
         if (color > 0) {
@@ -404,13 +403,13 @@ RayHit Octree::Raycast(glm::vec3 r0, glm::vec3 rd) {
 
                 std::vector<AABB> traversedNodes;
                 RayHit brickHit = RaycastDDA(brickPos, invRayDir, glm::ivec3(glm::greaterThan(rd, glm::vec3(0.0f))), brickPointer, traversedNodes);
-                #if DEBUG_OCTREE_TRAVERSAL
+#if DEBUG_OCTREE_TRAVERSAL
                 for (auto &node : traversedNodes) {
                     glm::vec3 nodeMin = Reflect(Remap<glm::vec3>(node.min, glm::vec3(0.0f), brickMax, p - currentSize, p), center, rd);
                     glm::vec3 nodeMax = Reflect(Remap<glm::vec3>(node.max, glm::vec3(0.0f), brickMax, p - currentSize, p), center, rd);
                     Debug::AddRect(nodeMin, nodeMax);
                 }
-                #endif
+#endif
                 if (brickHit.intersect) {
                     // Debug draw nodes
                     rayHit.normal = brickHit.normal * sign(rd);

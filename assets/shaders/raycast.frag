@@ -37,8 +37,8 @@ vec3 GenerateCameraRay(vec2 uv) {
 
 #define EPSILON 10e-7f
 #define MAX_ITERATIONS 1000
-#define BRICK_SIZE 16
-#define LEAF_NODE_SIZE 2
+#define BRICK_SIZE 8
+#define LEAF_NODE_SIZE 1
 #define BRICK_SIZE2 (BRICK_SIZE * BRICK_SIZE)
 #define BRICK_SIZE3 (BRICK_SIZE2 * BRICK_SIZE)
 #define UNIT_BRICK_SIZE (float(LEAF_NODE_SIZE) / float(BRICK_SIZE))
@@ -97,8 +97,7 @@ RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
     rayHit.iteration = 0;
     vec3 t = (1.0f - fract(r0)) * tStep;
 
-    vec3 dir = p - r0;
-    vec3 nearestAxis = step(dir.yzx, dir.xyz) * step(dir.zxy, dir.xyz);
+    vec3 nearestAxis = step(t, t.yzx) * step(t, t.zxy);
     for (int i = 0; i < GRID_MARCH_MAX_ITERATION; ++i) {
         uint voxelIndex = brickStart + uint(p.x * BRICK_SIZE2 + p.y * BRICK_SIZE + p.z);
         uint color = brickPools[voxelIndex];
@@ -310,7 +309,7 @@ void main() {
     fragColor = vec4(col, 1.0f);
 #else
     // float iter = (float(hit.iteration) / (MAX_ITERATIONS * 0.5f));
-    float iter = hit.t / 200.0f;
+    float iter = hit.iteration / 200.0f;
     fragColor = vec4(vec3(iter), 1.0);
 #endif
 }
