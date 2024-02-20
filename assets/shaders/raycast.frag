@@ -2,8 +2,6 @@
 
 layout(location = 0) out vec4 fragColor;
 
-layout(location = 0) in vec2 uv;
-
 layout(std430, binding = 0) readonly buffer NodeBuffer { uint nodePools[]; };
 layout(std430, binding = 1) readonly buffer BrickBuffer { uint brickPools[]; };
 
@@ -13,6 +11,7 @@ uniform mat4 uInvP;
 uniform mat4 uInvV;
 uniform vec3 uAABBMin;
 uniform vec3 uAABBMax;
+uniform vec2 uResolution;
 
 const int MAX_LEVELS = 12;
 struct StackData {
@@ -283,8 +282,9 @@ vec3 ACES(vec3 x) {
 }
 
 void main() {
+    vec2 uv = (gl_FragCoord.xy / uResolution) * 2.0f - 1.0f;
     vec3 r0 = uCamPos;
-    vec3 rd = GenerateCameraRay(uv * 2.0 - 1.0);
+    vec3 rd = GenerateCameraRay(uv);
 
     RayHit hit = Trace(r0, rd);
     vec3 col = vec3(0.5f);

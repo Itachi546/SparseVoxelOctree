@@ -15,7 +15,7 @@ struct OctreeRaycaster {
 
     void Initialize(Octree *octree);
 
-    void Render(gfx::Camera *camera, glm::vec3 lightPosition);
+    void Render(gfx::Camera *camera, glm::vec3 lightPosition, glm::vec2 resolution);
 
     void Shutdown();
 

@@ -162,7 +162,7 @@ void VoxelApp::OnRender() {
         if (enableRasterizer) {
             rasterizer->Render(camera);
         } else
-            raycaster->Render(camera, lightPosition);
+            raycaster->Render(camera, lightPosition, windowSize);
     }
     Debug::Render(VP);
 }
