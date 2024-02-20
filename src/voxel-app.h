@@ -37,7 +37,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void UpdateControls();
 
-    void LoadFromFile(const char *filename, float scale);
+    void LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims);
 
     using Clock = std::chrono::high_resolution_clock;
 
@@ -50,7 +50,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     float lastFrameTime;
 
     // Debug Variables
-    bool enableRasterizer = true;
+    bool enableRasterizer = false;
     bool show = true;
 
     glm::vec3 origin;
