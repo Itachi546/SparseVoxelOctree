@@ -21,7 +21,7 @@ const glm::vec3 COLORS[] = {
     glm::vec3(1.0f, 0.0f, 0.0f),
     glm::vec3(0.0f, 1.0f, 0.0f),
     glm::vec3(0.0f, 0.0f, 1.0f),
-    glm::vec3(1.0f, 0.0f, 1.0f),
+    glm::vec3(1.0f, 0.5f, 0.5f),
 };
 
 enum NodeMask {
@@ -46,7 +46,7 @@ struct Node {
 constexpr const uint32_t BRICK_SIZE = 16;
 constexpr const uint32_t BRICK_ELEMENT_COUNT = BRICK_SIZE * BRICK_SIZE * BRICK_SIZE;
 constexpr const uint32_t LEAF_NODE_SCALE = 2;
-
+constexpr const float BRICK_GRID_SIZE = float(LEAF_NODE_SCALE) / float(BRICK_SIZE);
 struct OctreeBrick {
     std::array<uint32_t, BRICK_ELEMENT_COUNT> data;
     glm::vec3 position;
@@ -105,7 +105,7 @@ struct Octree {
 
     bool IsRegionEmpty(VoxelData *generator, const glm::vec3 &min, const glm::vec3 &max);
 
-    RayHit RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, const glm::vec3 &dirMask, uint32_t brickStart);
+    RayHit RaycastDDA(const glm::vec3 &r0, const glm::vec3 &rd, const glm::vec3 &dirMask, uint32_t brickStart, std::vector<AABB> &traversedNodes);
     bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
     OctreeBrick temp;
 };

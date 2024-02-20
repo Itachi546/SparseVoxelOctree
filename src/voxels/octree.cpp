@@ -11,7 +11,7 @@
 
 #include "gfx/debug.h"
 
-#define DEBUG_OCTREE_TRAVERSAL 1
+#define DEBUG_OCTREE_TRAVERSAL 0
 
 inline Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {
     return Node{childPtr | (nodeMask << 30)};
@@ -278,7 +278,7 @@ glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
     return p;
 }
 
-RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm::vec3 &dirMask, uint32_t brickStart) {
+RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm::vec3 &dirMask, uint32_t brickStart, std::vector<AABB>& traversedNodes) {
     const int gridEndMargin = BRICK_SIZE - 1;
     glm::vec3 stepDir = mix(glm::vec3(-1.0f), glm::vec3(1.0f), dirMask);
     glm::vec3 tStep = invRd;
@@ -296,6 +296,10 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm
     glm::vec3 nearestAxis = glm::step(glm::vec3(dir.y, dir.z, dir.x), dir) *
                             glm::step(glm::vec3(dir.z, dir.x, dir.y), dir);
     for (int i = 0; i < 100; ++i) {
+        #if DEBUG_OCTREE_TRAVERSAL
+        glm::vec3 dp = glm::mix(glm::vec3(gridEndMargin) - p, p, dirMask);
+        traversedNodes.push_back(AABB{dp, dp + 1.0f});
+        #endif
         uint32_t voxelIndex = brickStart + uint32_t(p.x * BRICK_SIZE * BRICK_SIZE + p.y * BRICK_SIZE + p.z);
         uint32_t color = brickPools[voxelIndex];
         if (color > 0) {
@@ -304,15 +308,15 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm
             glm::vec3 t = (p - r0) * tStep;
             float tMax = glm::max(glm::max(t.x, t.y), t.z);
             rayHit.normal = -nearestAxis;
-            rayHit.t = tMax * (1.0f / float(BRICK_SIZE));
+            rayHit.t = tMax * BRICK_GRID_SIZE;
             rayHit.intersect = true;
             rayHit.color = color;
             rayHit.iteration = i;
             return rayHit;
         }
 
-        nearestAxis = glm::step(glm::vec3(dir.y, dir.z, dir.x), dir) *
-                      glm::step(glm::vec3(dir.z, dir.x, dir.y), dir);
+        nearestAxis = glm::step(t, glm::vec3(t.y, t.z, t.x)) *
+                      glm::step(t, glm::vec3(t.z, t.x, t.y));
         p += nearestAxis * stepDir;
         t += nearestAxis * tStep;
         if (p.x < 0.0f || p.x > gridEndMargin || p.y < 0.0f || p.y > gridEndMargin || p.z < 0.0f || p.z > gridEndMargin)
@@ -370,6 +374,12 @@ RayHit Octree::Raycast(glm::vec3 r0, glm::vec3 rd) {
     int i = 0;
     std::stack<StackData> stacks;
     for (; i < 1000; ++i) {
+#if DEBUG_OCTREE_TRAVERSAL
+        glm::vec3 dMin = Reflect(p - currentSize, center, rd);
+        glm::vec3 dMax = Reflect(p, center, rd);
+        uint32_t depth = static_cast<uint32_t>(stacks.size() % std::size(COLORS));
+        Debug::AddRect(dMin, dMax, COLORS[depth]);
+#endif
         uint32_t nodeIndex = firstSibling + (idx ^ octaneMask);
         Node nodeDescriptor = nodePools[nodeIndex];
         glm::vec3 tCorner = p * invRayDir - r0_rd;
@@ -390,8 +400,17 @@ RayHit Octree::Raycast(glm::vec3 r0, glm::vec3 rd) {
                 glm::vec3 intersectPos = r0 + glm::max(t.x, 0.0f) * d;
                 glm::vec3 brickMax = glm::vec3(BRICK_SIZE);
                 glm::vec3 brickPos = Remap<glm::vec3>(intersectPos, p - currentSize, p, glm::vec3(0.0f), brickMax);
+                brickPos = glm::clamp(brickPos, glm::vec3(0.0f), brickMax);
 
-                RayHit brickHit = RaycastDDA(brickPos, invRayDir, glm::ivec3(glm::greaterThan(rd, glm::vec3(0.0f))), brickPointer);
+                std::vector<AABB> traversedNodes;
+                RayHit brickHit = RaycastDDA(brickPos, invRayDir, glm::ivec3(glm::greaterThan(rd, glm::vec3(0.0f))), brickPointer, traversedNodes);
+                #if DEBUG_OCTREE_TRAVERSAL
+                for (auto &node : traversedNodes) {
+                    glm::vec3 nodeMin = Reflect(Remap<glm::vec3>(node.min, glm::vec3(0.0f), brickMax, p - currentSize, p), center, rd);
+                    glm::vec3 nodeMax = Reflect(Remap<glm::vec3>(node.max, glm::vec3(0.0f), brickMax, p - currentSize, p), center, rd);
+                    Debug::AddRect(nodeMin, nodeMax);
+                }
+                #endif
                 if (brickHit.intersect) {
                     // Debug draw nodes
                     rayHit.normal = brickHit.normal * sign(rd);

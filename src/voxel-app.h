@@ -50,7 +50,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     float lastFrameTime;
 
     // Debug Variables
-    bool enableRasterizer = false;
+    bool enableRasterizer = true;
     bool show = true;
 
     glm::vec3 origin;
