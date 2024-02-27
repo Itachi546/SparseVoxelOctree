@@ -1,6 +1,7 @@
 #include "input.h"
 
 void Input::Initialize() {
+    id = rand();
 }
 
 Key *Input::GetKey(int key) {
@@ -19,4 +20,7 @@ void Input::Update() {
 
     mouseDelta.x = 0.0f;
     mouseDelta.y = 0.0f;
+}
+
+void Input::Shutdown() {
 }

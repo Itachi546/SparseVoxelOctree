@@ -1,15 +1,10 @@
 #pragma once
 
 #include <string>
+#include "core/resource.h"
 
-class RenderingDevice {
+class RenderingDevice : public Resource {
   public:
-    virtual void Initialize() = 0;
-
-    virtual void Shutdown() = 0;
-
-    virtual void SetValidationMode(bool state) = 0;
-
     enum class DeviceType {
         DEVICE_TYPE_OTHER = 0x0,
         DEVICE_TYPE_INTEGRATED_GPU = 0x1,
@@ -18,10 +13,27 @@ class RenderingDevice {
         DEVICE_TYPE_CPU = 0x4,
         DEVICE_TYPE_MAX = 0x5
     };
-
     struct Device {
         std::string name;
         uint32_t vendor;
         DeviceType deviceType;
     };
+
+    virtual void Initialize() = 0;
+
+    virtual void SetValidationMode(bool state) = 0;
+
+    virtual void Shutdown() = 0;
+
+    virtual uint32_t GetDeviceCount() = 0;
+    virtual Device *GetDevice(int index) = 0;
+
+    static RenderingDevice *&GetInstance() {
+#ifdef VULKAN_ENABLED
+        static RenderingDevice *device = nullptr;
+        return device;
+#else
+#error No Supported Device Selected
+#endif
+    }
 };

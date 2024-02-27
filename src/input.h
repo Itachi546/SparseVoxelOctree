@@ -1,3 +1,5 @@
+#include "core/resource.h"
+
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
@@ -6,14 +8,14 @@ struct Key {
     bool wasDown;
 };
 
-struct Input {
+struct Input : public Resource {
 
-    static Input *GetInstance() {
+    static Input *Singleton() {
         static Input *input = new Input();
         return input;
     }
 
-    void Initialize();
+    void Initialize() override;
 
     Key *GetKey(int key);
 
@@ -43,4 +45,6 @@ struct Input {
 
     glm::vec2 mousePos;
     glm::vec2 mouseDelta;
+
+    void Shutdown() override;
 };

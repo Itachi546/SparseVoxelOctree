@@ -2,18 +2,21 @@
 #include "utils.h"
 
 #include "voxels/voxel-data.h"
-#include "rendering/vulkan-device.h"
+
+#ifdef VULKAN_ENABLED
+#include "rendering/vulkan-rendering-device.h"
+#endif
 
 int main() {
-    /*
-    VoxelApp app;
-    app.Run();
-    return 0;
-    */
-
-    RenderingDevice *device = new VulkanDevice();
+#if VULKAN_ENABLED
+    RenderingDevice::GetInstance() = new VulkanRenderingDevice();
+#endif
+    RenderingDevice *device = RenderingDevice::GetInstance();
     device->SetValidationMode(true);
     device->Initialize();
+
     while (true) {
     }
+
+    device->Shutdown();
 }

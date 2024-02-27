@@ -59,7 +59,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     Debug::Initialize();
     GpuTimer::Initialize();
-    Input::GetInstance()->Initialize();
+    Input::Singleton()->Initialize();
     ImGuiService::Initialize(glfwWindowPtr);
 
     camera = new gfx::Camera();
@@ -117,7 +117,7 @@ void VoxelApp::OnUpdate() {
 
     camera->Update(dt);
 
-    Input *input = Input::GetInstance();
+    Input *input = Input::Singleton();
 #if 1
     Ray ray;
     // glm::vec2 mouseCoord = ConvertFromWindowToNDC(input->mousePos, windowSize);
@@ -168,19 +168,19 @@ void VoxelApp::OnRender() {
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
-    Input::GetInstance()->SetMousePos(glm::vec2{x, y});
+    Input::Singleton()->SetMousePos(glm::vec2{x, y});
 }
 
 void VoxelApp::OnMouseScroll(float x, float y) {}
 
 void VoxelApp::OnMouseButton(int button, int action) {
-    Input::GetInstance()->SetKeyState(button, action != GLFW_RELEASE);
+    Input::Singleton()->SetKeyState(button, action != GLFW_RELEASE);
 }
 
 void VoxelApp::OnKey(int key, int action) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(glfwWindowPtr, true);
-    Input::GetInstance()->SetKeyState(key, action != GLFW_RELEASE);
+    Input::Singleton()->SetKeyState(key, action != GLFW_RELEASE);
 }
 
 void VoxelApp::OnResize(float width, float height) {
@@ -196,7 +196,7 @@ void VoxelApp::UpdateControls() {
 
     const float rotateSpeed = 2.0f;
 
-    Input *input = Input::GetInstance();
+    Input *input = Input::Singleton();
     if (input->GetKey(GLFW_MOUSE_BUTTON_LEFT)->isDown) {
         glm::vec2 mouseDelta = input->GetMouseDelta();
         camera->Rotate(-mouseDelta.y * rotateSpeed, -mouseDelta.x * rotateSpeed, dt);

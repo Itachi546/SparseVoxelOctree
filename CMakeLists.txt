@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 SET(PROJECT_SOURCE_FILES 
                   "src/gfx/opengl.cpp"
-                  "src/rendering/vulkan-device.cpp"
+                  "src/rendering/vulkan-rendering-device.cpp"
                   "src/gfx/gpu-timer.cpp"
                   "src/gfx/imgui-service.cpp"
                   "src/main.cpp"
@@ -22,7 +22,7 @@ SET(PROJECT_SOURCE_FILES
                   "src/utils.cpp"
                   "src/voxel-app.cpp")
 SET (PROJECT_HEADER_FILES 
-                   "src/rendering/vulkan-device.h"
+                   "src/rendering/vulkan-rendering-device.h"
                    "src/rendering/rendering-device.h"
                    "src/gfx/opengl.h"
                    "src/gfx/imgui-service.h"
@@ -39,6 +39,7 @@ SET (PROJECT_HEADER_FILES
                    "src/voxels/density-generator.h"
                    "src/voxels/voxel-data.h"
                    "src/gfx/mesh.h"
+                   "src/core/resource.h"
                    "src/voxel-app.h")
 
 add_executable(${PROJECT_NAME} ${PROJECT_HEADER_FILES} ${PROJECT_SOURCE_FILES})
@@ -48,22 +49,26 @@ find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(volk CONFIG REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 set(PROJECT_LIBRARIES 
     glad::glad
     glm::glm
     imgui::imgui
     volk::volk
-    glfw)
+    glfw
+)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PRIVATE 
         src/
-        external/)
+        external/
+    )
 target_compile_definitions(${PROJECT_NAME} PRIVATE   
         GLM_FORCE_XYZW_ONLY
         _CRT_SECURE_NO_WARNINGS
         VK_USE_PLATFORM_WIN32_KHR
+        VULKAN_ENABLED
     ) 
 
 if(MSVC)    
