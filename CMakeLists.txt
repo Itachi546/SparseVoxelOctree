@@ -5,44 +5,11 @@ set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
 project(vox-engine VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
-SET(PROJECT_SOURCE_FILES 
-                  "src/gfx/opengl.cpp"
-                  "src/rendering/vulkan-rendering-device.cpp"
-                  "src/gfx/gpu-timer.cpp"
-                  "src/gfx/imgui-service.cpp"
-                  "src/main.cpp"
-                  "src/input.cpp"
-                  "src/gfx/mesh.cpp"
-                  "src/gfx/camera.cpp"
-                  "src/gfx/debug.cpp"
-                  "src/voxels/octree.cpp"
-                  "src/voxels/voxel-data.cpp"
-                  "src/voxels/octree-raycaster.cpp"
-                  "src/voxels/octree-rasterizer.cpp"
-                  "src/utils.cpp"
-                  "src/voxel-app.cpp")
-SET (PROJECT_HEADER_FILES 
-                   "src/rendering/vulkan-rendering-device.h"
-                   "src/rendering/rendering-device.h"
-                   "src/gfx/opengl.h"
-                   "src/gfx/imgui-service.h"
-                   "src/gfx/gpu-timer.h"
-                   "src/app-window.h"
-                   "src/utils.h"
-                   "src/input.h"
-                   "src/gfx/camera.h"
-                   "src/math-utils.h"
-                   "src/gfx/debug.h"
-                   "src/voxels/octree.h"
-                   "src/voxels/octree-rasterizer.h"
-                   "src/voxels/octree-raycaster.h"
-                   "src/voxels/density-generator.h"
-                   "src/voxels/voxel-data.h"
-                   "src/gfx/mesh.h"
-                   "src/core/resource.h"
-                   "src/voxel-app.h")
+file(GLOB_RECURSE PROJECT_SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE PROJECT_HEADERS ${CMAKE_SOURCE_DIR}/src/*.h
+                          ${CMAKE_SOURCE_DIR}/external/*.h)
 
-add_executable(${PROJECT_NAME} ${PROJECT_HEADER_FILES} ${PROJECT_SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS})
 
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
