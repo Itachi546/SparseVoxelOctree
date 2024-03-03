@@ -57,6 +57,24 @@ namespace gfx {
         glDeleteShader(fragmentModule);
     }
 
+    void Shader::Create(const char *vs, const char *gs, const char *fs) {
+        GLuint vertexModule = CreateShaderModule(vs, GL_VERTEX_SHADER);
+        GLuint geometryModule = CreateShaderModule(gs, GL_GEOMETRY_SHADER);
+        GLuint fragmentModule = CreateShaderModule(fs, GL_FRAGMENT_SHADER);
+
+        handle = glCreateProgram();
+        glAttachShader(handle, vertexModule);
+        glAttachShader(handle, geometryModule);
+        glAttachShader(handle, fragmentModule);
+        glLinkProgram(handle);
+
+        PrintProgramInfoLog(handle);
+
+        glDeleteShader(vertexModule);
+        glDeleteShader(geometryModule);
+        glDeleteShader(fragmentModule);
+    }
+
     void Shader::Create(const char *cs) {
         GLuint computeModule = CreateShaderModule(cs, GL_COMPUTE_SHADER);
         handle = glCreateProgram();

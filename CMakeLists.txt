@@ -59,6 +59,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_compile_definitions(${PROJECT_NAME} PRIVATE   
         GLM_FORCE_XYZW_ONLY
         _CRT_SECURE_NO_WARNINGS
+        GLM_ENABLE_EXPERIMENTAL
     ) 
 
 if(MSVC)    

@@ -1,9 +1,10 @@
 #version 460
 
-in vec3 vColor;
-
+in vec3 gColor;
+in noperspective float dist;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-   fragColor = vec4(vColor, 1.0f);
+    float a = exp2(-dist * dist);
+    fragColor = vec4(gColor, a);
 }
