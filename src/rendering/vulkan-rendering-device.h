@@ -36,6 +36,9 @@ class VulkanRenderingDevice : public RenderingDevice {
     VkDevice device = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     std::vector<VkQueueFamilyProperties> queueFamilyProperties;
+    std::vector<uint32_t> selectedQueueFamilies;
+    std::vector<VkQueue> queues;
+
     VmaAllocator allocator = VK_NULL_HANDLE;
 
     std::vector<const char *> enabledInstanceExtensions;

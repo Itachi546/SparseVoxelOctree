@@ -152,6 +152,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
                 .queueCount = std::min(queueFamilyProperties[i].queueCount, 1u),
                 .pQueuePriorities = queuePriorities,
             });
+            selectedQueueFamilies.push_back(i);
             break;
         }
     }
@@ -188,6 +189,14 @@ void VulkanRenderingDevice::InitializeDevice(uint32_t deviceIndex) {
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queuePropertiesCount, queueFamilyProperties.data());
 
     device = CreateDevice(physicalDevice, enabledDeviceExtensions);
+
+    uint32_t queueCount = static_cast<uint32_t>(selectedQueueFamilies.size());
+    assert(queueCount > 0);
+
+    queues.resize(queueCount);
+    for (uint32_t i = 0; i < queueCount; ++i) {
+        vkGetDeviceQueue(device, selectedQueueFamilies[i], 0, &queues[i]);
+    }
 }
 
 void VulkanRenderingDevice::InitializeAllocator() {
