@@ -11,6 +11,7 @@ namespace gfx {
 
     struct Shader {
         void Create(const char *vs, const char *fs);
+        void Create(const char *vs, const char *gs, const char *fs);
         void Create(const char *cs);
 
         inline void Destroy() { glDeleteProgram(handle); }

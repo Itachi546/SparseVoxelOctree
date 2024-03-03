@@ -164,7 +164,7 @@ void VoxelApp::OnRender() {
         } else
             raycaster->Render(camera, lightPosition, windowSize);
     }
-    Debug::Render(VP);
+    Debug::Render(VP, windowSize);
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {

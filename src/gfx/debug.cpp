@@ -13,6 +13,7 @@ namespace Debug {
 
         gLineBuffer = gfx::CreateBuffer(nullptr, bufferSize, GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
         gLineShader.Create("assets/shaders/debug.vert",
+                           "assets/shaders/debug.geom",
                            "assets/shaders/debug.frag");
     }
 
@@ -103,7 +104,7 @@ namespace Debug {
         gLineBufferOffset += 12;
     }
 
-    void Render(glm::mat4 VP) {
+    void Render(glm::mat4 VP, glm::vec2 resolution) {
         if (gLineBufferOffset == 0)
             return;
         glUnmapNamedBuffer(gLineBuffer);
@@ -112,11 +113,16 @@ namespace Debug {
         uint32_t numLine = gLineBufferOffset;
         gLineBufferOffset = 0;
 
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         // Draw Line
         gLineShader.Bind();
         gLineShader.SetUniformMat4("VP", &VP[0][0]);
 
-        glLineWidth(2.0f);
+        glm::vec2 invResolution = 1.0f / resolution;
+        gLineShader.SetUniformFloat2("uInvResolution", &invResolution[0]);
+
+        // glLineWidth(2.0f);
         glBindBuffer(GL_ARRAY_BUFFER, gLineBuffer);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
@@ -126,7 +132,8 @@ namespace Debug {
 
         glDrawArrays(GL_LINES, 0, numLine * 2);
 
-        glLineWidth(1.0f);
+        glDisable(GL_BLEND);
+        // glLineWidth(1.0f);
     }
 
     void Shutdown() {
