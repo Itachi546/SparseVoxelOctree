@@ -48,7 +48,14 @@ class RenderingDevice : public Resource {
         DeviceType deviceType;
     };
 
-    virtual void Initialize() = 0;
+    struct WindowPlatformData {
+        void *windowPtr;
+    };
+
+    virtual void
+    Initialize() = 0;
+
+    virtual void CreateSurface(void *platformData) = 0;
 
     virtual void SetValidationMode(bool state) = 0;
 

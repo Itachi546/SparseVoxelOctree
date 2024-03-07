@@ -20,6 +20,8 @@ class VulkanRenderingDevice : public RenderingDevice {
         return static_cast<uint32_t>(gpus.size());
     }
 
+    void CreateSurface(void *platformData) override;
+
     Device *GetDevice(int index) override {
         return &gpus[index];
     }
@@ -40,6 +42,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     std::vector<VkQueue> queues;
 
     VmaAllocator allocator = VK_NULL_HANDLE;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
 
     std::vector<const char *> enabledInstanceExtensions;
     std::vector<const char *> enabledInstanceLayers;

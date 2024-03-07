@@ -9,6 +9,12 @@
 #include <assert.h>
 #include <vector>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif
+
+#define VK_LOAD_FUNCTION(instance, pFuncName) (vkGetInstanceProcAddr(instance, pFuncName))
 #define LOGE(err)                      \
     {                                  \
         std::cout << err << std::endl; \
@@ -116,6 +122,7 @@ void VulkanRenderingDevice::InitializeDevices() {
 }
 
 VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, std::vector<const char *> &enabledExtensions) {
+
     std::vector<const char *> requestedExt{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
@@ -156,6 +163,14 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
             break;
         }
     }
+
+#if _WIN32
+    static PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkCheckPresentationSupport = (PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)VK_LOAD_FUNCTION(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
+    if (!vkCheckPresentationSupport(physicalDevice, selectedQueueFamilies[0])) {
+        LOGE("Selected Device/Queue doesn't support presentation");
+        exit(-1);
+    }
+#endif
 
     assert(queueCreateInfos.size() > 0);
     LOG("Total queue: " + std::to_string(queueCreateInfos.size()));
@@ -259,16 +274,42 @@ void VulkanRenderingDevice::Initialize() {
     InitializeDevices();
 
     for (uint32_t deviceIndex = 0; deviceIndex < gpus.size(); ++deviceIndex) {
-        if (gpus[deviceIndex].deviceType == DeviceType::DEVICE_TYPE_DISCRETE_GPU)
+        if (gpus[deviceIndex].deviceType == DeviceType::DEVICE_TYPE_DISCRETE_GPU) {
             InitializeDevice(deviceIndex);
+            break;
+        }
     }
+    volkLoadDevice(device);
     assert(device != VK_NULL_HANDLE);
 
     InitializeAllocator();
     LOG("VMA Allocator Initialized ...");
 }
 
+void VulkanRenderingDevice::CreateSurface(void *platformData) {
+#ifdef _WIN32
+    HWND hwnd = (HWND) static_cast<WindowPlatformData *>(platformData)->windowPtr;
+    VkWin32SurfaceCreateInfoKHR createInfo = {
+        .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+        .hinstance = GetModuleHandle(0),
+        .hwnd = hwnd,
+    };
+    PFN_vkCreateWin32SurfaceKHR createWin32Surface = (PFN_vkCreateWin32SurfaceKHR)VK_LOAD_FUNCTION(instance, "vkCreateWin32SurfaceKHR");
+    VK_CHECK(createWin32Surface(instance, &createInfo, nullptr, &surface));
+#else
+#error "Unsupported Platform"
+#endif
+    VkBool32 presentSupport = false;
+    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, selectedQueueFamilies[0], surface, &presentSupport));
+    if (!presentSupport) {
+        LOGE("Presentation is supported by the device");
+        exit(-1);
+    }
+}
+
 void VulkanRenderingDevice::Shutdown() {
 
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    vkDestroyDevice(device, nullptr);
     vkDestroyInstance(instance, nullptr);
 }
