@@ -1,17 +1,24 @@
 #version 460
 
 layout(location = 0) out vec4 fragColor;
-/*
-layout(std430, binding = 0) readonly buffer NodeBuffer { uint nodePools[]; };
-layout(std430, binding = 1) readonly buffer BrickBuffer { uint brickPools[]; };
 
-uniform vec3 uCamPos;
-uniform vec3 uLightPos;
-uniform mat4 uInvP;
-uniform mat4 uInvV;
-uniform vec3 uAABBMin;
-uniform vec3 uAABBMax;
-uniform vec2 uResolution;
+layout(binding = 0) uniform GlobalData {
+    mat4 uInvP;
+    mat4 uInvV;
+    vec3 uCamPos;
+    float width;
+    vec3 uLightPos;
+    float height;
+};
+layout(std430, binding = 1) readonly buffer NodeBuffer { uint nodePools[]; };
+layout(std430, binding = 2) readonly buffer BrickBuffer { uint brickPools[]; };
+
+layout(push_constant) uniform PushConstants {
+    vec3 uAABBMin;
+    float padd0;
+    vec3 uAABBMax;
+    float padd1;
+};
 
 const int MAX_LEVELS = 12;
 struct StackData {
@@ -248,27 +255,27 @@ RayHit Trace(vec3 r0, vec3 rd) {
          * if we are currently at 10 and stepMask is 10
          *  Conclusion: Invalid because we have already taken a step in Y-Axis
          */
-/*
-if ((idx & stepMask) != 0) {
-    // Pop operation
-    if (!stack_empty()) {
-        StackData stackData = stack_pop();
-        p = stackData.position;
-        firstSibling = stackData.firstSibling;
-        t.y = stackData.tMax;
-        idx = stackData.idx;
-        currentSize = stackData.size;
-    } else
-        currentSize = currentSize * 2.0f;
-    processChild = false;
-}
 
-if (currentSize > octreeSize)
-    break;
-}
+        if ((idx & stepMask) != 0) {
+            // Pop operation
+            if (!stack_empty()) {
+                StackData stackData = stack_pop();
+                p = stackData.position;
+                firstSibling = stackData.firstSibling;
+                t.y = stackData.tMax;
+                idx = stackData.idx;
+                currentSize = stackData.size;
+            } else
+                currentSize = currentSize * 2.0f;
+            processChild = false;
+        }
 
-rayHit.iteration += i;
-return rayHit;
+        if (currentSize > octreeSize)
+            break;
+    }
+
+    rayHit.iteration += i;
+    return rayHit;
 }
 
 vec3 ACES(vec3 x) {
@@ -281,7 +288,8 @@ vec3 ACES(vec3 x) {
 }
 
 void main() {
-    vec2 uv = (gl_FragCoord.xy / uResolution) * 2.0f - 1.0f;
+    vec2 resolution = vec2(width, height);
+    vec2 uv = (gl_FragCoord.xy / resolution) * 2.0f - 1.0f;
     vec3 r0 = uCamPos;
     vec3 rd = GenerateCameraRay(uv);
 
@@ -312,9 +320,4 @@ void main() {
     float iter = hit.iteration / 200.0f;
     fragColor = vec4(vec3(iter), 1.0);
 #endif
-}
-*/
-
-void main() {
-    fragColor = vec4(1.0f);
 }
