@@ -41,46 +41,27 @@ int main() {
     CommandPoolID commandPool = device->CreateCommandPool();
     CommandBufferID commandBuffer = device->CreateCommandBuffer(commandPool);
 
-    ShaderID shaders[2];
-
-    RD::ShaderBinding uniforms[] = {
-        {RD::UNIFORM_TYPE_UNIFORM_BUFFER, 0},
-        {RD::UNIFORM_TYPE_STORAGE_BUFFER, 1},
-        {RD::UNIFORM_TYPE_STORAGE_BUFFER, 2},
+    RD::ShaderBinding bindings[] = {
+        {RD::BINDING_TYPE_IMAGE, 0},
     };
 
-    RD::PushConstant pushConstant = {
-        .offset = 0,
-        .size = sizeof(float) * 8,
-    };
+    ShaderID compShader = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.comp.spv",
+                                                                     bindings, static_cast<uint32_t>(std::size(bindings)),
+                                                                     nullptr, 0);
 
-    shaders[0] = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.vert.spv", nullptr, 0, nullptr, 0);
-    shaders[1] = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.frag.spv", uniforms, (uint32_t)std::size(uniforms), &pushConstant, 1);
+    PipelineID pipeline = device->CreateComputePipeline(compShader, "RayCast Compute");
+    device->Destroy(compShader);
 
-    RD::RasterizationState rs = RD::RasterizationState::Create();
-    RD::DepthState ds = RD::DepthState::Create();
-    RD::BlendState bs = RD::BlendState::Create();
-    RD::Format colorAttachments = RD::Format::FORMAT_R8G8B8A8_UNORM;
-
-    PipelineID pipeline = device->CreateGraphicsPipeline(shaders,
-                                                         static_cast<uint32_t>(std::size(shaders)),
-                                                         RD::TOPOLOGY_TRIANGLE_LIST,
-                                                         &rs,
-                                                         &ds,
-                                                         &colorAttachments,
-                                                         &bs,
-                                                         1,
-                                                         RD::FORMAT_UNDEFINED,
-                                                         "MainPipeline");
-
-    for (auto &shader : shaders)
-        device->Destroy(shader);
+    RD::TextureDescription textureDescription = RD::TextureDescription::Initialize(1920, 1080);
+    textureDescription.usageFlags = RD::TEXTURE_USAGE_INPUT_ATTACHMENT_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
+    TextureID texture = device->CreateTexture(&textureDescription);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         glfwSwapBuffers(window);
     }
+    device->Destroy(texture);
     device->Destroy(pipeline);
     device->Destroy(commandPool);
     device->Shutdown();

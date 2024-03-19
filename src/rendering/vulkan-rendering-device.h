@@ -38,12 +38,17 @@ class VulkanRenderingDevice : public RenderingDevice {
                                       Format depthAttachmentFormat,
                                       const std::string &name) override;
 
+    PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name);
+
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") override;
     CommandPoolID CreateCommandPool(const std::string &name = "commandPool") override;
+
+    TextureID CreateTexture(TextureDescription *description) override;
 
     void Destroy(PipelineID pipeline) override;
     void Destroy(CommandPoolID commandPool) override;
     void Destroy(ShaderID shaderModule) override;
+    void Destroy(TextureID texture) override;
 
     Device *GetDevice(int index) override {
         return &gpus[index];
@@ -70,7 +75,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     std::vector<uint32_t> selectedQueueFamilies;
     std::vector<VkQueue> queues;
 
-    VmaAllocator allocator = VK_NULL_HANDLE;
+    VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
 
@@ -103,6 +108,19 @@ class VulkanRenderingDevice : public RenderingDevice {
         std::vector<VkImageView> imageViews;
     };
 
+    struct VulkanTexture {
+        uint32_t width, height, depth;
+        uint32_t mipLevels, arrayLevels;
+
+        VkImageAspectFlags imageAspect;
+        VkFormat format;
+        VkImageType imageType;
+
+        VkImage image;
+        VkImageView imageView;
+        VmaAllocation allocation;
+    };
+
     std::unique_ptr<VulkanSwapchain>
         swapchain;
 
@@ -114,6 +132,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     ResourcePool<VulkanShader> _shaders;
     ResourcePool<VkCommandPool> _commandPools;
     ResourcePool<VulkanPipeline> _pipeline;
+    ResourcePool<VulkanTexture> _textures;
+
     std::vector<VkCommandBuffer> _commandBuffers;
     VkDescriptorPool _descriptorPool;
 

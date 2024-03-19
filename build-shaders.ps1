@@ -1,1 +1,2 @@
 forfiles /m *.glsl /p "assets\shaders" -c "cmd /c %VULKAN_SDK%/Bin/glslangValidator.exe @path -gVS -V -o assets\spriv\@fname.spv"
+# glslangValidator -V --target-env vulkan1.3 raycast.vert.glsl -o raycast.vert.spv

@@ -85,7 +85,7 @@ static VkFormat RD_FORMAT_TO_VK_FORMAT[RD::FORMAT_MAX] = {
     VK_FORMAT_UNDEFINED,
 };
 
-static VkDescriptorType RD_BINDING_TYPE_TO_VK_DESCRIPTOR_TYPE[RD::UNIFORM_TYPE_MAX] = {
+static VkDescriptorType RD_BINDING_TYPE_TO_VK_DESCRIPTOR_TYPE[RD::BINDING_TYPE_MAX] = {
     VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
     VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
     VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -440,7 +440,7 @@ void VulkanRenderingDevice::InitializeAllocator() {
         .vulkanApiVersion = vulkanAPIVersion,
     };
 
-    VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &allocator));
+    VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator));
 }
 
 void VulkanRenderingDevice::Initialize() {
@@ -539,7 +539,7 @@ void VulkanRenderingDevice::CreateSurface(void *platformData) {
     _shaders.Initialize(64, "ShaderPool");
     _commandPools.Initialize(16, "CommandPool");
     _pipeline.Initialize(64, "PipelinePool");
-
+    _textures.Initialize(64, "TexturePool");
     _commandBuffers.reserve(16);
 }
 
@@ -722,6 +722,47 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
     return PipelineID{pipelineID};
 }
 
+PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, const std::string &name) {
+    VulkanShader *vkShader = _shaders.Access(shader.id);
+    assert(vkShader->stage == VK_SHADER_STAGE_COMPUTE_BIT);
+
+    VkPipelineShaderStageCreateInfo shaderStage = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = vkShader->stage,
+        .module = vkShader->shaderModule,
+        .pName = "main",
+    };
+
+    uint32_t bindingCount = static_cast<uint32_t>(vkShader->layoutBindings.size());
+    std::vector<VkDescriptorSetLayoutBinding> bindings(bindingCount);
+    for (uint32_t i = 0; i < bindingCount; ++i) {
+        bindings[i].binding = vkShader->layoutBindings[i].binding;
+        bindings[i].descriptorCount = 1;
+        bindings[i].descriptorType = RD_BINDING_TYPE_TO_VK_DESCRIPTOR_TYPE[vkShader->layoutBindings[i].bindingType];
+        bindings[i].pImmutableSamplers = nullptr;
+        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+
+    VkDescriptorSetLayout setLayout = CreateDescriptorSetLayout(bindings, bindingCount);
+    VkPipelineLayout layout = CreatePipelineLayout(setLayout, vkShader->pushConstants);
+
+    VkComputePipelineCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = shaderStage,
+        .layout = layout};
+
+    uint64_t pipelineID = _pipeline.Obtain();
+    VulkanPipeline *pipeline = _pipeline.Access(pipelineID);
+    VK_CHECK(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
+
+    pipeline->setLayout = setLayout;
+    pipeline->layout = layout;
+
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline->pipeline, name.c_str());
+
+    return PipelineID{pipelineID};
+}
+
 CommandPoolID VulkanRenderingDevice::CreateCommandPool(const std::string &name) {
     VkCommandPoolCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -755,6 +796,72 @@ CommandBufferID VulkanRenderingDevice::CreateCommandBuffer(CommandPoolID command
     return CommandBufferID(_commandBuffers.size() - 1);
 }
 
+TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description) {
+    uint64_t textureID = _textures.Obtain();
+    VulkanTexture *texture = _textures.Access(textureID);
+    texture->width = description->width;
+    texture->height = description->height;
+    texture->depth = description->depth;
+    texture->mipLevels = description->mipMaps;
+    texture->arrayLevels = description->arrayLayers;
+    texture->imageType = VkImageType(description->textureType);
+
+    VkImageUsageFlags usage = 0;
+    if ((description->usageFlags & TEXTURE_USAGE_TRANSFER_SRC_BIT))
+        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    if ((description->usageFlags & TEXTURE_USAGE_TRANSFER_DST_BIT))
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if ((description->usageFlags & TEXTURE_USAGE_SAMPLED_BIT))
+        usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    if ((description->usageFlags & TEXTURE_USAGE_COLOR_ATTACHMENT_BIT))
+        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    if ((description->usageFlags & TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT))
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    if ((description->usageFlags & TEXTURE_USAGE_INPUT_ATTACHMENT_BIT))
+        usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+    texture->format = RD_FORMAT_TO_VK_FORMAT[description->format];
+    texture->imageAspect = (usage & TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = texture->imageType,
+        .format = texture->format,
+        .extent = {texture->width, texture->height, texture->depth},
+        .mipLevels = texture->mipLevels,
+        .arrayLayers = texture->arrayLevels,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = usage,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+
+    VmaAllocationCreateInfo allocationCreateInfo = {};
+    // @TODO change it later
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    allocationCreateInfo.flags = 0;
+
+    // Create Image
+    VmaAllocationInfo allocationInfo = {};
+    VK_CHECK(vmaCreateImage(vmaAllocator, &createInfo, &allocationCreateInfo, &texture->image, &texture->allocation, &allocationInfo));
+
+    VkImageViewCreateInfo imageViewCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = texture->image,
+        .viewType = VkImageViewType(texture->imageType),
+        .format = texture->format,
+        .components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A},
+        .subresourceRange = {
+            .aspectMask = texture->imageAspect,
+            .levelCount = texture->mipLevels,
+            .layerCount = texture->arrayLevels,
+        },
+    };
+    VK_CHECK(vkCreateImageView(device, &imageViewCreateInfo, nullptr, &texture->imageView));
+    return TextureID{textureID};
+}
+
 void VulkanRenderingDevice::Destroy(CommandPoolID commandPool) {
     VkCommandPool *vkcmdPool = _commandPools.Access(commandPool.id);
     vkDestroyCommandPool(device, *vkcmdPool, nullptr);
@@ -775,6 +882,13 @@ void VulkanRenderingDevice::Destroy(ShaderID shaderModule) {
     _shaders.Release(shaderModule.id);
 }
 
+void VulkanRenderingDevice::Destroy(TextureID texture) {
+    VulkanTexture *vkTexture = _textures.Access(texture.id);
+    vkDestroyImageView(device, vkTexture->imageView, nullptr);
+    vmaDestroyImage(vmaAllocator, vkTexture->image, vkTexture->allocation);
+    _textures.Release(texture.id);
+}
+
 void VulkanRenderingDevice::Shutdown() {
     // Release resource pool
     _shaders.Shutdown();
@@ -785,6 +899,7 @@ void VulkanRenderingDevice::Shutdown() {
     vkDestroySemaphore(device, timelineSemaphore, nullptr);
     for (auto &view : swapchain->imageViews)
         vkDestroyImageView(device, view, nullptr);
+    vmaDestroyAllocator(vmaAllocator);
     vkDestroySwapchainKHR(device, swapchain->swapchain, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDevice(device, nullptr);

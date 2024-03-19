@@ -30,6 +30,7 @@ DEFINE_ID(Shader)
 DEFINE_ID(CommandBuffer)
 DEFINE_ID(CommandPool)
 DEFINE_ID(Pipeline)
+DEFINE_ID(Texture)
 
 class RenderingDevice : public Resource {
   public:
@@ -57,11 +58,11 @@ class RenderingDevice : public Resource {
     };
 
     enum BindingType {
-        UNIFORM_TYPE_TEXTURE,
-        UNIFORM_TYPE_IMAGE,
-        UNIFORM_TYPE_STORAGE_BUFFER,
-        UNIFORM_TYPE_UNIFORM_BUFFER,
-        UNIFORM_TYPE_MAX
+        BINDING_TYPE_TEXTURE,
+        BINDING_TYPE_IMAGE,
+        BINDING_TYPE_STORAGE_BUFFER,
+        BINDING_TYPE_UNIFORM_BUFFER,
+        BINDING_TYPE_MAX
     };
 
     struct ShaderBinding {
@@ -76,8 +77,6 @@ class RenderingDevice : public Resource {
     };
 
     struct ShaderDescription {
-        bool isCompute = false;
-        uint32_t localSize[3] = {};
         ShaderBinding *bindings;
         uint32_t bindingCount;
 
@@ -185,6 +184,47 @@ class RenderingDevice : public Resource {
         }
     };
 
+    enum TextureType {
+        TEXTURE_TYPE_1D = 0,
+        TEXTURE_TYPE_2D = 1,
+        TEXTURE_TYPE_3D = 2,
+        TEXTURE_TYPE_MAX = 3
+    };
+
+    enum TextureUsageBits {
+        TEXTURE_USAGE_TRANSFER_SRC_BIT = (1 << 0),
+        TEXTURE_USAGE_TRANSFER_DST_BIT = (1 << 1),
+        TEXTURE_USAGE_SAMPLED_BIT = (1 << 2),
+        TEXTURE_USAGE_COLOR_ATTACHMENT_BIT = (1 << 3),
+        TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT = (1 << 4),
+        TEXTURE_USAGE_INPUT_ATTACHMENT_BIT = (1 << 5),
+    };
+
+    struct TextureDescription {
+        Format format;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        uint32_t arrayLayers;
+        uint32_t mipMaps;
+
+        TextureType textureType;
+        uint32_t usageFlags;
+
+        static TextureDescription Initialize(uint32_t width, uint32_t height, uint32_t depth = 1) {
+            return TextureDescription{
+                .format = FORMAT_R8G8B8A8_UNORM,
+                .width = width,
+                .height = height,
+                .depth = 1,
+                .arrayLayers = 1,
+                .mipMaps = 1,
+                .textureType = TEXTURE_TYPE_2D,
+                .usageFlags = 0,
+            };
+        }
+    };
+
     struct WindowPlatformData {
         void *windowPtr;
     };
@@ -205,6 +245,9 @@ class RenderingDevice : public Resource {
                                               uint32_t colorAttachmentCount,
                                               Format depthAttachmentFormat,
                                               const std::string &name) = 0;
+    virtual PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name) = 0;
+
+    virtual TextureID CreateTexture(TextureDescription *description) = 0;
 
     virtual void SetValidationMode(bool state) = 0;
 
@@ -217,6 +260,7 @@ class RenderingDevice : public Resource {
     virtual void Destroy(PipelineID pipeline) = 0;
     virtual void Destroy(ShaderID shaderModule) = 0;
     virtual void Destroy(CommandPoolID commandPool) = 0;
+    virtual void Destroy(TextureID texture) = 0;
 
     virtual void Shutdown() = 0;
 
