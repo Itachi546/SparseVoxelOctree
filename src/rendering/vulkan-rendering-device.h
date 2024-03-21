@@ -6,7 +6,7 @@
 
 #include "core/resource-pool.h"
 
-#define NOMINMAX
+#define NOMINMA
 #include <vma/vk_mem_alloc.h>
 
 #include <vector>
@@ -25,7 +25,6 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     void CreateSurface(void *platformData) override;
     void CreateSwapchain(void *platformData, bool vsync = true) override;
-
     ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name = "shader") override;
     PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
                                       uint32_t shaderCount,
@@ -39,16 +38,30 @@ class VulkanRenderingDevice : public RenderingDevice {
                                       const std::string &name) override;
 
     PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name);
-
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") override;
     CommandPoolID CreateCommandPool(const std::string &name = "commandPool") override;
-
     TextureID CreateTexture(TextureDescription *description) override;
+    UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount) override;
+
+    void BeginFrame() override;
+    void BeginCommandBuffer(CommandBufferID commandBuffer) override;
+    void EndCommandBuffer(CommandBufferID commandBuffer) override;
+    void Submit(CommandBufferID commandBuffer) override;
+    void Present() override;
+
+    void PipelineBarrier(CommandBufferID commandBuffer, TextureID texture) override;
+
+    void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
+    void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) override;
+    void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ = 1) override;
+
+    void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;
 
     void Destroy(PipelineID pipeline) override;
     void Destroy(CommandPoolID commandPool) override;
     void Destroy(ShaderID shaderModule) override;
     void Destroy(TextureID texture) override;
+    void Destroy(UniformSetID uniformSet) override;
 
     Device *GetDevice(int index) override {
         return &gpus[index];
@@ -73,15 +86,18 @@ class VulkanRenderingDevice : public RenderingDevice {
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     std::vector<VkQueueFamilyProperties> queueFamilyProperties;
     std::vector<uint32_t> selectedQueueFamilies;
-    std::vector<VkQueue> queues;
+    std::vector<VkQueue> _queues;
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
+    VkSemaphore renderEndSemaphore = VK_NULL_HANDLE;
+    VkSemaphore imageAcquireSemaphore = VK_NULL_HANDLE;
+    uint64_t lastSemaphoreValue_ = 0;
 
     struct VulkanShader {
         VkShaderModule shaderModule;
-        std::vector<RD::ShaderBinding> layoutBindings;
+        std::vector<RD::UniformBinding> layoutBindings;
         VkShaderStageFlagBits stage;
         std::vector<VkPushConstantRange> pushConstants;
     };
@@ -90,6 +106,7 @@ class VulkanRenderingDevice : public RenderingDevice {
         VkPipeline pipeline;
         VkPipelineLayout layout;
         VkDescriptorSetLayout setLayout;
+        VkPipelineBindPoint bindPoint;
     };
 
     struct VulkanSwapchain {
@@ -119,10 +136,16 @@ class VulkanRenderingDevice : public RenderingDevice {
         VkImage image;
         VkImageView imageView;
         VmaAllocation allocation;
+
+        VkImageLayout currentLayout;
     };
 
-    std::unique_ptr<VulkanSwapchain>
-        swapchain;
+    struct VulkanUniformSet {
+        VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+    };
+
+    std::unique_ptr<VulkanSwapchain> swapchain;
 
     std::vector<const char *> enabledInstanceExtensions;
     std::vector<const char *> enabledInstanceLayers;
@@ -133,6 +156,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     ResourcePool<VkCommandPool> _commandPools;
     ResourcePool<VulkanPipeline> _pipeline;
     ResourcePool<VulkanTexture> _textures;
+    ResourcePool<VulkanUniformSet> _uniformSets;
 
     std::vector<VkCommandBuffer> _commandBuffers;
     VkDescriptorPool _descriptorPool;
@@ -148,10 +172,19 @@ class VulkanRenderingDevice : public RenderingDevice {
     VkSwapchainKHR CreateSwapchainInternal(std::unique_ptr<VulkanSwapchain> &swapchain);
     VkDescriptorPool CreateDescriptorPool();
     VkDescriptorSetLayout CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding> &bindings, uint32_t bindingCount);
-
     VkPipelineLayout CreatePipelineLayout(VkDescriptorSetLayout setLayout, std::vector<VkPushConstantRange> &pushConstantRanges);
+    VkImageMemoryBarrier CreateImageBarrier(VkImage image,
+                                            VkImageAspectFlags aspect,
+                                            VkAccessFlags srcAccessMask,
+                                            VkAccessFlags dstAccessMask,
+                                            VkImageLayout oldLayout,
+                                            VkImageLayout newLayout,
+                                            uint32_t mipLevel = 0,
+                                            uint32_t arrLayer = 0,
+                                            uint32_t mipCount = ~0u,
+                                            uint32_t layerCount = ~0u);
 
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
 
-    VkSemaphore CreateSemaphore();
+    VkSemaphore CreateVulkanSemaphore(const std::string &name = "semaphore");
 };

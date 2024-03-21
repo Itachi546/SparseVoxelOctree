@@ -4,7 +4,7 @@
 
 namespace RenderingUtils {
     ShaderID CreateShaderModuleFromFile(const std::string &filename,
-                                        RD::ShaderBinding *bindings,
+                                        RD::UniformBinding *bindings,
                                         uint32_t bindingCount,
                                         RD::PushConstant *pushConstants,
                                         uint32_t pushConstantCount);

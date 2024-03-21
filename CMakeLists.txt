@@ -36,6 +36,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
         _CRT_SECURE_NO_WARNINGS
         VK_USE_PLATFORM_WIN32_KHR
         VULKAN_ENABLED
+        NOMINMAX
     ) 
 
 if(MSVC)    

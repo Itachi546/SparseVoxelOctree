@@ -19,7 +19,7 @@ namespace RenderingUtils {
         return RD::ShaderStage::SHADER_STAGE_MAX;
     }
 
-    ShaderID CreateShaderModuleFromFile(const std::string &filename, RD::ShaderBinding *bindings, uint32_t bindingCount, RD::PushConstant *pushConstants, uint32_t pushConstantCount) {
+    ShaderID CreateShaderModuleFromFile(const std::string &filename, RD::UniformBinding *bindings, uint32_t bindingCount, RD::PushConstant *pushConstants, uint32_t pushConstantCount) {
         auto shaderCode = utils::ReadFile(filename, std::ios::binary);
         if (!shaderCode.has_value()) {
             std::cerr << "Failed to open shader file: " << filename << std::endl;

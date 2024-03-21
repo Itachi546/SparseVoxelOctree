@@ -31,6 +31,7 @@ DEFINE_ID(CommandBuffer)
 DEFINE_ID(CommandPool)
 DEFINE_ID(Pipeline)
 DEFINE_ID(Texture)
+DEFINE_ID(UniformSet)
 
 class RenderingDevice : public Resource {
   public:
@@ -65,10 +66,16 @@ class RenderingDevice : public Resource {
         BINDING_TYPE_MAX
     };
 
-    struct ShaderBinding {
+    struct UniformBinding {
         BindingType bindingType;
         uint32_t binding;
         uint32_t size;
+    };
+
+    struct BoundUniform {
+        BindingType bindingType;
+        uint32_t binding;
+        ID resourceID;
     };
 
     struct PushConstant {
@@ -77,7 +84,7 @@ class RenderingDevice : public Resource {
     };
 
     struct ShaderDescription {
-        ShaderBinding *bindings;
+        UniformBinding *bindings;
         uint32_t bindingCount;
 
         PushConstant *pushConstants;
@@ -198,6 +205,7 @@ class RenderingDevice : public Resource {
         TEXTURE_USAGE_COLOR_ATTACHMENT_BIT = (1 << 3),
         TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT = (1 << 4),
         TEXTURE_USAGE_INPUT_ATTACHMENT_BIT = (1 << 5),
+        TEXTURE_USAGE_STORAGE_BIT = (1 << 6),
     };
 
     struct TextureDescription {
@@ -231,10 +239,10 @@ class RenderingDevice : public Resource {
 
     virtual void Initialize() = 0;
 
+    virtual void SetValidationMode(bool state) = 0;
+
     virtual void CreateSurface(void *platformData) = 0;
-
     virtual void CreateSwapchain(void *platformData, bool vsync = true) = 0;
-
     virtual PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
                                               uint32_t shaderCount,
                                               Topology topology,
@@ -246,21 +254,33 @@ class RenderingDevice : public Resource {
                                               Format depthAttachmentFormat,
                                               const std::string &name) = 0;
     virtual PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name) = 0;
-
     virtual TextureID CreateTexture(TextureDescription *description) = 0;
-
-    virtual void SetValidationMode(bool state) = 0;
-
     virtual ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInBytes, ShaderDescription *desc, const std::string &name = "shader") = 0;
-    // virtual gfx::PipelineID CreateGraphicsPipeline(PipelineDescription *desc) = 0;
-
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(const std::string &name = "commandPool") = 0;
+    virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount) = 0;
+
+    virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
+    virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) = 0;
+    virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
+    virtual void Submit(CommandBufferID commandBuffer) = 0;
+
+    // @TODO Hardcoded just for testing
+    virtual void PipelineBarrier(CommandBufferID commandBuffer, TextureID texture) = 0;
+
+    // @TODO seperate it into copy and present
+    virtual void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) = 0;
+
+    virtual void BeginFrame() = 0;
+    virtual void BeginCommandBuffer(CommandBufferID commandBuffer) = 0;
+    virtual void EndCommandBuffer(CommandBufferID commandBuffer) = 0;
+    virtual void Present() = 0;
 
     virtual void Destroy(PipelineID pipeline) = 0;
     virtual void Destroy(ShaderID shaderModule) = 0;
     virtual void Destroy(CommandPoolID commandPool) = 0;
     virtual void Destroy(TextureID texture) = 0;
+    virtual void Destroy(UniformSetID uniformSet) = 0;
 
     virtual void Shutdown() = 0;
 

@@ -6,6 +6,6 @@ layout(rgba8, binding = 0) writeonly uniform image2D uOutputTexture;
 
 void main() {
     ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
-    vec4 color = vec4(1.0f);
+    vec4 color = vec4(1.0f, 0.0f, 0.0f, 1.0f);
     imageStore(uOutputTexture, uv, color);
 }
