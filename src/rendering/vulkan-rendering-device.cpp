@@ -8,6 +8,7 @@
 #include <string>
 #include <assert.h>
 #include <vector>
+#include <array>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -566,6 +567,10 @@ ShaderID VulkanRenderingDevice::CreateShader(const uint32_t *byteCode, uint32_t 
     RD::UniformBinding *bindings = desc->bindings;
     shader->layoutBindings.insert(shader->layoutBindings.end(), desc->bindings, desc->bindings + desc->bindingCount);
 
+    std::sort(shader->layoutBindings.begin(), shader->layoutBindings.end(), [](const UniformBinding &lhs, const UniformBinding &rhs) {
+        return lhs.set < rhs.set;
+    });
+
     for (uint32_t i = 0; i < desc->pushConstantCount; ++i) {
         shader->pushConstants.push_back(VkPushConstantRange{
             .stageFlags = 0u | shader->stage,
@@ -579,11 +584,11 @@ ShaderID VulkanRenderingDevice::CreateShader(const uint32_t *byteCode, uint32_t 
     return ShaderID(shaderId);
 }
 
-VkPipelineLayout VulkanRenderingDevice::CreatePipelineLayout(VkDescriptorSetLayout setLayout, std::vector<VkPushConstantRange> &pushConstantRanges) {
+VkPipelineLayout VulkanRenderingDevice::CreatePipelineLayout(std::vector<VkDescriptorSetLayout> &setLayouts, std::vector<VkPushConstantRange> &pushConstantRanges) {
     VkPipelineLayoutCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &setLayout,
+        .setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+        .pSetLayouts = setLayouts.data(),
         .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
         .pPushConstantRanges = pushConstantRanges.data(),
     };
@@ -717,15 +722,15 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
     createInfo.pNext = &renderingCreateInfo;
 
     VkDescriptorSetLayout setLayout = CreateDescriptorSetLayout(layoutBindings, bindingCount);
-    VkPipelineLayout pipelineLayout = CreatePipelineLayout(setLayout, pushConstants);
-    createInfo.layout = pipelineLayout;
+    // VkPipelineLayout pipelineLayout = CreatePipelineLayout(setLayout, pushConstants);
+    // createInfo.layout = pipelineLayout;
 
     uint64_t pipelineID = _pipeline.Obtain();
     VulkanPipeline *pipeline = _pipeline.Access(pipelineID);
     VK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
 
-    pipeline->layout = pipelineLayout;
-    pipeline->setLayout = setLayout;
+    // pipeline->layout = pipelineLayout;
+    pipeline->setLayout.push_back(setLayout);
     pipeline->bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     SetDebugMarkerObjectName(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline->pipeline, name.c_str());
     return PipelineID{pipelineID};
@@ -742,29 +747,37 @@ PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, c
         .pName = "main",
     };
 
-    uint32_t bindingCount = static_cast<uint32_t>(vkShader->layoutBindings.size());
-    std::vector<VkDescriptorSetLayoutBinding> bindings(bindingCount);
-    for (uint32_t i = 0; i < bindingCount; ++i) {
-        bindings[i].binding = vkShader->layoutBindings[i].binding;
-        bindings[i].descriptorCount = 1;
-        bindings[i].descriptorType = RD_BINDING_TYPE_TO_VK_DESCRIPTOR_TYPE[vkShader->layoutBindings[i].bindingType];
-        bindings[i].pImmutableSamplers = nullptr;
-        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    uint32_t uniformBindingCount = static_cast<uint32_t>(vkShader->layoutBindings.size());
+    std::array<std::vector<VkDescriptorSetLayoutBinding>, MAX_SET_COUNT> setBindings;
+
+    uint32_t setCount = 0;
+    for (uint32_t i = 0; i < uniformBindingCount; ++i) {
+        UniformBinding &layoutDef = vkShader->layoutBindings[i];
+        VkDescriptorSetLayoutBinding &binding = setBindings[layoutDef.set].emplace_back(VkDescriptorSetLayoutBinding{});
+        binding.binding = layoutDef.binding;
+        binding.descriptorCount = 1;
+        binding.descriptorType = RD_BINDING_TYPE_TO_VK_DESCRIPTOR_TYPE[layoutDef.bindingType];
+        binding.pImmutableSamplers = nullptr;
+        binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        setCount = std::max(layoutDef.set, setCount);
     }
-
-    VkDescriptorSetLayout setLayout = CreateDescriptorSetLayout(bindings, bindingCount);
-    VkPipelineLayout layout = CreatePipelineLayout(setLayout, vkShader->pushConstants);
-
-    VkComputePipelineCreateInfo createInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .stage = shaderStage,
-        .layout = layout};
 
     uint64_t pipelineID = _pipeline.Obtain();
     VulkanPipeline *pipeline = _pipeline.Access(pipelineID);
-    VK_CHECK(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
 
-    pipeline->setLayout = setLayout;
+    std::vector<VkDescriptorSetLayout> &setLayouts = pipeline->setLayout;
+    setLayouts.reserve(setCount);
+    for (auto &setBinding : setBindings)
+        setLayouts.push_back(CreateDescriptorSetLayout(setBinding, static_cast<uint32_t>(setBinding.size())));
+
+    VkPipelineLayout layout = CreatePipelineLayout(setLayouts, vkShader->pushConstants);
+    VkComputePipelineCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = shaderStage,
+        .layout = layout,
+    };
+
+    VK_CHECK(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
     pipeline->layout = layout;
     pipeline->bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 
@@ -874,7 +887,7 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description) 
     return TextureID{textureID};
 }
 
-UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount) {
+UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) {
     std::vector<VkWriteDescriptorSet> writeSets(uniformCount);
     std::vector<VkDescriptorImageInfo> imageInfos;
 
@@ -904,7 +917,7 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = _descriptorPool,
         .descriptorSetCount = 1,
-        .pSetLayouts = &vkPipeline->setLayout,
+        .pSetLayouts = &vkPipeline->setLayout[set],
     };
 
     VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
@@ -919,6 +932,7 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
     VulkanUniformSet *uniformSet = _uniformSets.Access(uniformSetID);
     uniformSet->descriptorPool = _descriptorPool;
     uniformSet->descriptorSet = descriptorSet;
+    uniformSet->set = set;
 
     return UniformSetID{uniformSetID};
 }
@@ -986,7 +1000,7 @@ void VulkanRenderingDevice::BindUniformSet(CommandBufferID commandBuffer, Pipeli
 
     VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
     VulkanUniformSet *vkUniformSet = _uniformSets.Access(uniformSet.id);
-    vkCmdBindDescriptorSets(_commandBuffers[commandBuffer.id], vkPipeline->bindPoint, vkPipeline->layout, 0, 1, &vkUniformSet->descriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets(_commandBuffers[commandBuffer.id], vkPipeline->bindPoint, vkPipeline->layout, vkUniformSet->set, 1, &vkUniformSet->descriptorSet, 0, nullptr);
 }
 
 void VulkanRenderingDevice::DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) {
@@ -1114,7 +1128,8 @@ void VulkanRenderingDevice::Destroy(PipelineID pipeline) {
     VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
     vkDestroyPipeline(device, vkPipeline->pipeline, nullptr);
     vkDestroyPipelineLayout(device, vkPipeline->layout, nullptr);
-    vkDestroyDescriptorSetLayout(device, vkPipeline->setLayout, nullptr);
+    for (auto &setLayout : vkPipeline->setLayout)
+        vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
     _pipeline.Release(pipeline.id);
 }
 

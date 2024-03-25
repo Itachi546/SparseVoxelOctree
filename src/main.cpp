@@ -45,7 +45,8 @@ int main() {
     CommandBufferID commandBuffer = device->CreateCommandBuffer(commandPool);
 
     RD::UniformBinding bindings[] = {
-        {RD::BINDING_TYPE_IMAGE, 0},
+        {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
+        {RD::BINDING_TYPE_IMAGE, 1, 0},
     };
 
     ShaderID compShader = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.comp.spv",
@@ -60,7 +61,7 @@ int main() {
     TextureID texture = device->CreateTexture(&textureDescription);
 
     RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture};
-    UniformSetID uniformSet = device->CreateUniformSet(pipeline, &textureBinding, 1);
+    UniformSetID uniformSet = device->CreateUniformSet(pipeline, &textureBinding, 1, 1);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();

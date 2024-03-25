@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <memory>
+#include <array>
 
 class VulkanRenderingDevice : public RenderingDevice {
 
@@ -41,7 +42,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") override;
     CommandPoolID CreateCommandPool(const std::string &name = "commandPool") override;
     TextureID CreateTexture(TextureDescription *description) override;
-    UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount) override;
+    UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) override;
 
     void BeginFrame() override;
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;
@@ -105,7 +106,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     struct VulkanPipeline {
         VkPipeline pipeline;
         VkPipelineLayout layout;
-        VkDescriptorSetLayout setLayout;
+        std::vector<VkDescriptorSetLayout> setLayout;
         VkPipelineBindPoint bindPoint;
     };
 
@@ -143,6 +144,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     struct VulkanUniformSet {
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        uint32_t set = 0;
     };
 
     std::unique_ptr<VulkanSwapchain> swapchain;
@@ -161,6 +163,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     std::vector<VkCommandBuffer> _commandBuffers;
     VkDescriptorPool _descriptorPool;
 
+    static const uint32_t MAX_SET_COUNT = 4;
+
   private:
     void FindValidationLayers(std::vector<const char *> &enabledLayers);
     void InitializeInstanceExtensions(std::vector<const char *> &enabledExtensions);
@@ -171,8 +175,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     VkDevice CreateDevice(VkPhysicalDevice physicalDevice, std::vector<const char *> &enabledExtensions);
     VkSwapchainKHR CreateSwapchainInternal(std::unique_ptr<VulkanSwapchain> &swapchain);
     VkDescriptorPool CreateDescriptorPool();
-    VkDescriptorSetLayout CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding> &bindings, uint32_t bindingCount);
-    VkPipelineLayout CreatePipelineLayout(VkDescriptorSetLayout setLayout, std::vector<VkPushConstantRange> &pushConstantRanges);
+    VkDescriptorSetLayout CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding> &binding, uint32_t bindingCount);
+    VkPipelineLayout CreatePipelineLayout(std::vector<VkDescriptorSetLayout> &setLayouts, std::vector<VkPushConstantRange> &pushConstantRanges);
     VkImageMemoryBarrier CreateImageBarrier(VkImage image,
                                             VkImageAspectFlags aspect,
                                             VkAccessFlags srcAccessMask,

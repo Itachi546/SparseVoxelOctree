@@ -68,8 +68,8 @@ class RenderingDevice : public Resource {
 
     struct UniformBinding {
         BindingType bindingType;
+        uint32_t set;
         uint32_t binding;
-        uint32_t size;
     };
 
     struct BoundUniform {
@@ -258,7 +258,7 @@ class RenderingDevice : public Resource {
     virtual ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInBytes, ShaderDescription *desc, const std::string &name = "shader") = 0;
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(const std::string &name = "commandPool") = 0;
-    virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount) = 0;
+    virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) = 0;
 
     virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
     virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) = 0;
