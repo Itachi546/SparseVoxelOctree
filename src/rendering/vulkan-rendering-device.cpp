@@ -285,14 +285,28 @@ VkSwapchainKHR VulkanRenderingDevice::CreateSwapchainInternal(std::unique_ptr<Vu
         .oldSwapchain = swapchain->swapchain,
     };
     VkSwapchainKHR swapchainKHR = VK_NULL_HANDLE;
-    VK_CHECK(vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchainKHR));
+    VkResult result = vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchainKHR);
     return swapchainKHR;
 }
 
-void VulkanRenderingDevice::CreateSwapchain(void *platformData, bool vsync) {
+void VulkanRenderingDevice::ResizeSwapchain() {
+    VkSwapchainKHR oldSwapchain = swapchain->swapchain;
+    for (auto &imageView : swapchain->imageViews)
+        vkDestroyImageView(device, imageView, nullptr);
+
+    swapchain->imageViews.clear();
+    swapchain->images.clear();
+    swapchain->imageCount = 0;
+    CreateSwapchain(swapchain->vsync);
+
+    vkDestroySwapchainKHR(device, oldSwapchain, nullptr);
+}
+
+void VulkanRenderingDevice::CreateSwapchain(bool vsync) {
     if (swapchain == nullptr) {
         swapchain = std::make_unique<VulkanSwapchain>();
         swapchain->vsync = vsync;
+        swapchain->swapchain = VK_NULL_HANDLE;
     }
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities = {};
@@ -351,7 +365,6 @@ void VulkanRenderingDevice::CreateSwapchain(void *platformData, bool vsync) {
             ? VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR
             : VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
 
-    swapchain->swapchain = VK_NULL_HANDLE;
     swapchain->currentTransform = surfaceCapabilities.currentTransform;
     swapchain->swapchain = CreateSwapchainInternal(swapchain);
 
@@ -522,10 +535,11 @@ void VulkanRenderingDevice::Initialize() {
 
     // Initialize Resource Pools
     _shaders.Initialize(64, "ShaderPool");
-    _commandPools.Initialize(16, "CommandPool");
     _pipeline.Initialize(64, "PipelinePool");
     _textures.Initialize(64, "TexturePool");
-    _uniformSets.Initialize(16, "UniformSetPool");
+    _buffers.Initialize(64, "BufferPool");
+    _uniformSets.Initialize(64, "UniformSetPool");
+    _commandPools.Initialize(16, "CommandPool");
     _commandBuffers.reserve(16);
 
     _descriptorPool = CreateDescriptorPool();
@@ -887,9 +901,60 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description) 
     return TextureID{textureID};
 }
 
+BufferID VulkanRenderingDevice::CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType) {
+    assert(size > 0);
+    VkBufferCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = size,
+        .usage = usageFlags,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+
+    VmaAllocationCreateInfo allocationCreateInfo = {};
+
+    switch (allocationType) {
+    case MEMORY_ALLOCATION_TYPE_CPU: {
+        bool isSrc = (usageFlags & BUFFER_USAGE_TRANSFER_SRC_BIT) > 0;
+        bool isDst = (usageFlags & BUFFER_USAGE_TRANSFER_DST_BIT) > 0;
+
+        // This is a staging buffer
+        allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        if (isDst && !isSrc)
+            allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+        allocationCreateInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+        break;
+    }
+    case MEMORY_ALLOCATION_TYPE_GPU: {
+        allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        break;
+    }
+    }
+
+    VkBuffer vkBuffer = VK_NULL_HANDLE;
+    VmaAllocation allocation = nullptr;
+    VmaAllocationInfo allocationInfo = {};
+    VK_CHECK(vmaCreateBuffer(vmaAllocator, &createInfo, &allocationCreateInfo, &vkBuffer, &allocation, &allocationInfo));
+
+    uint64_t bufferID = _buffers.Obtain();
+    VulkanBuffer *buffer = _buffers.Access(bufferID);
+    buffer->buffer = vkBuffer;
+    buffer->allocation = allocation;
+    buffer->size = size;
+    return BufferID(bufferID);
+}
+
+uint8_t *VulkanRenderingDevice::MapBuffer(BufferID buffer) {
+    VulkanBuffer *vkBuffer = _buffers.Access(buffer.id);
+    void *ptr = nullptr;
+    VK_CHECK(vmaMapMemory(vmaAllocator, vkBuffer->allocation, &ptr));
+    return (uint8_t *)ptr;
+}
+
 UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) {
     std::vector<VkWriteDescriptorSet> writeSets(uniformCount);
     std::vector<VkDescriptorImageInfo> imageInfos;
+    std::vector<VkDescriptorBufferInfo> bufferInfos;
 
     for (uint32_t i = 0; i < uniformCount; ++i) {
         BoundUniform *uniform = uniforms + i;
@@ -909,6 +974,18 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
             writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             writeSets[i].pImageInfo = &imageInfo;
         } break;
+        case BINDING_TYPE_UNIFORM_BUFFER: {
+            VulkanBuffer *buffer = _buffers.Access(uniform->resourceID.id);
+            VkDescriptorBufferInfo &bufferInfo = bufferInfos.emplace_back(VkDescriptorBufferInfo{});
+            bufferInfo.buffer = buffer->buffer;
+            bufferInfo.offset = uniform->offset;
+            bufferInfo.range = uniform->size;
+            writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            writeSets[i].pBufferInfo = &bufferInfo;
+        } break;
+        default:
+            assert(0 && "Undefined Binding Type");
+            break;
         }
     }
 
@@ -938,6 +1015,16 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
 }
 
 void VulkanRenderingDevice::BeginFrame() {
+    // Check swapchain resize
+    VkSurfaceCapabilitiesKHR surfaceCaps = {};
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCaps));
+    uint32_t width = swapchain->width;
+    uint32_t height = swapchain->height;
+
+    bool resized = (width != surfaceCaps.currentExtent.width) || (height != surfaceCaps.currentExtent.height);
+    if (resized)
+        ResizeSwapchain();
+
     VK_CHECK(vkAcquireNextImageKHR(device, swapchain->swapchain, ~0ul, imageAcquireSemaphore, VK_NULL_HANDLE, &swapchain->currentImageIndex));
 }
 
@@ -997,7 +1084,6 @@ void VulkanRenderingDevice::BindPipeline(CommandBufferID commandBuffer, Pipeline
 }
 
 void VulkanRenderingDevice::BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) {
-
     VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
     VulkanUniformSet *vkUniformSet = _uniformSets.Access(uniformSet.id);
     vkCmdBindDescriptorSets(_commandBuffers[commandBuffer.id], vkPipeline->bindPoint, vkPipeline->layout, vkUniformSet->set, 1, &vkUniformSet->descriptorSet, 0, nullptr);
@@ -1116,6 +1202,15 @@ void VulkanRenderingDevice::Present() {
 
     VK_CHECK(vkQueuePresentKHR(_queues[0], &presentInfo));
     vkDeviceWaitIdle(device);
+}
+
+void VulkanRenderingDevice::Destroy(BufferID buffer) {
+    VulkanBuffer *vkBuffer = _buffers.Access(buffer.id);
+    if (vkBuffer->allocation->IsMappingAllowed()) {
+        vmaUnmapMemory(vmaAllocator, vkBuffer->allocation);
+    }
+    vmaDestroyBuffer(vmaAllocator, vkBuffer->buffer, vkBuffer->allocation);
+    _buffers.Release(buffer.id);
 }
 
 void VulkanRenderingDevice::Destroy(CommandPoolID commandPool) {

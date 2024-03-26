@@ -25,7 +25,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     }
 
     void CreateSurface(void *platformData) override;
-    void CreateSwapchain(void *platformData, bool vsync = true) override;
+    void CreateSwapchain(bool vsync = true) override;
     ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name = "shader") override;
     PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
                                       uint32_t shaderCount,
@@ -43,6 +43,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     CommandPoolID CreateCommandPool(const std::string &name = "commandPool") override;
     TextureID CreateTexture(TextureDescription *description) override;
     UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) override;
+    BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType) override;
+    uint8_t *MapBuffer(BufferID buffer) override;
 
     void BeginFrame() override;
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;
@@ -63,6 +65,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Destroy(ShaderID shaderModule) override;
     void Destroy(TextureID texture) override;
     void Destroy(UniformSetID uniformSet) override;
+    void Destroy(BufferID buffer) override;
 
     Device *GetDevice(int index) override {
         return &gpus[index];
@@ -141,6 +144,12 @@ class VulkanRenderingDevice : public RenderingDevice {
         VkImageLayout currentLayout;
     };
 
+    struct VulkanBuffer {
+        VkBuffer buffer;
+        VmaAllocation allocation;
+        uint32_t size;
+    };
+
     struct VulkanUniformSet {
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
@@ -159,6 +168,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     ResourcePool<VulkanPipeline> _pipeline;
     ResourcePool<VulkanTexture> _textures;
     ResourcePool<VulkanUniformSet> _uniformSets;
+    ResourcePool<VulkanBuffer> _buffers;
 
     std::vector<VkCommandBuffer> _commandBuffers;
     VkDescriptorPool _descriptorPool;
@@ -189,6 +199,7 @@ class VulkanRenderingDevice : public RenderingDevice {
                                             uint32_t layerCount = ~0u);
 
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
+    void ResizeSwapchain();
 
     VkSemaphore CreateVulkanSemaphore(const std::string &name = "semaphore");
 };

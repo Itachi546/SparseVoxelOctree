@@ -39,7 +39,7 @@ int main() {
     device->SetValidationMode(true);
     device->Initialize();
     device->CreateSurface(&platformData);
-    device->CreateSwapchain(&platformData, true);
+    device->CreateSwapchain(true);
 
     CommandPoolID commandPool = device->CreateCommandPool();
     CommandBufferID commandBuffer = device->CreateCommandBuffer(commandPool);
@@ -60,6 +60,12 @@ int main() {
     textureDescription.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
     TextureID texture = device->CreateTexture(&textureDescription);
 
+    BufferID buffer = device->CreateBuffer(44 * sizeof(float), RD::BUFFER_USAGE_UNIFORM_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU);
+    uint8_t *bufferPtr = device->MapBuffer(buffer);
+
+    RD::BoundUniform globalBindings = {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, buffer, 0, ~0ull};
+    UniformSetID globalSet = device->CreateUniformSet(pipeline, &globalBindings, 1, 0);
+
     RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture};
     UniformSetID uniformSet = device->CreateUniformSet(pipeline, &textureBinding, 1, 1);
 
@@ -70,6 +76,7 @@ int main() {
         device->BeginCommandBuffer(commandBuffer);
         device->PipelineBarrier(commandBuffer, texture);
         device->BindPipeline(commandBuffer, pipeline);
+        device->BindUniformSet(commandBuffer, pipeline, globalSet);
         device->BindUniformSet(commandBuffer, pipeline, uniformSet);
         device->DispatchCompute(commandBuffer, (width / 8) + 1, (height / 8) + 1, 1);
 
@@ -82,6 +89,9 @@ int main() {
 
         glfwSwapBuffers(window);
     }
+
+    device->Destroy(buffer);
+    device->Destroy(globalSet);
     device->Destroy(uniformSet);
     device->Destroy(texture);
     device->Destroy(pipeline);

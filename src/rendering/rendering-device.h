@@ -32,6 +32,7 @@ DEFINE_ID(CommandPool)
 DEFINE_ID(Pipeline)
 DEFINE_ID(Texture)
 DEFINE_ID(UniformSet)
+DEFINE_ID(Buffer)
 
 class RenderingDevice : public Resource {
   public:
@@ -76,6 +77,8 @@ class RenderingDevice : public Resource {
         BindingType bindingType;
         uint32_t binding;
         ID resourceID;
+        uint64_t offset = 0;
+        uint64_t size = ~0ull;
     };
 
     struct PushConstant {
@@ -208,6 +211,21 @@ class RenderingDevice : public Resource {
         TEXTURE_USAGE_STORAGE_BIT = (1 << 6),
     };
 
+    enum BufferUsageBits {
+        BUFFER_USAGE_TRANSFER_SRC_BIT = (1 << 0),
+        BUFFER_USAGE_TRANSFER_DST_BIT = (1 << 1),
+        BUFFER_USAGE_UNIFORM_BUFFER_BIT = (1 << 4),
+        BUFFER_USAGE_STORAGE_BUFFER_BIT = (1 << 5),
+        BUFFER_USAGE_INDEX_BUFFER_BIT = (1 << 6),
+        BUFFER_USAGE_VERTEX_BUFFER_BIT = (1 << 7),
+        BUFFER_USAGE_INDIRECT_BUFFER_BIT = (1 << 8)
+    };
+
+    enum MemoryAllocationType {
+        MEMORY_ALLOCATION_TYPE_CPU,
+        MEMORY_ALLOCATION_TYPE_GPU
+    };
+
     struct TextureDescription {
         Format format;
         uint32_t width;
@@ -242,7 +260,7 @@ class RenderingDevice : public Resource {
     virtual void SetValidationMode(bool state) = 0;
 
     virtual void CreateSurface(void *platformData) = 0;
-    virtual void CreateSwapchain(void *platformData, bool vsync = true) = 0;
+    virtual void CreateSwapchain(bool vsync = true) = 0;
     virtual PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
                                               uint32_t shaderCount,
                                               Topology topology,
@@ -259,6 +277,8 @@ class RenderingDevice : public Resource {
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(const std::string &name = "commandPool") = 0;
     virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) = 0;
+    virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType) = 0;
+    virtual uint8_t *MapBuffer(BufferID buffer) = 0;
 
     virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
     virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) = 0;
@@ -281,6 +301,7 @@ class RenderingDevice : public Resource {
     virtual void Destroy(CommandPoolID commandPool) = 0;
     virtual void Destroy(TextureID texture) = 0;
     virtual void Destroy(UniformSetID uniformSet) = 0;
+    virtual void Destroy(BufferID buffer) = 0;
 
     virtual void Shutdown() = 0;
 
