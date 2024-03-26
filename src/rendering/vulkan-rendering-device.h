@@ -52,7 +52,10 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Submit(CommandBufferID commandBuffer) override;
     void Present() override;
 
-    void PipelineBarrier(CommandBufferID commandBuffer, TextureID texture) override;
+    void PipelineBarrier(CommandBufferID commandBuffer,
+                         PipelineStageBits srcStage,
+                         PipelineStageBits dstStage,
+                         std::vector<TextureBarrier> &textureBarriers) override;
 
     void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
     void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) override;

@@ -69,12 +69,17 @@ int main() {
     RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture};
     UniformSetID uniformSet = device->CreateUniformSet(pipeline, &textureBinding, 1, 1);
 
+    std::vector<RD::TextureBarrier> textureBarriers{
+        RD::TextureBarrier{texture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL},
+    };
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         device->BeginFrame();
         device->BeginCommandBuffer(commandBuffer);
-        device->PipelineBarrier(commandBuffer, texture);
+
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, textureBarriers);
         device->BindPipeline(commandBuffer, pipeline);
         device->BindUniformSet(commandBuffer, pipeline, globalSet);
         device->BindUniformSet(commandBuffer, pipeline, uniformSet);

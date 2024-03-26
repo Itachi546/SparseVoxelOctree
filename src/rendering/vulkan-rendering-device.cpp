@@ -1120,16 +1120,36 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
     };
 }
 
-void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer, TextureID texture) {
-    VulkanTexture *vkTexture = _textures.Access(texture.id);
-    VkImageMemoryBarrier imageBarrier = CreateImageBarrier(vkTexture->image, vkTexture->imageAspect, VK_ACCESS_NONE, VK_ACCESS_SHADER_WRITE_BIT, vkTexture->currentLayout, VK_IMAGE_LAYOUT_GENERAL);
-    vkTexture->currentLayout = VK_IMAGE_LAYOUT_GENERAL;
-    vkCmdPipelineBarrier(_commandBuffers[commandBuffer.id],
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_DEPENDENCY_BY_REGION_BIT,
-                         0, nullptr,
-                         0, nullptr,
-                         1, &imageBarrier);
+void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
+                                            PipelineStageBits srcStage,
+                                            PipelineStageBits dstStage,
+                                            std::vector<TextureBarrier> &textureBarriers) {
+
+    std::vector<VkImageMemoryBarrier> vkTextureBarriers(textureBarriers.size());
+    for (uint32_t i = 0; i < textureBarriers.size(); ++i) {
+        TextureBarrier &textureBarrier = textureBarriers[i];
+        VkImageLayout newLayout = VkImageLayout(textureBarrier.newLayout);
+        VulkanTexture *vkTexture = _textures.Access(textureBarrier.texture.id);
+        if (newLayout == vkTexture->currentLayout)
+            continue;
+
+        vkTextureBarriers[i] = CreateImageBarrier(vkTexture->image, vkTexture->imageAspect,
+                                                  VkAccessFlags(textureBarrier.srcAccess),
+                                                  VkAccessFlags(textureBarrier.dstAccess),
+                                                  vkTexture->currentLayout, newLayout);
+        vkTexture->currentLayout = newLayout;
+    }
+
+    if (vkTextureBarriers.size() > 0) {
+        vkCmdPipelineBarrier(_commandBuffers[commandBuffer.id],
+                             VkPipelineStageFlags(srcStage),
+                             VkPipelineStageFlags(dstStage),
+                             VK_DEPENDENCY_BY_REGION_BIT,
+                             0, nullptr,
+                             0, nullptr,
+                             static_cast<uint32_t>(vkTextureBarriers.size()),
+                             vkTextureBarriers.data());
+    }
 }
 
 void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) {
