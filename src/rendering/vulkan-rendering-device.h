@@ -26,7 +26,7 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     void CreateSurface(void *platformData) override;
     void CreateSwapchain(bool vsync = true) override;
-    ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name = "shader") override;
+    ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name) override;
     PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
                                       uint32_t shaderCount,
                                       Topology topology,
@@ -39,11 +39,11 @@ class VulkanRenderingDevice : public RenderingDevice {
                                       const std::string &name) override;
 
     PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name);
-    CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") override;
-    CommandPoolID CreateCommandPool(const std::string &name = "commandPool") override;
-    TextureID CreateTexture(TextureDescription *description) override;
-    UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) override;
-    BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType) override;
+    CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name) override;
+    CommandPoolID CreateCommandPool(const std::string &name = "CommandPool") override;
+    TextureID CreateTexture(TextureDescription *description, const std::string &name) override;
+    UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) override;
+    BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) override;
     uint8_t *MapBuffer(BufferID buffer) override;
 
     void BeginFrame() override;
@@ -59,6 +59,7 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
     void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) override;
+    void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) override;
     void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ = 1) override;
 
     void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;

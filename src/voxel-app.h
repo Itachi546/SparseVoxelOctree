@@ -53,7 +53,27 @@ struct VoxelApp : AppWindow<VoxelApp> {
     bool enableRasterizer = false;
     bool show = true;
 
+    struct FrameData {
+        glm::mat4 uInvP;
+        glm::mat4 uInvV;
+
+        glm::vec3 uLightPosition;
+        float uScreenWidth;
+
+        glm::vec3 uCameraPosition;
+        float uScreenHeight;
+    } frameData;
+
     glm::vec3 origin;
     glm::vec3 target;
     glm::vec3 lightPosition;
+
+    RenderingDevice *device;
+    CommandPoolID commandPool;
+    CommandBufferID commandBuffer;
+
+    BufferID globalUB;
+    uint8_t *globalUBPtr;
+
+    UniformSetID globalUniformSet;
 };

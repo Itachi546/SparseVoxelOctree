@@ -828,12 +828,12 @@ CommandBufferID VulkanRenderingDevice::CreateCommandBuffer(CommandPoolID command
     VkCommandBuffer *commandBuffer = &_commandBuffers.emplace_back(VK_NULL_HANDLE);
     VK_CHECK(vkAllocateCommandBuffers(device, &allocateInfo, commandBuffer));
 
-    SetDebugMarkerObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)*commandBuffer, name.c_str());
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)(*commandBuffer), name.c_str());
 
     return CommandBufferID(_commandBuffers.size() - 1);
 }
 
-TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description) {
+TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description, const std::string &name) {
     uint64_t textureID = _textures.Obtain();
     VulkanTexture *texture = _textures.Access(textureID);
     texture->width = description->width;
@@ -884,6 +884,7 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description) 
     // Create Image
     VmaAllocationInfo allocationInfo = {};
     VK_CHECK(vmaCreateImage(vmaAllocator, &createInfo, &allocationCreateInfo, &texture->image, &texture->allocation, &allocationInfo));
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_IMAGE, (uint64_t)texture->image, name.c_str());
 
     VkImageViewCreateInfo imageViewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -898,10 +899,11 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description) 
         },
     };
     VK_CHECK(vkCreateImageView(device, &imageViewCreateInfo, nullptr, &texture->imageView));
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)texture->imageView, (name + "ImageView").c_str());
     return TextureID{textureID};
 }
 
-BufferID VulkanRenderingDevice::CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType) {
+BufferID VulkanRenderingDevice::CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) {
     assert(size > 0);
     VkBufferCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -935,6 +937,7 @@ BufferID VulkanRenderingDevice::CreateBuffer(uint32_t size, uint32_t usageFlags,
     VmaAllocation allocation = nullptr;
     VmaAllocationInfo allocationInfo = {};
     VK_CHECK(vmaCreateBuffer(vmaAllocator, &createInfo, &allocationCreateInfo, &vkBuffer, &allocation, &allocationInfo));
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_BUFFER, (uint64_t)vkBuffer, name.c_str());
 
     uint64_t bufferID = _buffers.Obtain();
     VulkanBuffer *buffer = _buffers.Access(bufferID);
@@ -951,10 +954,13 @@ uint8_t *VulkanRenderingDevice::MapBuffer(BufferID buffer) {
     return (uint8_t *)ptr;
 }
 
-UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) {
+UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) {
     std::vector<VkWriteDescriptorSet> writeSets(uniformCount);
+
+    // @TODO replace with custom allocator
     std::vector<VkDescriptorImageInfo> imageInfos;
     std::vector<VkDescriptorBufferInfo> bufferInfos;
+    imageInfos.reserve(16), bufferInfos.reserve(16);
 
     for (uint32_t i = 0; i < uniformCount; ++i) {
         BoundUniform *uniform = uniforms + i;
@@ -983,6 +989,15 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
             writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             writeSets[i].pBufferInfo = &bufferInfo;
         } break;
+        case BINDING_TYPE_STORAGE_BUFFER: {
+            VulkanBuffer *buffer = _buffers.Access(uniform->resourceID.id);
+            VkDescriptorBufferInfo &bufferInfo = bufferInfos.emplace_back(VkDescriptorBufferInfo{});
+            bufferInfo.buffer = buffer->buffer;
+            bufferInfo.offset = uniform->offset;
+            bufferInfo.range = uniform->size;
+            writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writeSets[i].pBufferInfo = &bufferInfo;
+        } break;
         default:
             assert(0 && "Undefined Binding Type");
             break;
@@ -999,6 +1014,7 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
 
     VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
     vkAllocateDescriptorSets(device, &allocateInfo, &descriptorSet);
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSet, name.c_str());
 
     for (auto &writeSet : writeSets)
         writeSet.dstSet = descriptorSet;
@@ -1083,6 +1099,12 @@ void VulkanRenderingDevice::BindPipeline(CommandBufferID commandBuffer, Pipeline
     vkCmdBindPipeline(_commandBuffers[commandBuffer.id], vkPipeline->bindPoint, vkPipeline->pipeline);
 }
 
+void VulkanRenderingDevice::BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) {
+    VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+    vkCmdPushConstants(cb, vkPipeline->layout, RD_STAGE_TO_VK_SHADER_STAGE_BITS[shaderStage], offset, size, data);
+}
+
 void VulkanRenderingDevice::BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) {
     VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
     VulkanUniformSet *vkUniformSet = _uniformSets.Access(uniformSet.id);
@@ -1154,7 +1176,6 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
 
 void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) {
     uint32_t imageIndex = swapchain->currentImageIndex;
-
     VulkanTexture *src = _textures.Access(texture.id);
     VkImage dst = swapchain->images[imageIndex];
 
@@ -1162,7 +1183,7 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
     if (src->currentLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
         barriers.push_back(CreateImageBarrier(src->image,
                                               src->imageAspect,
-                                              VK_ACCESS_NONE,
+                                              VK_ACCESS_SHADER_WRITE_BIT,
                                               VK_ACCESS_TRANSFER_READ_BIT,
                                               src->currentLayout,
                                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL));
@@ -1177,7 +1198,7 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
                                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
     VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
-    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_DEPENDENCY_BY_REGION_BIT,
                          0, 0, 0, 0,
@@ -1192,9 +1213,9 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
     blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     blitRegion.dstSubresource.layerCount = 1;
     blitRegion.srcOffsets[0] = {0, 0, 0};
-    blitRegion.srcOffsets[1] = {0, 0, 1};
-    blitRegion.dstOffsets[0] = {0, 0, 0};
-    blitRegion.dstOffsets[1] = {(int)swapchain->width, (int)swapchain->height, 1};
+    blitRegion.srcOffsets[1] = {(int)src->width, (int)src->height, 1};
+    blitRegion.dstOffsets[0] = {0, (int)swapchain->height, 0};
+    blitRegion.dstOffsets[1] = {(int)swapchain->width, 0, 1};
 
     vkCmdBlitImage(cb, src->image, src->currentLayout, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitRegion, VK_FILTER_LINEAR);
 
@@ -1205,7 +1226,7 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
                                                                0,
                                                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                                                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
 }
 
 void VulkanRenderingDevice::Present() {

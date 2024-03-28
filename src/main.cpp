@@ -7,8 +7,7 @@
 #ifdef VULKAN_ENABLED
 #include "rendering/vulkan-rendering-device.h"
 #endif
-
-#include <GLFW/glfw3.h>
+/*#include <GLFW/glfw3.h>
 
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -102,4 +101,10 @@ int main() {
     device->Destroy(pipeline);
     device->Destroy(commandPool);
     device->Shutdown();
+}*/
+
+int main() {
+    VoxelApp app;
+    app.Run();
+    return 0;
 }

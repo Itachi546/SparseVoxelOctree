@@ -2,8 +2,16 @@
 
 #include "gfx/opengl.h"
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 
 #include "math-utils.h"
+#include "rendering/rendering-device.h"
+#ifdef VULKAN_ENABLED
+#include "rendering/vulkan-rendering-device.h"
+#endif
 
 #include <iostream>
 #include <string>
@@ -12,15 +20,14 @@ template <typename App>
 struct AppWindow {
 
     AppWindow(const char *title, const glm::vec2 &windowSize) : windowSize(windowSize) {
-        glfwInit();
+        if (!glfwInit()) {
+            std::cout << "Failed to initialize GLFW" << std::endl;
+            return;
+        }
 
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowPtr = glfwCreateWindow(static_cast<int>(windowSize.x), static_cast<int>(windowSize.y), title, nullptr, nullptr);
         glfwSetWindowUserPointer(glfwWindowPtr, this);
-        glfwMakeContextCurrent(glfwWindowPtr);
-        // glfwSwapInterval(1);
 
         glfwSetCursorPosCallback(glfwWindowPtr, [](GLFWwindow *window, double x, double y) {
             auto &app = *reinterpret_cast<App *>(glfwGetWindowUserPointer(window));
@@ -51,18 +58,16 @@ struct AppWindow {
                 app.OnResize(static_cast<float>(sx), static_cast<float>(sy));
             });
 
-        gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-
-        const char *rendererInfo = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
-        const char *vendorInfo = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
-        const char *openglVersion = reinterpret_cast<const char *>(glGetString(GL_VERSION));
-
-        std::cout << "Renderer: " << std::string(rendererInfo) << std::endl;
-        std::cout << "Vendor: " << std::string(vendorInfo) << std::endl;
-        std::cout << "OpenGL Version: " << std::string(openglVersion) << std::endl;
-
-        glEnable(GL_DEPTH_TEST);
-        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        RD::WindowPlatformData platformData;
+        platformData.windowPtr = glfwGetWin32Window(glfwWindowPtr);
+#if VULKAN_ENABLED
+        RD::GetInstance() = new VulkanRenderingDevice();
+#endif
+        RenderingDevice *device = RenderingDevice::GetInstance();
+        device->SetValidationMode(true);
+        device->Initialize();
+        device->CreateSurface(&platformData);
+        device->CreateSwapchain(true);
     }
 
     virtual ~AppWindow() {

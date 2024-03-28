@@ -333,15 +333,16 @@ class RenderingDevice : public Resource {
                                               Format depthAttachmentFormat,
                                               const std::string &name) = 0;
     virtual PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name) = 0;
-    virtual TextureID CreateTexture(TextureDescription *description) = 0;
+    virtual TextureID CreateTexture(TextureDescription *description, const std::string &name) = 0;
     virtual ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInBytes, ShaderDescription *desc, const std::string &name = "shader") = 0;
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(const std::string &name = "commandPool") = 0;
-    virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set) = 0;
-    virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType) = 0;
+    virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) = 0;
+    virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
 
     virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
+    virtual void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) = 0;
     virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) = 0;
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
     virtual void Submit(CommandBufferID commandBuffer) = 0;
