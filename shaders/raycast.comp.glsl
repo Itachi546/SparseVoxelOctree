@@ -299,6 +299,9 @@ vec3 ACES(vec3 x) {
 
 void main() {
     ivec2 iuv = ivec2(gl_GlobalInvocationID.xy);
+    if (iuv.x > uScreenWidth || iuv.y > uScreenHeight)
+        return;
+
     vec2 uv = (vec2(iuv) / vec2(uScreenWidth, uScreenHeight)) * 2.0f - 1.0f;
 
     vec3 r0 = uCameraPosition;

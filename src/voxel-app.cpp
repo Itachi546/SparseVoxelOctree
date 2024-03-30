@@ -80,9 +80,9 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 #if 1
     octree = new Octree("monu3x16.octree");
 #else
-    constexpr uint32_t kOctreeDims = 32;
-    LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
-    octree->Serialize("monu3x16.octree");
+    constexpr uint32_t kOctreeDims = 512;
+    LoadFromFile("assets/models/cathedral.vox", 0.8f, kOctreeDims);
+    octree->Serialize("cathedral.octree");
 #endif
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree, 1920, 1080);
