@@ -12,6 +12,9 @@ file(GLOB_RECURSE PROJECT_HEADERS ${CMAKE_SOURCE_DIR}/src/*.h
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS})
 
 add_subdirectory(shaders/)
+set(ENKITS_BUILD_C_INTERFACE OFF)
+set(ENKITS_BUILD_EXAMPLES OFF)
+add_subdirectory(external/enkiTS)
 
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
@@ -26,6 +29,7 @@ set(PROJECT_LIBRARIES
     imgui::imgui
     volk::volk
     glfw
+    enkiTS
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})
@@ -35,6 +39,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     )
 target_compile_definitions(${PROJECT_NAME} PRIVATE   
         GLM_FORCE_XYZW_ONLY
+        GLM_ENABLE_EXPERIMENTAL
         _CRT_SECURE_NO_WARNINGS
         VK_USE_PLATFORM_WIN32_KHR
         VULKAN_ENABLED
