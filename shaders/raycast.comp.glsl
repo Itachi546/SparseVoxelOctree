@@ -77,7 +77,7 @@ void main() {
         col = ACES(col);
         col = pow(col, vec3(0.4545));
     }
-#if 1
+#if 0
     imageStore(outputTexture, iuv, vec4(col, 1.0f));
 #else
     // float iter = (float(hit.iteration) / (MAX_ITERATIONS * 0.5f));

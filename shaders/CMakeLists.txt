@@ -6,6 +6,7 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "*.comp.glsl"
     "*.geom.glsl"
     )
+    
 foreach(GLSL ${GLSL_SOURCE_FILES})
     # get only the first part of filename
     # strip extension and directory

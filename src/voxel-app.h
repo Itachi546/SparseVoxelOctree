@@ -8,7 +8,7 @@ namespace gfx {
     class Camera;
 } // namespace gfx
 
-struct Octree;
+class ParallelOctree;
 struct OctreeBrick;
 struct OctreeRaycaster;
 struct OctreeRasterizer;
@@ -42,7 +42,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Camera *camera;
-    Octree *octree;
+    ParallelOctree *octree;
     OctreeRaycaster *raycaster;
     OctreeRasterizer *rasterizer;
 

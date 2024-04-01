@@ -1,11 +1,11 @@
 #include "octree-raycaster.h"
-#include "octree.h"
+#include "parallel-octree.h"
 #include "gfx/camera.h"
 #include "gfx/gpu-timer.h"
 
 #include "rendering/rendering-utils.h"
 
-void OctreeRaycaster::Initialize(Octree *octree, uint32_t outputWidth, uint32_t outputHeight) {
+void OctreeRaycaster::Initialize(ParallelOctree *octree, uint32_t outputWidth, uint32_t outputHeight) {
 
     width = outputWidth;
     height = outputHeight;

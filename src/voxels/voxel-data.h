@@ -11,6 +11,12 @@ struct VoxelData {
     virtual ~VoxelData() = default;
 };
 
+struct VoxProceduralData : public VoxelData {
+    uint32_t Sample(glm::vec3 p) {
+        return (length(p) - 25.0f) > 0.0f ? 0 : 1;
+    }
+};
+
 struct VoxModelData : public VoxelData {
 
     void Load(const char *filename, float scale = 1.0f);

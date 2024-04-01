@@ -5,7 +5,7 @@
 
 #include <vector>
 
-struct Octree;
+class ParallelOctree;
 
 namespace gfx {
     class Camera;
@@ -15,7 +15,7 @@ struct OctreeRaycaster {
 
     OctreeRaycaster() = default;
 
-    void Initialize(Octree *octree, uint32_t outputWidth, uint32_t outputHeight);
+    void Initialize(ParallelOctree *octree, uint32_t outputWidth, uint32_t outputHeight);
 
     void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 

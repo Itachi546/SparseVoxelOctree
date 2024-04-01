@@ -6,11 +6,13 @@
 #include "gfx/debug.h"
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
-#include "voxels/octree.h"
+// #include "voxels/octree.h"
+#include "voxels/parallel-octree.h"
 #include "voxels/voxel-data.h"
 #include "voxels/octree-raycaster.h"
 #include "voxels/octree-rasterizer.h"
 #include "rendering/rendering-utils.h"
+#include "voxels/density-generator.h"
 
 #include <glm/gtx/component_wise.hpp>
 #include <thread>
@@ -35,7 +37,7 @@ MessageCallback(GLenum source,
 }
 
 void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
-    octree = new Octree(glm::vec3(0.0f), float(kOctreeDims));
+    octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData model;
     model.Load(filename, scale);
     {
@@ -44,12 +46,6 @@ void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeD
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
-    }
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        auto end = std::chrono::high_resolution_clock::now();
-        float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
-        std::cout << "Total time to read/load chunk: " << duration << "ms" << std::endl;
     }
     model.Destroy();
 }
@@ -77,12 +73,15 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 1
+#if 0
     octree = new Octree("monu3x16.octree");
 #else
-    constexpr uint32_t kOctreeDims = 512;
-    LoadFromFile("assets/models/cathedral.vox", 0.8f, kOctreeDims);
-    octree->Serialize("cathedral.octree");
+    constexpr uint32_t kOctreeDims = 32;
+     LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
+    //octree = new ParallelOctree(glm::vec3{0.0f}, kOctreeDims);
+    //VoxProceduralData procgenerator;
+    //octree->Generate(&procgenerator);
+    // octree->Serialize("monu3x16.octree");
 #endif
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree, 1920, 1080);
