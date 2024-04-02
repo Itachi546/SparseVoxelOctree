@@ -68,7 +68,7 @@ void ParallelOctree::Generate(VoxelData *generator) {
     std::cout << "Generating Octree..." << std::endl;
     std::cout << "Num Threads: " << enki::GetNumHardwareThreads() << std::endl;
     enki::TaskScheduler ts;
-    ts.Initialize(1);
+    ts.Initialize();
 
     const uint32_t depth = static_cast<uint32_t>(std::log2(size) / (std::log2(LEAF_NODE_SCALE) + 1));
     float currentSize = size;
@@ -80,7 +80,7 @@ void ParallelOctree::Generate(VoxelData *generator) {
         center,
     });
 
-    for (uint32_t i = 0; i < depth; ++i) {
+    for (uint32_t i = 0; i <= depth; ++i) {
         uint32_t cl = i % 2;
         uint32_t nl = 1 - cl;
 
@@ -103,7 +103,7 @@ void ParallelOctree::Generate(VoxelData *generator) {
         currentSize = currentSize * 0.5f;
     }
 
-    uint32_t cl = depth % 2;
+    uint32_t cl = (depth + 1) % 2;
     std::cout << "Processing brick, Total bricks: " << nodeList[cl].size() << std::endl;
 
     enki::TaskSet task(dispatchCount, [&](enki::TaskSetPartition range, uint32_t threadNum) {
