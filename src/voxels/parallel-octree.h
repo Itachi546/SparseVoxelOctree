@@ -10,8 +10,10 @@ class ParallelOctree {
 
   public:
     ParallelOctree(const glm::vec3 &center, float size);
+    ParallelOctree(const char *filename);
 
     void Generate(VoxelData *data);
+    void Serialize(const char *filename);
 
     std::vector<Node> nodePools;
     std::vector<uint32_t> brickPools;

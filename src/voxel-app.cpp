@@ -8,11 +8,11 @@
 #include "gfx/gpu-timer.h"
 // #include "voxels/octree.h"
 #include "voxels/parallel-octree.h"
+#include "voxels/perlin-voxdata.h"
 #include "voxels/voxel-data.h"
 #include "voxels/octree-raycaster.h"
 #include "voxels/octree-rasterizer.h"
 #include "rendering/rendering-utils.h"
-#include "voxels/density-generator.h"
 
 #include <glm/gtx/component_wise.hpp>
 #include <thread>
@@ -65,7 +65,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     globalUBPtr = device->MapBuffer(globalUB);
 
     camera = new gfx::Camera();
-    camera->SetPosition(glm::vec3{0.0f, 0.0f, 32.0f});
+    camera->SetPosition(glm::vec3{0.5f, 0.5f, 32.5f});
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
@@ -74,14 +74,16 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     target = glm::vec3(0.0f);
 
 #if 0
-    octree = new Octree("monu3x16.octree");
+    octree = new ParallelOctree("monu3x16.octree");
 #else
     constexpr uint32_t kOctreeDims = 32;
-     LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
-    //octree = new ParallelOctree(glm::vec3{0.0f}, kOctreeDims);
-    //VoxProceduralData procgenerator;
-    //octree->Generate(&procgenerator);
-    // octree->Serialize("monu3x16.octree");
+    LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
+    /*
+    octree = new ParallelOctree(glm::vec3{0.0f}, kOctreeDims);
+    PerlinVoxData generator;
+    octree->Generate(&generator);
+    octree->Serialize("terrain.octree");
+    */
 #endif
     raycaster = new OctreeRaycaster();
     raycaster->Initialize(octree, 1920, 1080);

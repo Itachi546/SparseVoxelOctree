@@ -4,6 +4,7 @@
 #include "core/thread-safe-vector.h"
 #include "voxel-data.h"
 
+#include <fstream>
 #include <iostream>
 
 inline Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {
@@ -12,6 +13,31 @@ inline Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {
 
 ParallelOctree::ParallelOctree(const glm::vec3 &center, float size) : center(center), size(size) {
     nodePools.push_back(CreateNode(NodeMask::InternalLeafNode));
+}
+
+ParallelOctree::ParallelOctree(const char *filename) {
+    std::ifstream inFile(filename, std::ios::binary);
+    if (!inFile) {
+        std::cerr << "Failed to load file: " << filename << std::endl;
+        return;
+    }
+    inFile.read(reinterpret_cast<char *>(&center), sizeof(glm::vec3));
+    inFile.read(reinterpret_cast<char *>(&size), sizeof(float));
+
+    uint32_t nodeCount = 0;
+    inFile.read(reinterpret_cast<char *>(&nodeCount), sizeof(uint32_t));
+    if (nodeCount > 0) {
+        nodePools.resize(nodeCount);
+        inFile.read(reinterpret_cast<char *>(nodePools.data()), sizeof(uint32_t) * nodeCount);
+    }
+
+    uint32_t brickCount = 0;
+    inFile.read(reinterpret_cast<char *>(&brickCount), sizeof(uint32_t));
+    if (brickCount > 0) {
+        uint32_t brickElementCount = brickCount * BRICK_ELEMENT_COUNT;
+        brickPools.resize(brickElementCount);
+        inFile.read(reinterpret_cast<char *>(brickPools.data()), sizeof(uint32_t) * brickElementCount);
+    }
 }
 
 void ParallelOctree::CreateChildren(NodeData *parent, float size, ThreadSafeVector<NodeData> &childNodes) {
@@ -136,4 +162,18 @@ void ParallelOctree::Generate(VoxelData *generator) {
 
     ts.AddTaskSetToPipe(&task);
     ts.WaitforTask(&task);
+}
+
+void ParallelOctree::Serialize(const char *filename) {
+    std::ofstream outFile(filename, std::ios::binary);
+    outFile.write(reinterpret_cast<const char *>(&center), sizeof(glm::vec3));
+    outFile.write(reinterpret_cast<const char *>(&size), sizeof(float));
+
+    uint32_t nodeCount = static_cast<uint32_t>(nodePools.size());
+    outFile.write(reinterpret_cast<const char *>(&nodeCount), sizeof(uint32_t));
+    outFile.write(reinterpret_cast<const char *>(nodePools.data()), sizeof(uint32_t) * nodeCount);
+
+    uint32_t brickCount = static_cast<uint32_t>(brickPools.size() / BRICK_ELEMENT_COUNT);
+    outFile.write(reinterpret_cast<const char *>(&brickCount), sizeof(uint32_t));
+    outFile.write(reinterpret_cast<const char *>(brickPools.data()), sizeof(uint32_t) * brickCount * BRICK_ELEMENT_COUNT);
 }
