@@ -5,60 +5,45 @@ set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
 project(vox-engine VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
-SET(PROJECT_SOURCE_FILES 
-                  "src/gfx/opengl.cpp"
-                  "src/gfx/gpu-timer.cpp"
-                  "src/gfx/imgui-service.cpp"
-                  "src/main.cpp"
-                  "src/input.cpp"
-                  "src/gfx/mesh.cpp"
-                  "src/gfx/camera.cpp"
-                  "src/gfx/debug.cpp"
-                  "src/voxels/octree.cpp"
-                  "src/voxels/voxel-data.cpp"
-                  "src/voxels/octree-raycaster.cpp"
-                  "src/voxels/octree-rasterizer.cpp"
-                  "src/utils.cpp"
-                  "src/voxel-app.cpp")
-SET (PROJECT_HEADER_FILES 
-                   "src/gfx/opengl.h"
-                   "src/gfx/imgui-service.h"
-                   "src/gfx/gpu-timer.h"
-                   "src/app-window.h"
-                   "src/utils.h"
-                   "src/input.h"
-                   "src/gfx/camera.h"
-                   "src/math-utils.h"
-                   "src/gfx/debug.h"
-                   "src/voxels/octree.h"
-                   "src/voxels/octree-rasterizer.h"
-                   "src/voxels/octree-raycaster.h"
-                   "src/voxels/density-generator.h"
-                   "src/voxels/voxel-data.h"
-                   "src/gfx/mesh.h"
-                   "src/voxel-app.h")
+file(GLOB_RECURSE PROJECT_SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE PROJECT_HEADERS ${CMAKE_SOURCE_DIR}/src/*.h
+                          ${CMAKE_SOURCE_DIR}/external/*.h)
 
-add_executable(${PROJECT_NAME} ${PROJECT_HEADER_FILES} ${PROJECT_SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS})
+
+add_subdirectory(shaders/)
+set(ENKITS_BUILD_C_INTERFACE OFF)
+set(ENKITS_BUILD_EXAMPLES OFF)
+add_subdirectory(external/enkiTS)
 
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
-
+find_package(volk CONFIG REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 set(PROJECT_LIBRARIES 
     glad::glad
     glm::glm
     imgui::imgui
-    glfw)
+    volk::volk
+    glfw
+    enkiTS
+)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PRIVATE 
         src/
-        external/)
+        external/
+    )
 target_compile_definitions(${PROJECT_NAME} PRIVATE   
         GLM_FORCE_XYZW_ONLY
+        GLM_ENABLE_EXPERIMENTAL
         _CRT_SECURE_NO_WARNINGS
+        VK_USE_PLATFORM_WIN32_KHR
+        VULKAN_ENABLED
+        NOMINMAX
     ) 
 
 if(MSVC)    

@@ -1,0 +1,3 @@
+[submodule "external/enkiTS"]
+	path = external/enkiTS
+	url = https://github.com/dougbinks/enkiTS.git

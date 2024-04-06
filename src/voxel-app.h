@@ -8,7 +8,7 @@ namespace gfx {
     class Camera;
 } // namespace gfx
 
-struct Octree;
+class ParallelOctree;
 struct OctreeBrick;
 struct OctreeRaycaster;
 struct OctreeRasterizer;
@@ -42,7 +42,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Camera *camera;
-    Octree *octree;
+    ParallelOctree *octree;
     OctreeRaycaster *raycaster;
     OctreeRasterizer *rasterizer;
 
@@ -53,7 +53,27 @@ struct VoxelApp : AppWindow<VoxelApp> {
     bool enableRasterizer = false;
     bool show = true;
 
+    struct FrameData {
+        glm::mat4 uInvP;
+        glm::mat4 uInvV;
+
+        glm::vec3 uLightPosition;
+        float uScreenWidth;
+
+        glm::vec3 uCameraPosition;
+        float uScreenHeight;
+    } frameData;
+
     glm::vec3 origin;
     glm::vec3 target;
     glm::vec3 lightPosition;
+
+    RenderingDevice *device;
+    CommandPoolID commandPool;
+    CommandBufferID commandBuffer;
+
+    BufferID globalUB;
+    uint8_t *globalUBPtr;
+
+    UniformSetID globalUniformSet;
 };

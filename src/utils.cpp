@@ -3,13 +3,12 @@
 #define OGT_VOX_IMPLEMENTATION
 #include "ogt_vox/ogt_vox.h"
 
-#include <fstream>
 #include <assert.h>
 #include <iostream>
 
 namespace utils {
-    std::optional<std::string> ReadFile(const char *filename) {
-        std::ifstream inFile(filename);
+    std::optional<std::string> ReadFile(const std::string &filename, std::ios::openmode mode) {
+        std::ifstream inFile(filename, mode);
         if (!inFile)
             return {};
         return std::string{

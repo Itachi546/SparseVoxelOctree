@@ -1,22 +1,70 @@
 #include "octree-raycaster.h"
-#include "octree.h"
+#include "parallel-octree.h"
 #include "gfx/camera.h"
 #include "gfx/gpu-timer.h"
 
-void OctreeRaycaster::Initialize(Octree *octree) {
-    shader.Create("assets/shaders/raycast.vert", "assets/shaders/raycast.frag");
+#include "rendering/rendering-utils.h"
+
+void OctreeRaycaster::Initialize(ParallelOctree *octree, uint32_t outputWidth, uint32_t outputHeight) {
+
+    width = outputWidth;
+    height = outputHeight;
+
+    RenderingDevice *device = RD::GetInstance();
+
+    RD::UniformBinding bindings[] = {
+        RD::UniformBinding{RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
+        RD::UniformBinding{RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0},
+        RD::UniformBinding{RD::BINDING_TYPE_STORAGE_BUFFER, 1, 1},
+        RD::UniformBinding{RD::BINDING_TYPE_IMAGE, 1, 2},
+    };
+    RD::PushConstant pushConstant = {
+        .offset = 0,
+        .size = sizeof(float) * 8,
+    };
+
+    ShaderID shaderID = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.comp.spv", bindings, static_cast<uint32_t>(std::size(bindings)), &pushConstant, 1);
+    pipeline = device->CreateComputePipeline(shaderID, "Raycast Compute Pipeline");
+    // shader.Create("assets/shaders/raycast.vert", "assets/shaders/raycast.frag");
 
     minBound = octree->center - octree->size;
     maxBound = octree->center + octree->size;
 
     uint32_t nodePoolSize = static_cast<uint32_t>(octree->nodePools.size() * sizeof(Node));
-    nodesBuffer = gfx::CreateBuffer(octree->nodePools.data(), nodePoolSize, GL_DYNAMIC_STORAGE_BIT);
+    nodesBuffer = device->CreateBuffer(nodePoolSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "NodeBuffer");
+    uint8_t *nodeBufferPtr = device->MapBuffer(nodesBuffer);
+    std::memcpy(nodeBufferPtr, octree->nodePools.data(), nodePoolSize);
 
     uint32_t brickPoolSize = static_cast<uint32_t>(octree->brickPools.size() * sizeof(uint32_t));
-    brickBuffer = gfx::CreateBuffer(octree->brickPools.data(), brickPoolSize, GL_DYNAMIC_STORAGE_BIT);
+    brickBuffer = device->CreateBuffer(brickPoolSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "BrickBuffer");
+    uint8_t *brickBufferPtr = device->MapBuffer(brickBuffer);
+    std::memcpy(brickBufferPtr, octree->brickPools.data(), brickPoolSize);
+
+    RD::TextureDescription textureDescription = RD::TextureDescription::Initialize(1920, 1080);
+    textureDescription.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
+    outputTexture = device->CreateTexture(&textureDescription, "RaycastOutputTexture");
+
+    outputImageBarrier.push_back({outputTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL});
+
+    RD::BoundUniform boundedUniform[3] = {
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, nodesBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, brickBuffer},
+        {RD::BINDING_TYPE_IMAGE, 2, outputTexture},
+    };
+    resourceSet = device->CreateUniformSet(pipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "RaycastResourceSet");
 }
 
-void OctreeRaycaster::Render(gfx::Camera *camera, glm::vec3 lightPosition, glm::vec2 resolution) {
+void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
+    glm::vec4 dims[2] = {glm::vec4(minBound, 0.0f), glm::vec4(maxBound, 0.0f)};
+    auto *device = RD::GetInstance();
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier);
+    device->BindPipeline(commandBuffer, pipeline);
+    device->BindUniformSet(commandBuffer, pipeline, globalSet);
+    device->BindUniformSet(commandBuffer, pipeline, resourceSet);
+    device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_COMPUTE, &dims, 0, sizeof(float) * 8);
+    device->DispatchCompute(commandBuffer, (width / 8) + 1, (height / 8) + 1, 1);
+
+    /*
     // GpuProfiler::Begin("Raycast");
     glm::mat4 invP = camera->GetInvProjectionMatrix();
     glm::mat4 invV = camera->GetInvViewMatrix();
@@ -36,10 +84,12 @@ void OctreeRaycaster::Render(gfx::Camera *camera, glm::vec3 lightPosition, glm::
     glDrawArrays(GL_TRIANGLES, 0, 3);
     shader.Unbind();
     GpuTimer::End();
+    */
 }
 
 void OctreeRaycaster::Shutdown() {
-    shader.Destroy();
-    gfx::DestroyBuffer(nodesBuffer);
-    gfx::DestroyBuffer(brickBuffer);
+    auto *device = RD::GetInstance();
+    device->Destroy(pipeline);
+    device->Destroy(nodesBuffer);
+    device->Destroy(brickBuffer);
 }

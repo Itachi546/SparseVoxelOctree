@@ -1,56 +1,5 @@
-#version 460
-
-layout(location = 0) out vec4 fragColor;
-/*
-layout(std430, binding = 0) readonly buffer NodeBuffer { uint nodePools[]; };
-layout(std430, binding = 1) readonly buffer BrickBuffer { uint brickPools[]; };
-
-uniform vec3 uCamPos;
-uniform vec3 uLightPos;
-uniform mat4 uInvP;
-uniform mat4 uInvV;
-uniform vec3 uAABBMin;
-uniform vec3 uAABBMax;
-uniform vec2 uResolution;
-
-const int MAX_LEVELS = 12;
-struct StackData {
-    vec3 position;
-    uint firstSibling;
-    int idx;
-    float size;
-    float tMax;
-} stack[MAX_LEVELS];
-
-int stackPtr = 0;
-void stack_reset() { stackPtr = 0; }
-void stack_push(StackData data) { stack[stackPtr++] = data; }
-
-StackData stack_pop() { return stack[--stackPtr]; }
-bool stack_empty() { return stackPtr == 0; }
-
-vec3 GenerateCameraRay(vec2 uv) {
-    vec4 clipPos = uInvP * vec4(uv, -1.0, 0.0);
-    vec4 worldPos = uInvV * vec4(clipPos.x, clipPos.y, -1.0, 0.0);
-    return normalize(worldPos.xyz);
-}
-
-#define EPSILON 10e-7f
-#define MAX_ITERATIONS 1000
-#define BRICK_SIZE 8
-#define LEAF_NODE_SIZE 1
-#define BRICK_SIZE2 (BRICK_SIZE * BRICK_SIZE)
-#define BRICK_SIZE3 (BRICK_SIZE2 * BRICK_SIZE)
-#define UNIT_BRICK_SIZE (float(LEAF_NODE_SIZE) / float(BRICK_SIZE))
-#define GRID_MARCH_MAX_ITERATION 100
-
-#define REFLECT(p, c) (2.0f * c - p)
-#define GET_MASK(p) (p >> 30)
-#define GET_FIRST_CHILD(p) (p & 0x3fffffff)
-#define InternalLeafNode 0
-#define InternalNode 1
-#define LeafNode 2
-#define LeafNodeWithPtr 3
+#include "stack.glsl"
+#include "raycast-def.glsl"
 
 int FindEntryNode(inout vec3 p, float scale, float t, vec3 tM) {
     ivec3 mask = ivec3(step(vec3(t), tM));
@@ -75,13 +24,6 @@ struct RayHit {
     uint color;
     int iteration;
 };
-
-vec3 uintToRGB(uint color) {
-    return vec3((color >> 16) & 0xff,
-                (color >> 8) & 0xff,
-                color & 0xff) /
-           255.0f;
-}
 
 const int gridEndMargin = BRICK_SIZE - 1;
 RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
@@ -125,11 +67,19 @@ RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
 
 RayHit Trace(vec3 r0, vec3 rd) {
     vec3 r0_orig = r0;
-    vec3 aabbMin = uAABBMin;
-    vec3 aabbMax = uAABBMax;
+    vec3 aabbMin = uAABBMin.xyz;
+    vec3 aabbMax = uAABBMax.xyz;
     vec3 center = (aabbMin + aabbMax) * 0.5f;
 
     int octaneMask = 7;
+
+    if (abs(rd.x) < EPSILON)
+        rd.x = EPSILON;
+    if (abs(rd.y) < EPSILON)
+        rd.y = EPSILON;
+    if (abs(rd.z) < EPSILON)
+        rd.z = EPSILON;
+
     if (rd.x < 0.0) {
         octaneMask ^= 1;
         r0.x = REFLECT(r0.x, center.x);
@@ -144,7 +94,7 @@ RayHit Trace(vec3 r0, vec3 rd) {
     }
 
     vec3 d = abs(rd);
-    vec3 invRayDir = 1.0f / (d + EPSILON);
+    vec3 invRayDir = 1.0f / d;
     vec3 r0_rd = r0 * invRayDir;
 
     vec3 tMin = aabbMin * invRayDir - r0_rd;
@@ -248,73 +198,25 @@ RayHit Trace(vec3 r0, vec3 rd) {
          * if we are currently at 10 and stepMask is 10
          *  Conclusion: Invalid because we have already taken a step in Y-Axis
          */
-/*
-if ((idx & stepMask) != 0) {
-    // Pop operation
-    if (!stack_empty()) {
-        StackData stackData = stack_pop();
-        p = stackData.position;
-        firstSibling = stackData.firstSibling;
-        t.y = stackData.tMax;
-        idx = stackData.idx;
-        currentSize = stackData.size;
-    } else
-        currentSize = currentSize * 2.0f;
-    processChild = false;
-}
 
-if (currentSize > octreeSize)
-    break;
-}
-
-rayHit.iteration += i;
-return rayHit;
-}
-
-vec3 ACES(vec3 x) {
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
-}
-
-void main() {
-    vec2 uv = (gl_FragCoord.xy / uResolution) * 2.0f - 1.0f;
-    vec3 r0 = uCamPos;
-    vec3 rd = GenerateCameraRay(uv);
-
-    RayHit hit = Trace(r0, rd);
-    vec3 col = vec3(0.5f);
-    if (hit.intersect) {
-        vec3 diffuseColor = pow(uintToRGB(hit.color), vec3(2.2f));
-        vec3 n = normalize(hit.normal);
-        vec3 p = r0 + hit.t * rd;
-        vec3 ld = normalize(uLightPos - p);
-
-        stack_reset();
-        float shadow = 1.0f;
-        RayHit shadowHit = Trace(p + n * UNIT_BRICK_SIZE * 0.5f, ld);
-        if (shadowHit.intersect) {
-            shadow = 0.1f;
+        if ((idx & stepMask) != 0) {
+            // Pop operation
+            if (!stack_empty()) {
+                StackData stackData = stack_pop();
+                p = stackData.position;
+                firstSibling = stackData.firstSibling;
+                t.y = stackData.tMax;
+                idx = stackData.idx;
+                currentSize = stackData.size;
+            } else
+                currentSize = currentSize * 2.0f;
+            processChild = false;
         }
-        col = max(dot(n, ld), 0.0f) * diffuseColor * shadow;
-        col += 0.05f;
-        col = ACES(col);
-        col = pow(col, vec3(0.4545));
+
+        if (currentSize > octreeSize)
+            break;
     }
 
-#if 0
-    fragColor = vec4(col, 1.0f);
-#else
-    // float iter = (float(hit.iteration) / (MAX_ITERATIONS * 0.5f));
-    float iter = hit.iteration / 200.0f;
-    fragColor = vec4(vec3(iter), 1.0);
-#endif
-}
-*/
-
-void main() {
-    fragColor = vec4(1.0f);
+    rayHit.iteration += i;
+    return rayHit;
 }
