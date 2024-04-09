@@ -5,25 +5,10 @@
 
 namespace gfx {
 
-    Mesh::Mesh(float *vertices, uint32_t vertexCount, uint32_t *indices, uint32_t indexCount) : vertexBuffer(InvalidBuffer),
-                                                                                                indexBuffer(InvalidBuffer),
-                                                                                                numVertices(0),
-                                                                                                vertexArrayObject(0) {
+    Mesh::Mesh(float *vertices, uint32_t vertexCount, uint32_t *indices, uint32_t indexCount) : vertexBuffer(~0u),
+                                                                                                indexBuffer(~0u),
+                                                                                                numVertices(0) {
         Initialize(vertices, vertexCount, indices, indexCount);
-    }
-
-    void Mesh::Bind() {
-        glBindVertexArray(vertexArrayObject);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, 0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (void *)(sizeof(float) * 3));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (void *)(sizeof(float) * 6));
-        glBindVertexArray(0);
     }
 
     void Mesh::Initialize(float *vertices, uint32_t vertexCount, uint32_t *indices, uint32_t indexCount) {
@@ -32,25 +17,20 @@ namespace gfx {
             return;
         }
 
-        vertexBuffer = CreateBuffer(vertices, sizeof(float) * vertexCount, 0);
-        indexBuffer = CreateBuffer(indices, sizeof(uint32_t) * indexCount, 0);
+        RD *device = RD::GetInstance();
+
+        // @TODO use staging buffer
+        uint32_t vertexSize = static_cast<uint32_t>(sizeof(float) * vertexCount);
+        vertexBuffer = device->CreateBuffer(vertexSize, RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "MeshVertexBuffer");
+        void *vb = device->MapBuffer(vertexBuffer);
+        std::memcpy(vb, vertices, vertexSize);
+
+        uint32_t indexSize = sizeof(uint32_t) * indexCount;
+        indexBuffer = device->CreateBuffer(sizeof(uint32_t) * indexCount, RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_INDEX_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "MeshIndexBuffer");
+        void *ib = device->MapBuffer(indexBuffer);
+        std::memcpy(ib, indices, indexSize);
+
         numVertices = indexCount;
-
-        glGenVertexArrays(1, &vertexArrayObject);
-
-        Bind();
-    }
-
-    void Mesh::Draw() {
-        glBindVertexArray(vertexArrayObject);
-        glDrawElements(GL_TRIANGLES, numVertices, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-    }
-
-    void Mesh::DrawInstanced(uint32_t count) {
-        glBindVertexArray(vertexArrayObject);
-        glDrawElementsInstanced(GL_TRIANGLES, numVertices, GL_UNSIGNED_INT, 0, count);
-        glBindVertexArray(0);
     }
 
     void Mesh::CreatePlane(Mesh *mesh, int width, int height) {
@@ -140,9 +120,9 @@ namespace gfx {
     }
 
     Mesh::~Mesh() {
-        DestroyBuffer(vertexBuffer);
-        DestroyBuffer(indexBuffer);
-        glDeleteVertexArrays(1, &vertexArrayObject);
+        RD *device = RD::GetInstance();
+        device->Destroy(vertexBuffer);
+        device->Destroy(indexBuffer);
     }
 
 } // namespace gfx

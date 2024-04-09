@@ -167,6 +167,37 @@ class RenderingDevice : public Resource {
         }
     };
 
+    enum AttachmentLoadOp {
+        LOAD_OP_LOAD = 0,
+        LOAD_OP_CLEAR = 1,
+        LOAD_OP_DONT_CARE = 2,
+    };
+
+    enum AttachmentStoreOp {
+        STORE_OP_STORE = 0,
+        STORE_OP_DONT_CARE = 0
+    };
+
+    struct AttachmentInfo {
+        AttachmentLoadOp loadOp;
+        AttachmentStoreOp storeOp;
+
+        float clearColor[4];
+        float clearDepth;
+        uint32_t clearStencil;
+        TextureID attachment;
+    };
+
+    struct RenderingInfo {
+        uint32_t width;
+        uint32_t height;
+        uint32_t layerCount;
+
+        uint32_t colorAttachmentCount;
+        AttachmentInfo *pColorAttachments;
+        AttachmentInfo *pDepthStencilAttachment;
+    };
+
     struct DepthState {
         bool enableDepthClamp;
         bool enableDepthTest;
@@ -341,6 +372,11 @@ class RenderingDevice : public Resource {
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
 
+    virtual void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
+    virtual void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
+
+    virtual void BindIndexBuffer(CommandBufferID commandBuffer, BufferID buffer) = 0;
+
     virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
     virtual void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) = 0;
     virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) = 0;
@@ -359,6 +395,12 @@ class RenderingDevice : public Resource {
     virtual void BeginFrame() = 0;
     virtual void BeginCommandBuffer(CommandBufferID commandBuffer) = 0;
     virtual void EndCommandBuffer(CommandBufferID commandBuffer) = 0;
+
+    virtual void BeginRenderPass(CommandBufferID commandBuffer, RenderingInfo *renderingInfo) = 0;
+    virtual void EndRenderPass(CommandBufferID commandBuffer) = 0;
+
+    virtual void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) = 0;
+
     virtual void Present() = 0;
 
     virtual void Destroy(PipelineID pipeline) = 0;

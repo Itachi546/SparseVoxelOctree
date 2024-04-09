@@ -4,16 +4,7 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, set = 0) uniform GlobalData {
-    mat4 uInvP;
-    mat4 uInvV;
-
-    vec3 uLightPosition;
-    float uScreenWidth;
-
-    vec3 uCameraPosition;
-    float uScreenHeight;
-};
+#include "globaldata.glsl"
 
 layout(binding = 0, set = 1) readonly buffer NodeBuffer { uint nodePools[]; };
 layout(binding = 1, set = 1) readonly buffer BrickBuffer { uint brickPools[]; };

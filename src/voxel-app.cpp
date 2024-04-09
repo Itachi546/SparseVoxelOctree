@@ -10,8 +10,7 @@
 #include "voxels/parallel-octree.h"
 #include "voxels/perlin-voxdata.h"
 #include "voxels/voxel-data.h"
-#include "voxels/octree-raycaster.h"
-#include "voxels/octree-rasterizer.h"
+#include "voxels/octree-renderer.h"
 #include "rendering/rendering-utils.h"
 
 #include <glm/gtx/component_wise.hpp>
@@ -42,7 +41,7 @@ void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeD
     model.Load(filename, scale);
     {
         auto start = std::chrono::high_resolution_clock::now();
-        octree->Generate(&model);
+        octree->Generate(&model, camera->GetPosition());
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
@@ -73,15 +72,17 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 0
+#if 1
     octree = new ParallelOctree("monu3x16.octree");
 #else
     constexpr uint32_t kOctreeDims = 32;
     LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
     octree->Serialize("monu3x16.octree");
 #endif
-    raycaster = new OctreeRaycaster();
-    raycaster->Initialize(octree, 1920, 1080);
+    octreeRenderer = new OctreeRenderer(1920, 1080);
+    octreeRenderer->Initialize(octree);
+    // raycaster = new OctreeRaycaster();
+    // raycaster->Initialize(octree, 1920, 1080);
 
     // rasterizer = new OctreeRasterizer();
     // rasterizer->Initialize(octree);
@@ -92,7 +93,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         .resourceID = globalUB,
         .offset = 0,
     };
-    globalUniformSet = device->CreateUniformSet(raycaster->pipeline, &globalBinding, 1, 0, "GlobalUniformSet");
+     globalUniformSet = device->CreateUniformSet(octreeRenderer->voxelRasterPipeline, &globalBinding, 1, 0, "GlobalUniformSet");
 }
 
 void VoxelApp::Run() {
@@ -105,7 +106,7 @@ void VoxelApp::Run() {
             device->BeginCommandBuffer(commandBuffer);
             OnRender();
             // OnRenderUI();
-            device->CopyToSwapchain(commandBuffer, raycaster->outputTexture);
+            device->CopyToSwapchain(commandBuffer, octreeRenderer->colorAttachment);
             device->EndCommandBuffer(commandBuffer);
             device->Submit(commandBuffer);
             device->Present();
@@ -131,6 +132,9 @@ void VoxelApp::OnUpdate() {
 
     frameData.uInvP = camera->GetInvProjectionMatrix();
     frameData.uInvV = camera->GetInvViewMatrix();
+    frameData.P = camera->GetProjectionMatrix();
+    frameData.V = camera->GetViewMatrix();
+    frameData.VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
     frameData.uCameraPosition = camera->GetPosition();
     frameData.uScreenWidth = 1920;
     frameData.uScreenHeight = 1080;
@@ -167,6 +171,7 @@ void VoxelApp::OnUpdate() {
 }
 
 void VoxelApp::OnRenderUI() {
+    /*
     ImGui::Text("Total Voxel: %d", rasterizer->voxelCount);
     ImGui::Checkbox("Show", &show);
 
@@ -183,9 +188,11 @@ void VoxelApp::OnRenderUI() {
 
     ImGuiService::Render();
     GpuTimer::Reset();
+    */
 }
 
 void VoxelApp::OnRender() {
+    /*
     glm::mat4 VP = camera->GetViewProjectionMatrix();
     if (show) {
         if (enableRasterizer) {
@@ -193,7 +200,9 @@ void VoxelApp::OnRender() {
         } else
             raycaster->Render(commandBuffer, globalUniformSet);
     }
+    */
     // Debug::Render(VP);
+    octreeRenderer->Render(commandBuffer, globalUniformSet);
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
@@ -256,6 +265,8 @@ VoxelApp::~VoxelApp() {
     // GpuTimer::Shutdown();
     if (octree)
         delete octree;
-    delete raycaster;
-    // delete rasterizer;
+    octreeRenderer->Shutdown();
+    delete octreeRenderer;
+    // delete raycaster;
+    //  delete rasterizer;
 }

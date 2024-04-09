@@ -30,7 +30,7 @@ void OctreeRasterizer::Render(gfx::Camera *camera) {
         shader.Bind();
         shader.SetUniformMat4("uVP", &VP[0][0]);
         shader.SetBuffer(0, instanceBuffer);
-        cubeMesh->DrawInstanced(voxelCount);
+        //cubeMesh->DrawInstanced(voxelCount);
         shader.Unbind();
         GpuTimer::End();
     }

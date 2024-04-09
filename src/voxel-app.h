@@ -10,8 +10,7 @@ namespace gfx {
 
 class ParallelOctree;
 struct OctreeBrick;
-struct OctreeRaycaster;
-struct OctreeRasterizer;
+struct OctreeRenderer;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -43,8 +42,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     gfx::Camera *camera;
     ParallelOctree *octree;
-    OctreeRaycaster *raycaster;
-    OctreeRasterizer *rasterizer;
+    OctreeRenderer *octreeRenderer;
 
     float dt;
     float lastFrameTime;
@@ -56,6 +54,10 @@ struct VoxelApp : AppWindow<VoxelApp> {
     struct FrameData {
         glm::mat4 uInvP;
         glm::mat4 uInvV;
+
+        glm::mat4 P;
+        glm::mat4 V;
+        glm::mat4 VP;
 
         glm::vec3 uLightPosition;
         float uScreenWidth;

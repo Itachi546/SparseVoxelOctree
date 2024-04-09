@@ -49,6 +49,15 @@ class VulkanRenderingDevice : public RenderingDevice {
     void BeginFrame() override;
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;
     void EndCommandBuffer(CommandBufferID commandBuffer) override;
+
+    void BeginRenderPass(CommandBufferID commandBuffer, RenderingInfo *renderingInfo) override;
+    void EndRenderPass(CommandBufferID commandBuffer) override;
+
+    void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) override;
+    void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) override;
+
+    void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) override;
+
     void Submit(CommandBufferID commandBuffer) override;
     void Present() override;
 
@@ -57,6 +66,7 @@ class VulkanRenderingDevice : public RenderingDevice {
                          PipelineStageBits dstStage,
                          std::vector<TextureBarrier> &textureBarriers) override;
 
+    void BindIndexBuffer(CommandBufferID commandBuffer, BufferID buffer) override;
     void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
     void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) override;
     void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) override;
