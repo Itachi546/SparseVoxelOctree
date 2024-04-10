@@ -3,10 +3,8 @@
 #include "math-utils.h"
 
 #include "gfx/camera.h"
-#include "gfx/debug.h"
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
-// #include "voxels/octree.h"
 #include "voxels/parallel-octree.h"
 #include "voxels/perlin-voxdata.h"
 #include "voxels/voxel-data.h"
@@ -52,19 +50,21 @@ void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeD
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
     // Debug::Initialize();
     // GpuTimer::Initialize();
-    Input::Singleton()->Initialize();
-    // ImGuiService::Initialize(glfwWindowPtr);
 
     // Initialize CommandBuffer/Pool
     device = RD::GetInstance();
     commandPool = device->CreateCommandPool("RenderCommandPool");
     commandBuffer = device->CreateCommandBuffer(commandPool, "RenderCommandBuffer");
 
+    Input::Singleton()->Initialize();
+    ImGuiService::Initialize(glfwWindowPtr, commandBuffer);
+
     globalUB = device->CreateBuffer(sizeof(FrameData), RD::BUFFER_USAGE_UNIFORM_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "GlobalUniformBuffer");
     globalUBPtr = device->MapBuffer(globalUB);
 
     camera = new gfx::Camera();
     camera->SetPosition(glm::vec3{0.5f, 0.5f, 32.5f});
+    camera->SetNearPlane(0.1f);
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
@@ -93,7 +93,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         .resourceID = globalUB,
         .offset = 0,
     };
-     globalUniformSet = device->CreateUniformSet(octreeRenderer->voxelRasterPipeline, &globalBinding, 1, 0, "GlobalUniformSet");
+    globalUniformSet = device->CreateUniformSet(octreeRenderer->voxelRasterPipeline, &globalBinding, 1, 0, "GlobalUniformSet");
 }
 
 void VoxelApp::Run() {
@@ -105,8 +105,10 @@ void VoxelApp::Run() {
             device->BeginFrame();
             device->BeginCommandBuffer(commandBuffer);
             OnRender();
-            // OnRenderUI();
             device->CopyToSwapchain(commandBuffer, octreeRenderer->colorAttachment);
+            OnRenderUI();
+            device->PrepareSwapchain(commandBuffer);
+            // Draw UI
             device->EndCommandBuffer(commandBuffer);
             device->Submit(commandBuffer);
             device->Present();
@@ -126,7 +128,10 @@ void VoxelApp::Run() {
 }
 
 void VoxelApp::OnUpdate() {
-    UpdateControls();
+
+    ImGuiService::NewFrame();
+    if (!ImGuiService::IsFocused())
+        UpdateControls();
 
     camera->Update(dt);
 
@@ -136,17 +141,9 @@ void VoxelApp::OnUpdate() {
     frameData.V = camera->GetViewMatrix();
     frameData.VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
     frameData.uCameraPosition = camera->GetPosition();
-    frameData.uScreenWidth = 1920;
-    frameData.uScreenHeight = 1080;
+    frameData.uScreenWidth = windowSize.x;
+    frameData.uScreenHeight = windowSize.y;
     std::memcpy(globalUBPtr, &frameData, sizeof(FrameData));
-
-    /*
-    ImGuiService::NewFrame();
-
-    if (!ImGuiService::IsFocused())
-        UpdateControls();
-
-    */
 
     /*
 #if 1
@@ -171,37 +168,44 @@ void VoxelApp::OnUpdate() {
 }
 
 void VoxelApp::OnRenderUI() {
-    /*
-    ImGui::Text("Total Voxel: %d", rasterizer->voxelCount);
-    ImGui::Checkbox("Show", &show);
 
+    ImGui::Text("Total Voxel: %d", octreeRenderer->numVoxels);
+    ImGui::Checkbox("Show", &show);
     if (show)
         ImGui::Checkbox("Rasterizer", &enableRasterizer);
 
-    ImGui::SliderFloat3("Ray origin", &origin[0], -64.0f, 64.0f);
-    ImGui::SliderFloat3("Ray target", &target[0], -64.0f, 64.0f);
+    // ImGui::SliderFloat3("Ray origin", &origin[0], -64.0f, 64.0f);
+    // ImGui::SliderFloat3("Ray target", &target[0], -64.0f, 64.0f);
 
-    ImGui::DragFloat3("Light Position", &lightPosition[0], 0.1f, -100.0f, 100.0f);
-    Debug::AddRect(lightPosition - 0.5f, lightPosition + 0.5f, glm::vec3(1.0f));
+    ImGui::DragFloat3("Light Position", &frameData.uLightPosition[0], 0.1f, -100.0f, 100.0f);
+    // GpuTimer::AddUI();
+    // GpuTimer::Reset();
 
-    GpuTimer::AddUI();
+    RD::AttachmentInfo colorAttachmentInfos = {
+        .loadOp = RD::LOAD_OP_LOAD,
+        .storeOp = RD::STORE_OP_STORE,
+        .clearColor = {0.5f, 0.5f, 0.5f, 1.0f},
+        .clearDepth = 0,
+        .clearStencil = 0,
+        .attachment = TextureID{~0u},
+    };
 
-    ImGuiService::Render();
-    GpuTimer::Reset();
-    */
+    RD::RenderingInfo renderingInfo = {
+        .width = (uint32_t)windowSize.x,
+        .height = (uint32_t)windowSize.y,
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colorAttachmentInfos,
+        .pDepthStencilAttachment = nullptr,
+    };
+
+    device->BeginRenderPass(commandBuffer, &renderingInfo);
+    device->SetViewport(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
+    ImGuiService::Render(commandBuffer);
+    device->EndRenderPass(commandBuffer);
 }
 
 void VoxelApp::OnRender() {
-    /*
-    glm::mat4 VP = camera->GetViewProjectionMatrix();
-    if (show) {
-        if (enableRasterizer) {
-            rasterizer->Render(camera);
-        } else
-            raycaster->Render(commandBuffer, globalUniformSet);
-    }
-    */
-    // Debug::Render(VP);
     octreeRenderer->Render(commandBuffer, globalUniformSet);
 }
 
@@ -261,12 +265,10 @@ void VoxelApp::UpdateControls() {
 VoxelApp::~VoxelApp() {
     device->Destroy(commandPool);
 
-    // ImGuiService::Shutdown();
+    ImGuiService::Shutdown();
     // GpuTimer::Shutdown();
     if (octree)
         delete octree;
     octreeRenderer->Shutdown();
     delete octreeRenderer;
-    // delete raycaster;
-    //  delete rasterizer;
 }

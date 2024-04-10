@@ -1,10 +1,9 @@
 #pragma once
 
-#include "opengl.h"
+#include "rendering/rendering-device.h"
+#include "imgui/imgui.h"
+
 #include <glm/glm.hpp>
-
-#include <imgui.h>
-
 #include <vector>
 #include <sstream>
 #include <chrono>
@@ -13,11 +12,11 @@
 struct GLFWwindow;
 
 namespace ImGuiService {
-    void Initialize(GLFWwindow *window);
+    void Initialize(GLFWwindow *window, CommandBufferID commandBuffer);
 
     void NewFrame();
 
-    void Render();
+    void Render(CommandBufferID commandBuffer);
 
     void Shutdown();
 

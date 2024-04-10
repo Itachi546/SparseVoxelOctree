@@ -257,6 +257,17 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     return device;
 }
 
+VkFence VulkanRenderingDevice::CreateFence(const std::string &name) {
+    VkFence fence = 0;
+    VkFenceCreateInfo createInfo{
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    };
+    VK_CHECK(vkCreateFence(device, &createInfo, nullptr, &fence));
+
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_FENCE, (uint64_t)fence, name.c_str());
+    return fence;
+}
+
 VkSemaphore VulkanRenderingDevice::CreateVulkanSemaphore(const std::string &name) {
     VkSemaphoreCreateInfo createInfo = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     VkSemaphore semaphore = VK_NULL_HANDLE;
@@ -315,7 +326,7 @@ void VulkanRenderingDevice::CreateSwapchain(bool vsync) {
         return;
     swapchain->width = surfaceCapabilities.currentExtent.width;
     swapchain->height = surfaceCapabilities.currentExtent.height;
-    swapchain->minImageCount = std::max(2u, surfaceCapabilities.maxImageCount);
+    swapchain->minImageCount = std::min(std::max(2u, surfaceCapabilities.maxImageCount), 4u);
 
     uint32_t formatCount = 0;
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr));
@@ -375,6 +386,11 @@ void VulkanRenderingDevice::CreateSwapchain(bool vsync) {
 
     VK_CHECK(vkGetSwapchainImagesKHR(device, swapchain->swapchain, &imageCount, swapchain->images.data()));
     swapchain->imageCount = imageCount;
+
+    for (uint32_t i = 0; i < imageCount; ++i) {
+        std::string name = "SwapchainImage" + std::to_string(i);
+        SetDebugMarkerObjectName(VK_OBJECT_TYPE_IMAGE, (uint64_t)swapchain->images[i], name.c_str());
+    }
 
     VkImageViewCreateInfo imageViewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -543,6 +559,10 @@ void VulkanRenderingDevice::Initialize() {
     _commandBuffers.reserve(16);
 
     _descriptorPool = CreateDescriptorPool();
+
+    CommandPoolID commandPool = CreateCommandPool("Upload CommandPool");
+    uploadCommandBuffer = CreateCommandBuffer(commandPool, "Upload Command Buffer");
+    uploadFence = CreateFence("Upload Fence");
 }
 
 void VulkanRenderingDevice::CreateSurface(void *platformData) {
@@ -1072,13 +1092,19 @@ void VulkanRenderingDevice::BeginRenderPass(CommandBufferID commandBuffer, Rende
     std::vector<VkRenderingAttachmentInfo> colorAttachments;
     for (uint32_t i = 0; i < renderInfo->colorAttachmentCount; ++i) {
         AttachmentInfo &attachment = renderInfo->pColorAttachments[i];
-        VulkanTexture *texture = _textures.Access(attachment.attachment.id);
         VkRenderingAttachmentInfo &attachmentInfo = colorAttachments.emplace_back(VkRenderingAttachmentInfo{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO});
-        attachmentInfo.imageView = texture->imageView;
         attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         attachmentInfo.loadOp = VkAttachmentLoadOp(attachment.loadOp);
         attachmentInfo.storeOp = VkAttachmentStoreOp(attachment.storeOp);
         attachmentInfo.clearValue.color = {attachment.clearColor[0], attachment.clearColor[1], attachment.clearColor[2], attachment.clearColor[3]};
+
+        if (attachment.attachment.id == ~0u) {
+            uint32_t currentImageIndex = swapchain->currentImageIndex;
+            attachmentInfo.imageView = swapchain->imageViews[currentImageIndex];
+        } else {
+            VulkanTexture *texture = _textures.Access(attachment.attachment.id);
+            attachmentInfo.imageView = texture->imageView;
+        }
     }
 
     vkRenderingInfo.renderArea = {0, 0, renderInfo->width, renderInfo->height};
@@ -1110,6 +1136,25 @@ void VulkanRenderingDevice::EndRenderPass(CommandBufferID commandBuffer) {
 void VulkanRenderingDevice::DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, uint32_t vertexOffset, uint32_t firstInstance) {
     VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
     vkCmdDrawIndexed(cb, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
+void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer) {
+    // Check swapchain Image layout and transition if needed
+    uint32_t currentImageIndex = swapchain->currentImageIndex;
+
+    VkImageMemoryBarrier presentBarrier = CreateImageBarrier(swapchain->images[currentImageIndex],
+                                                             VK_IMAGE_ASPECT_COLOR_BIT,
+                                                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                                                             0,
+                                                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+    VkCommandBuffer vkCommandBuffer = _commandBuffers[commandBuffer.id];
+    vkCmdPipelineBarrier(vkCommandBuffer,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                         VK_DEPENDENCY_BY_REGION_BIT,
+                         0, nullptr, 0, nullptr,
+                         1, &presentBarrier);
 }
 
 void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer) {
@@ -1294,10 +1339,41 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
     VkImageMemoryBarrier swapchainBarrier = CreateImageBarrier(dst,
                                                                VK_IMAGE_ASPECT_COLOR_BIT,
                                                                VK_ACCESS_TRANSFER_WRITE_BIT,
-                                                               0,
+                                                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                                                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
+                                                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
+}
+
+void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function) {
+    VkCommandBuffer cmd = _commandBuffers[uploadCommandBuffer.id];
+    VkCommandBufferBeginInfo cmdBeginInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
+
+    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+    function(uploadCommandBuffer);
+
+    VK_CHECK(vkEndCommandBuffer(cmd));
+
+    VkSubmitInfo submitInfo{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = nullptr,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores = nullptr,
+    };
+
+    VK_CHECK(vkQueueSubmit(_queues[0], 1, &submitInfo, uploadFence));
+
+    vkWaitForFences(device, 1, &uploadFence, true, UINT64_MAX);
+    vkResetFences(device, 1, &uploadFence);
+
+    vkResetCommandPool(device, *_commandPools.Access(uploadCommandPool.id), 0);
 }
 
 void VulkanRenderingDevice::Present() {
@@ -1365,6 +1441,7 @@ void VulkanRenderingDevice::Shutdown() {
     _commandPools.Shutdown();
     _pipeline.Shutdown();
 
+    vkDestroyFence(device, uploadFence, nullptr);
     vkDestroyDescriptorPool(device, _descriptorPool, nullptr);
     vkDestroySemaphore(device, timelineSemaphore, nullptr);
     vkDestroySemaphore(device, imageAcquireSemaphore, nullptr);

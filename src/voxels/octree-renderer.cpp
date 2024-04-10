@@ -76,6 +76,16 @@ void OctreeRenderer::Initialize(ParallelOctree *octree) {
 }
 
 void OctreeRenderer::RasterizeVoxel(CommandBufferID commandBuffer, UniformSetID globalSet) {
+    /*
+    std::vector<RD::TextureBarrier> imageBarrier;
+    imageBarrier.push_back(RD::TextureBarrier{
+        colorAttachment,
+        RD::BARRIER_ACCESS_TRANSFER_READ_BIT,
+        RD::BARRIER_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        RD::TEXTURE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    });
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, imageBarrier);
+    */
     RD::AttachmentInfo colorAttachmentInfos = {
         .loadOp = RD::LOAD_OP_CLEAR,
         .storeOp = RD::STORE_OP_STORE,

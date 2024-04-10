@@ -2,11 +2,11 @@
 
 #include "rendering-device.h"
 #define VK_NO_PROTOTYPES
+#define VULKAN_1_3
 #include <volk.h>
 
 #include "core/resource-pool.h"
 
-#define NOMINMA
 #include <vma/vk_mem_alloc.h>
 
 #include <vector>
@@ -59,6 +59,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) override;
 
     void Submit(CommandBufferID commandBuffer) override;
+    void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function);
+
     void Present() override;
 
     void PipelineBarrier(CommandBufferID commandBuffer,
@@ -71,6 +73,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) override;
     void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) override;
     void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ = 1) override;
+
+    void PrepareSwapchain(CommandBufferID commandBuffer) override;
 
     void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;
 
@@ -185,6 +189,10 @@ class VulkanRenderingDevice : public RenderingDevice {
     ResourcePool<VulkanBuffer> _buffers;
 
     std::vector<VkCommandBuffer> _commandBuffers;
+    CommandBufferID uploadCommandBuffer;
+    CommandPoolID uploadCommandPool;
+    VkFence uploadFence;
+
     VkDescriptorPool _descriptorPool;
 
     static const uint32_t MAX_SET_COUNT = 4;
@@ -215,5 +223,6 @@ class VulkanRenderingDevice : public RenderingDevice {
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
     void ResizeSwapchain();
 
+    VkFence CreateFence(const std::string &name = "fence");
     VkSemaphore CreateVulkanSemaphore(const std::string &name = "semaphore");
 };

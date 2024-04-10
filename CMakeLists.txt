@@ -5,7 +5,7 @@ set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
 project(vox-engine VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
-file(GLOB_RECURSE PROJECT_SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE PROJECT_SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/external/imgui/*.cpp)
 file(GLOB_RECURSE PROJECT_HEADERS ${CMAKE_SOURCE_DIR}/src/*.h
                           ${CMAKE_SOURCE_DIR}/external/*.h)
 
@@ -19,14 +19,12 @@ add_subdirectory(external/enkiTS)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 find_package(volk CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 set(PROJECT_LIBRARIES 
     glad::glad
     glm::glm
-    imgui::imgui
     volk::volk
     glfw
     enkiTS

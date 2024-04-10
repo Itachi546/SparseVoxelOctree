@@ -1,7 +1,9 @@
 #pragma once
 
-#include <string>
 #include "core/resource.h"
+
+#include <functional>
+#include <string>
 
 struct ID {
     size_t id = 0;
@@ -383,11 +385,14 @@ class RenderingDevice : public Resource {
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
     virtual void Submit(CommandBufferID commandBuffer) = 0;
 
+    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function) = 0;
     // @TODO Hardcoded just for testing
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
                                  PipelineStageBits srcStage,
                                  PipelineStageBits dstStage,
                                  std::vector<TextureBarrier> &textureBarriers) = 0;
+
+    virtual void PrepareSwapchain(CommandBufferID commandBuffer) = 0;
 
     // @TODO seperate it into copy and present
     virtual void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) = 0;
