@@ -48,7 +48,6 @@ void OctreeRenderer::SetupRasterizer(ParallelOctree *octree) {
     octree->ListVoxels(voxels);
     numVoxels = static_cast<uint32_t>(voxels.size());
 
-    // @TODO use staging buffer here
     uint32_t bufferSize = static_cast<uint32_t>(voxels.size() * sizeof(glm::vec4));
     instanceDataBuffer = device->CreateBuffer(bufferSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "InstancedDataBuffer");
     void *bufferPtr = device->MapBuffer(instanceDataBuffer);

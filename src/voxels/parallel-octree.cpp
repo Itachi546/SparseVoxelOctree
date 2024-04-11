@@ -144,7 +144,7 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
                 if (!this->IsRegionEmpty(generator, nodeData.center - currentSize, nodeData.center + currentSize)) {
                     float camDist = glm::length(cameraPosition - nodeData.center);
                     float lod = calculateLOD(camDist);
-                    /*
+
                     if (lod == currentSize) {
                         OctreeBrick brick;
                         brick.position = nodeData.center;
@@ -157,8 +157,8 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
                         else
                             node = InsertBrick(&brick);
                         nodePools[nodeData.nodeIndex] = node;
-                    } else*/
-                    CreateChildren(&nodeData, currentSize, nodeList[nl]);
+                    } else
+                        CreateChildren(&nodeData, currentSize, nodeList[nl]);
                 }
             }
         });

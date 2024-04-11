@@ -380,7 +380,7 @@ class RenderingDevice : public Resource {
 
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
-    virtual void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion* region) = 0;
+    virtual void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) = 0;
 
     virtual void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
     virtual void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
@@ -394,7 +394,6 @@ class RenderingDevice : public Resource {
     virtual void Submit(CommandBufferID commandBuffer) = 0;
 
     virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function) = 0;
-    // @TODO Hardcoded just for testing
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
                                  PipelineStageBits srcStage,
                                  PipelineStageBits dstStage,
@@ -402,7 +401,6 @@ class RenderingDevice : public Resource {
 
     virtual void PrepareSwapchain(CommandBufferID commandBuffer) = 0;
 
-    // @TODO seperate it into copy and present
     virtual void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) = 0;
 
     virtual void BeginFrame() = 0;

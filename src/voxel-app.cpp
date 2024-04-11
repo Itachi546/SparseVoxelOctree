@@ -72,12 +72,12 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 1
+#if 0
     octree = new ParallelOctree("monu3x16.octree");
 #else
     constexpr uint32_t kOctreeDims = 32;
     LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
-    octree->Serialize("monu3x16.octree");
+    // octree->Serialize("monu3x16.octree");
 #endif
     octreeRenderer = new OctreeRenderer(1920, 1080);
     octreeRenderer->Initialize(octree);

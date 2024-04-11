@@ -33,7 +33,7 @@ void main() {
     vec3 worldPos = position * data.w + vec3(data.x, data.y, data.z);
 
     vNormal = normal;
-    vUV = position.xy * vertex.nz + position.yz * normal.x + position.xz * normal.y;
+    vUV = vec2(vertex.tu, vertex.tv) * 2.0f - 1.0f;
 
     gl_Position = VP * vec4(worldPos, 1.0f);
 }

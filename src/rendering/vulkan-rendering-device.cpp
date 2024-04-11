@@ -902,7 +902,6 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description, 
     };
 
     VmaAllocationCreateInfo allocationCreateInfo = {};
-    // @TODO change it later
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     allocationCreateInfo.flags = 0;
 
