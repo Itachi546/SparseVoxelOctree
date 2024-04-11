@@ -21,14 +21,25 @@ namespace gfx {
 
         // @TODO use staging buffer
         uint32_t vertexSize = static_cast<uint32_t>(sizeof(float) * vertexCount);
-        vertexBuffer = device->CreateBuffer(vertexSize, RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "MeshVertexBuffer");
-        void *vb = device->MapBuffer(vertexBuffer);
-        std::memcpy(vb, vertices, vertexSize);
-
         uint32_t indexSize = sizeof(uint32_t) * indexCount;
-        indexBuffer = device->CreateBuffer(sizeof(uint32_t) * indexCount, RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_INDEX_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "MeshIndexBuffer");
-        void *ib = device->MapBuffer(indexBuffer);
-        std::memcpy(ib, indices, indexSize);
+
+        BufferID stagingBuffer = device->CreateBuffer(vertexSize + indexSize, RD::BUFFER_USAGE_TRANSFER_SRC_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "StagingBuffer");
+        void *sbPtr = device->MapBuffer(stagingBuffer);
+
+        std::memcpy(sbPtr, vertices, vertexSize);
+        std::memcpy((uint8_t *)sbPtr + vertexSize, indices, indexSize);
+
+        vertexBuffer = device->CreateBuffer(vertexSize, RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "MeshVertexBuffer");
+        indexBuffer = device->CreateBuffer(sizeof(uint32_t) * indexCount, RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_INDEX_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "MeshIndexBuffer");
+
+        device->ImmediateSubmit([&](CommandBufferID commandBuffer) {
+            RD::BufferCopyRegion copyRegion{0, 0, vertexSize};
+            device->CopyBuffer(commandBuffer, stagingBuffer, vertexBuffer, &copyRegion);
+            copyRegion.srcOffset = vertexSize;
+            copyRegion.size = indexSize;
+            device->CopyBuffer(commandBuffer, stagingBuffer, indexBuffer, &copyRegion);
+        });
+        device->Destroy(stagingBuffer);
 
         numVertices = indexCount;
     }

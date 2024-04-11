@@ -43,8 +43,10 @@ class VulkanRenderingDevice : public RenderingDevice {
     CommandPoolID CreateCommandPool(const std::string &name = "CommandPool") override;
     TextureID CreateTexture(TextureDescription *description, const std::string &name) override;
     UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) override;
+
     BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) override;
     uint8_t *MapBuffer(BufferID buffer) override;
+    void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) override;
 
     void BeginFrame() override;
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;

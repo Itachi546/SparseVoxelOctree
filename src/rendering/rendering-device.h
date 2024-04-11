@@ -308,6 +308,12 @@ class RenderingDevice : public Resource {
         TEXTURE_LAYOUT_VRS_ATTACHMENT_OPTIMAL = 1000164003,
     };
 
+    struct BufferCopyRegion {
+        uint64_t srcOffset;
+        uint64_t dstOffset;
+        uint64_t size;
+    };
+
     struct TextureBarrier {
         TextureID texture;
         BarrierAccessBits srcAccess;
@@ -371,8 +377,10 @@ class RenderingDevice : public Resource {
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(const std::string &name = "commandPool") = 0;
     virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) = 0;
+
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
+    virtual void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion* region) = 0;
 
     virtual void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
     virtual void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;

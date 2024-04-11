@@ -979,6 +979,12 @@ uint8_t *VulkanRenderingDevice::MapBuffer(BufferID buffer) {
     return (uint8_t *)ptr;
 }
 
+void VulkanRenderingDevice::CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) {
+    VulkanBuffer *vkSrc = _buffers.Access(src.id);
+    VulkanBuffer *vkDst = _buffers.Access(dst.id);
+    vkCmdCopyBuffer(_commandBuffers[commandBuffer.id], vkSrc->buffer, vkDst->buffer, 1, (const VkBufferCopy *)region);
+}
+
 UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) {
     std::vector<VkWriteDescriptorSet> writeSets(uniformCount);
 
