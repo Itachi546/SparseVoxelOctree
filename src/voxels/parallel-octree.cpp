@@ -213,6 +213,7 @@ void ParallelOctree::Serialize(const char *filename) {
 
 void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
     ListVoxels(center, size, 0, voxels);
+    //voxels.push_back(glm::vec4{0.0f, 0.0f, 0.0f, 5.0f});
 }
 
 void ParallelOctree::ListVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels) {

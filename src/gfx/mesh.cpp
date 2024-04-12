@@ -115,43 +115,18 @@ namespace gfx {
         };
 
         std::vector<unsigned int> indices = {
-            0,
-            1,
-            2, // Front face
-            0,
-            2,
-            3,
-            4,
-            5,
-            6, // Back face
-            4,
-            6,
-            7,
-            8,
-            9,
-            10, // Top face
-            8,
-            10,
-            11,
-            12,
-            13,
-            14, // Bottom face
-            12,
-            14,
-            15,
-            16,
-            17,
-            18, // Right face
-            16,
-            18,
-            19,
-            20,
-            21,
-            22, // Left face
-            20,
-            22,
-            23,
-        };
+            0, 1, 2, // Front face
+            0, 2, 3,
+            4, 6, 5, // Back face
+            6, 4, 7,
+            8, 9, 10, // Top face
+            8, 10, 11,
+            13, 12, 14, // Bottom face
+            14, 12, 15,
+            16, 17, 18, // Right face
+            18, 17, 19,
+            20, 22, 21, // Left face
+            21, 22, 23};
 
         uint32_t vertexCount = static_cast<uint32_t>(vertices.size()) * 8;
         uint32_t indexCount = static_cast<uint32_t>(indices.size());

@@ -72,7 +72,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 0
+#if 1
     octree = new ParallelOctree("monu3x16.octree");
 #else
     constexpr uint32_t kOctreeDims = 32;
