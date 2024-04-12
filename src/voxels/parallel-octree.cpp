@@ -212,33 +212,53 @@ void ParallelOctree::Serialize(const char *filename) {
 }
 
 void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
-    ListVoxels(center, size, 0, voxels);
-    //voxels.push_back(glm::vec4{0.0f, 0.0f, 0.0f, 5.0f});
-}
+    enki::TaskScheduler ts;
+    ts.Initialize();
 
-void ParallelOctree::ListVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels) {
-    Node node = nodePools[parent];
-    uint32_t nodeMask = node.GetNodeMask();
-    float halfSize = size * 0.5f;
+    uint32_t dispatchCount = 1;
+    float currentSize = size;
+    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
 
-    if (nodeMask == NodeMask::InternalNode) {
-        uint32_t firstChild = node.GetChildPtr();
-        for (int i = 0; i < 8; ++i) {
-            glm::vec3 childPos = center + DIRECTIONS[i] * halfSize;
-            ListVoxels(childPos, halfSize, firstChild + i, voxels);
-        }
-    } else if (nodeMask == NodeMask::LeafNode) {
-        voxels.push_back(glm::vec4(center, size));
-    } else if (nodeMask == NodeMask::LeafNodeWithPtr) {
-        uint32_t brickPtr = node.GetChildPtr() * BRICK_ELEMENT_COUNT;
-        ListVoxelsFromBrick(center, brickPtr, voxels);
+    ThreadSafeVector<NodeData> nodeList[2];
+    nodeList[0].push(NodeData{center, 0});
+
+    std::mutex insertionMutex;
+    for (uint32_t i = 0; i <= depth; ++i) {
+        uint32_t cl = i % 2;
+        uint32_t nl = 1 - cl;
+        enki::TaskSet task(dispatchCount, [&](enki::TaskSetPartition range, uint32_t threadNum) {
+            for (uint32_t work = range.start; work < range.end; ++work) {
+                // Be careful about reading reference from vector and using it as pointer
+                NodeData &nodeData = nodeList[cl].get(work);
+                Node node = nodePools[nodeData.nodeIndex];
+                glm::vec3 center = nodeData.center;
+                if (node.GetNodeMask() == NodeMask::InternalNode) {
+                    for (int i = 0; i < 8; ++i) {
+                        glm::vec3 childPos = center + DIRECTIONS[i] * currentSize * 0.5f;
+                        nodeList[nl].push(NodeData{childPos, node.GetChildPtr() + i});
+                    }
+                } else if (node.GetNodeMask() == NodeMask::LeafNode) {
+                    std::lock_guard insertionGuard{insertionMutex};
+                    voxels.push_back(glm::vec4{center, currentSize});
+                } else if (node.GetNodeMask() == NodeMask::LeafNodeWithPtr) {
+                    std::lock_guard insertionGuard{insertionMutex};
+                    ListVoxelsFromBrick(center, node.GetChildPtr() * BRICK_ELEMENT_COUNT, currentSize * 2.0f, voxels);
+                }
+            }
+        });
+
+        ts.AddTaskSetToPipe(&task);
+        ts.WaitforTask(&task);
+
+        nodeList[cl].reset();
+        dispatchCount = nodeList[nl].size();
+        currentSize = currentSize * 0.5f;
     }
 }
 
-void ParallelOctree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels) {
-    float voxelHalfSize = (LEAF_NODE_SCALE / float(BRICK_SIZE)) * 0.5f;
-    glm::vec3 min = center - LEAF_NODE_SCALE * 0.5f;
-    float size = float(LEAF_NODE_SCALE);
+void ParallelOctree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, float gridSize, std::vector<glm::vec4> &voxels) {
+    float unitVoxelHalfSize = (gridSize * 0.5f) / float(BRICK_SIZE);
+    glm::vec3 min = center - gridSize * 0.5f;
     for (int x = 0; x < BRICK_SIZE; ++x) {
         for (int y = 0; y < BRICK_SIZE; ++y) {
             for (int z = 0; z < BRICK_SIZE; ++z) {
@@ -246,9 +266,9 @@ void ParallelOctree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brick
                 uint32_t val = brickPools[brickPtr + offset];
                 if (val > 0) {
                     glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(BRICK_SIZE);
-                    glm::vec3 position = min + t01 * size;
+                    glm::vec3 position = min + t01 * gridSize;
                     // Calculate center and size
-                    voxels.push_back(glm::vec4(position + voxelHalfSize, voxelHalfSize));
+                    voxels.push_back(glm::vec4(position + unitVoxelHalfSize, unitVoxelHalfSize));
                 }
             }
         }

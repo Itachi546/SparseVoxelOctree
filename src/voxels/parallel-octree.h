@@ -37,6 +37,5 @@ class ParallelOctree {
     bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
     Node InsertBrick(OctreeBrick *brick);
 
-    void ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels);
-    void ListVoxels(const glm::vec3 &center, float size, uint32_t parent, std::vector<glm::vec4> &voxels);
+    void ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, float size, std::vector<glm::vec4> &voxels);
 };
