@@ -40,10 +40,10 @@ struct Node {
     }
 };
 
-constexpr const uint32_t BRICK_SIZE = 8;
-constexpr const uint32_t BRICK_ELEMENT_COUNT = BRICK_SIZE * BRICK_SIZE * BRICK_SIZE;
+constexpr const uint32_t NUM_BRICK = 8;
+constexpr const uint32_t BRICK_ELEMENT_COUNT = NUM_BRICK * NUM_BRICK * NUM_BRICK;
 constexpr const uint32_t LEAF_NODE_SCALE = 1;
-constexpr const float BRICK_GRID_SIZE = float(LEAF_NODE_SCALE) / float(BRICK_SIZE);
+constexpr const float BRICK_GRID_SIZE = float(LEAF_NODE_SCALE) / float(NUM_BRICK);
 struct OctreeBrick {
     std::array<uint32_t, BRICK_ELEMENT_COUNT> data;
     glm::vec3 position;

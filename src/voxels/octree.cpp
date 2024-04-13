@@ -118,16 +118,16 @@ void Octree::ListVoxels(const glm::vec3 &center, float size, uint32_t parent, st
 }
 
 void Octree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, std::vector<glm::vec4> &voxels) {
-    float voxelHalfSize = (LEAF_NODE_SCALE / float(BRICK_SIZE)) * 0.5f;
+    float voxelHalfSize = (LEAF_NODE_SCALE / float(NUM_BRICK)) * 0.5f;
     glm::vec3 min = center - LEAF_NODE_SCALE * 0.5f;
     float size = float(LEAF_NODE_SCALE);
-    for (int x = 0; x < BRICK_SIZE; ++x) {
-        for (int y = 0; y < BRICK_SIZE; ++y) {
-            for (int z = 0; z < BRICK_SIZE; ++z) {
-                uint32_t offset = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+    for (int x = 0; x < NUM_BRICK; ++x) {
+        for (int y = 0; y < NUM_BRICK; ++y) {
+            for (int z = 0; z < NUM_BRICK; ++z) {
+                uint32_t offset = x * NUM_BRICK * NUM_BRICK + y * NUM_BRICK + z;
                 uint32_t val = brickPools[brickPtr + offset];
                 if (val > 0) {
-                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(BRICK_SIZE);
+                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(NUM_BRICK);
                     glm::vec3 position = min + t01 * size;
                     // Calculate center and size
                     voxels.push_back(glm::vec4(position + voxelHalfSize, voxelHalfSize));
@@ -160,13 +160,13 @@ void Octree::Generate(VoxelData *voxels) {
 
 bool Octree::CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size) {
     bool empty = true;
-    for (int x = 0; x < BRICK_SIZE; ++x) {
-        for (int y = 0; y < BRICK_SIZE; ++y) {
-            for (int z = 0; z < BRICK_SIZE; ++z) {
-                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(BRICK_SIZE - 1);
+    for (int x = 0; x < NUM_BRICK; ++x) {
+        for (int y = 0; y < NUM_BRICK; ++y) {
+            for (int z = 0; z < NUM_BRICK; ++z) {
+                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(NUM_BRICK - 1);
                 glm::vec3 p = min + t01 * size;
                 uint32_t val = voxels->Sample(p);
-                uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                uint32_t index = x * NUM_BRICK * NUM_BRICK + y * NUM_BRICK + z;
                 if (val > 0) {
                     brick->data[index] = val;
                     empty = false;
@@ -278,7 +278,7 @@ glm::vec3 Reflect(glm::vec3 p, const glm::vec3 &c, const glm::vec3 &dir) {
 }
 
 RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm::vec3 &dirMask, uint32_t brickStart, std::vector<AABB> &traversedNodes) {
-    const int gridEndMargin = BRICK_SIZE - 1;
+    const int gridEndMargin = NUM_BRICK - 1;
     glm::vec3 stepDir = mix(glm::vec3(-1.0f), glm::vec3(1.0f), dirMask);
     glm::vec3 tStep = invRd;
 
@@ -299,7 +299,7 @@ RayHit Octree::RaycastDDA(const glm::vec3 &r0, const glm::vec3 &invRd, const glm
         glm::vec3 dp = glm::mix(glm::vec3(gridEndMargin) - p, p, dirMask);
         traversedNodes.push_back(AABB{dp, dp + 1.0f});
 #endif
-        uint32_t voxelIndex = brickStart + uint32_t(p.x * BRICK_SIZE * BRICK_SIZE + p.y * BRICK_SIZE + p.z);
+        uint32_t voxelIndex = brickStart + uint32_t(p.x * NUM_BRICK * NUM_BRICK + p.y * NUM_BRICK + p.z);
         uint32_t color = brickPools[voxelIndex];
         if (color > 0) {
             // Undo the reflection
@@ -397,7 +397,7 @@ RayHit Octree::Raycast(glm::vec3 r0, glm::vec3 rd) {
             } else if (mask == LeafNodeWithPtr) {
                 uint32_t brickPointer = nodeDescriptor.GetChildPtr() * BRICK_ELEMENT_COUNT;
                 glm::vec3 intersectPos = r0 + glm::max(t.x, 0.0f) * d;
-                glm::vec3 brickMax = glm::vec3(BRICK_SIZE);
+                glm::vec3 brickMax = glm::vec3(NUM_BRICK);
                 glm::vec3 brickPos = Remap<glm::vec3>(intersectPos, p - currentSize, p, glm::vec3(0.0f), brickMax);
                 brickPos = glm::clamp(brickPos, glm::vec3(0.0f), brickMax);
 

@@ -12,7 +12,7 @@ struct PerlinVoxData : public VoxelData {
     }
 
     uint32_t Sample(glm::vec3 p) override {
-        float frequency = 0.5f;
+        float frequency = 0.05f;
         float amplitude = 0.5f;
         float res = 0.0f;
         for (uint32_t i = 0; i < 5; ++i) {
@@ -21,9 +21,9 @@ struct PerlinVoxData : public VoxelData {
             frequency *= 2.0f;
         }
 
-        float detailOffset = 0.1f;
-        float offset = noise->GetNoise(p.x * 200.0f, p.z * 200.0f) * detailOffset;
-        float height = 2.0f;
+        //float detailOffset = 0.1f;
+        //float offset = noise->GetNoise(p.x * 200.0f, p.z * 200.0f) * detailOffset;
+        float height = 12.0f;
         res *= height;
 
         uint32_t colors[] = {
@@ -32,7 +32,7 @@ struct PerlinVoxData : public VoxelData {
             0x0000ff44,
         };
         uint32_t numColors = static_cast<uint32_t>(std::size(colors));
-        return std::abs(p.y + res + offset) > (height + detailOffset)
+        return std::abs(p.y + res) > height
                    ? 0u
                    : colors[rand() % numColors];
     };

@@ -68,15 +68,18 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
-    frameData.uLightPosition = glm::vec3(0.0f, 32.0f, 32.0f);
+    frameData.uLightPosition = glm::vec3(0.0f, 4.0f, 32.0f);
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 1
+#if 0
     octree = new ParallelOctree("monu3x16.octree");
 #else
-    constexpr uint32_t kOctreeDims = 32;
-    LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
+    constexpr uint32_t kOctreeDims = 512;
+    PerlinVoxData generator;
+    octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
+    octree->Generate(&generator, camera->GetPosition());
+    //LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
     // octree->Serialize("monu3x16.octree");
 #endif
     octreeRenderer = new OctreeRenderer(1920, 1080);

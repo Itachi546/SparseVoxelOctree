@@ -1117,9 +1117,9 @@ void VulkanRenderingDevice::BeginRenderPass(CommandBufferID commandBuffer, Rende
     vkRenderingInfo.colorAttachmentCount = renderInfo->colorAttachmentCount;
     vkRenderingInfo.pColorAttachments = colorAttachments.data();
 
+    VkRenderingAttachmentInfo depthAttachment = {VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     if (renderInfo->pDepthStencilAttachment != nullptr) {
         AttachmentInfo *attachment = renderInfo->pDepthStencilAttachment;
-        VkRenderingAttachmentInfo depthAttachment = {VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
         VulkanTexture *texture = _textures.Access(attachment->attachment.id);
         depthAttachment.imageView = texture->imageView;
         depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;

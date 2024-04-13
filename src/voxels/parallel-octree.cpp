@@ -43,7 +43,7 @@ ParallelOctree::ParallelOctree(const char *filename) {
 void ParallelOctree::CreateChildren(NodeData *parent, float size, ThreadSafeVector<NodeData> &childNodes) {
     std::lock_guard lock{nodePoolMutex};
     uint32_t firstChild = static_cast<uint32_t>(nodePools.size());
-    float halfSize = size * 0.5f;
+    float halfSize = size * 0.25f;
 
     for (int i = 0; i < 8; ++i) {
         nodePools.push_back(CreateNode(InternalLeafNode, 0));
@@ -84,16 +84,16 @@ bool ParallelOctree::IsRegionEmpty(VoxelData *voxels, const glm::vec3 &min, cons
     }
     return true;
 }
-
+// Create octree brick from AABB
 bool ParallelOctree::CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size) {
     bool empty = true;
-    for (int x = 0; x < BRICK_SIZE; ++x) {
-        for (int y = 0; y < BRICK_SIZE; ++y) {
-            for (int z = 0; z < BRICK_SIZE; ++z) {
-                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(BRICK_SIZE - 1);
+    for (int x = 0; x < NUM_BRICK; ++x) {
+        for (int y = 0; y < NUM_BRICK; ++y) {
+            for (int z = 0; z < NUM_BRICK; ++z) {
+                glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(NUM_BRICK - 1);
                 glm::vec3 p = min + t01 * size;
                 uint32_t val = voxels->Sample(p);
-                uint32_t index = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+                uint32_t index = x * NUM_BRICK * NUM_BRICK + y * NUM_BRICK + z;
                 if (val > 0) {
                     brick->data[index] = val;
                     empty = false;
@@ -111,8 +111,8 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
     enki::TaskScheduler ts;
     ts.Initialize();
 
-    const uint32_t depth = static_cast<uint32_t>(std::log2(size) / (std::log2(LEAF_NODE_SCALE) + 1));
-    float currentSize = size;
+    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
+    float currentSize = size * 2.0f;
     uint32_t dispatchCount = 1;
     std::cout << "Octree Depth: " << depth << std::endl;
 
@@ -128,8 +128,23 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
      * We process the leaf in the same loop i.g
      */
     auto calculateLOD = [](float d) {
+        if (d < 16.0f)
+            return 1.0f;
+        else if (d < 32.0f)
+            return 2.0f;
+        else if (d < 64.0f)
+            return 4.0f;
+        else if (d < 128.0f)
+            return 8.0f;
+        else if (d < 256.0f)
+            return 16.0f;
+        else
+            return 32.0f;
+        /*
+        //return LEAF_NODE_SCALE * 0.5f;
         float t = std::max(std::floor(std::log2(d)) - 4.0f, 0.0f);
         return std::pow(2.0f, t);
+        */
     };
 
     for (uint32_t i = 0; i <= depth; ++i) {
@@ -141,16 +156,15 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
             for (uint32_t work = range.start; work < range.end; ++work) {
                 // Be careful about reading reference from vector and using it as pointer
                 NodeData &nodeData = nodeList[cl].get(work);
-                if (!this->IsRegionEmpty(generator, nodeData.center - currentSize, nodeData.center + currentSize)) {
+                float halfSize = currentSize * 0.5f;
+                if (!this->IsRegionEmpty(generator, nodeData.center - halfSize, nodeData.center + halfSize)) {
                     float camDist = glm::length(cameraPosition - nodeData.center);
                     float lod = calculateLOD(camDist);
-
-                    if (lod == currentSize) {
-                        OctreeBrick brick;
+                    if (lod >= currentSize) {
+                        OctreeBrick brick{};
                         brick.position = nodeData.center;
-                        glm::vec3 min = nodeData.center - currentSize;
-                        float brickSize = (currentSize * 2.0f) / float(BRICK_SIZE);
-                        bool empty = CreateBrick(generator, &brick, min, brickSize);
+                        glm::vec3 min = nodeData.center - halfSize;
+                        bool empty = CreateBrick(generator, &brick, min, currentSize);
                         Node node = nodePools[nodeData.nodeIndex];
                         if (empty)
                             node = CreateNode(InternalLeafNode);
@@ -168,12 +182,13 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
 
         nodeList[cl].reset();
         dispatchCount = nodeList[nl].size();
+        if (dispatchCount == 0)
+            break;
         currentSize = currentSize * 0.5f;
     }
-
+    /*
     uint32_t cl = (depth + 1) % 2;
     std::cout << "Processing brick, Total bricks: " << nodeList[cl].size() << std::endl;
-
     enki::TaskSet task(dispatchCount, [&](enki::TaskSetPartition range, uint32_t threadNum) {
         for (uint32_t work = range.start; work < range.end; ++work) {
             NodeData &nodeData = nodeList[cl].get(work);
@@ -192,9 +207,9 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
             nodePools[nodeData.nodeIndex] = node;
         }
     });
-
     ts.AddTaskSetToPipe(&task);
     ts.WaitforTask(&task);
+    */
 }
 
 void ParallelOctree::Serialize(const char *filename) {
@@ -257,15 +272,15 @@ void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
 }
 
 void ParallelOctree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, float gridSize, std::vector<glm::vec4> &voxels) {
-    float unitVoxelHalfSize = (gridSize * 0.5f) / float(BRICK_SIZE);
+    float unitVoxelHalfSize = (gridSize * 0.5f) / float(NUM_BRICK);
     glm::vec3 min = center - gridSize * 0.5f;
-    for (int x = 0; x < BRICK_SIZE; ++x) {
-        for (int y = 0; y < BRICK_SIZE; ++y) {
-            for (int z = 0; z < BRICK_SIZE; ++z) {
-                uint32_t offset = x * BRICK_SIZE * BRICK_SIZE + y * BRICK_SIZE + z;
+    for (int x = 0; x < NUM_BRICK; ++x) {
+        for (int y = 0; y < NUM_BRICK; ++y) {
+            for (int z = 0; z < NUM_BRICK; ++z) {
+                uint32_t offset = x * NUM_BRICK * NUM_BRICK + y * NUM_BRICK + z;
                 uint32_t val = brickPools[brickPtr + offset];
                 if (val > 0) {
-                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(BRICK_SIZE);
+                    glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(NUM_BRICK);
                     glm::vec3 position = min + t01 * gridSize;
                     // Calculate center and size
                     voxels.push_back(glm::vec4(position + unitVoxelHalfSize, unitVoxelHalfSize));
