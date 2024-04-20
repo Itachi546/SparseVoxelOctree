@@ -21,8 +21,8 @@ struct PerlinVoxData : public VoxelData {
             frequency *= 2.0f;
         }
 
-        //float detailOffset = 0.1f;
-        //float offset = noise->GetNoise(p.x * 200.0f, p.z * 200.0f) * detailOffset;
+        // float detailOffset = 0.1f;
+        // float offset = noise->GetNoise(p.x * 200.0f, p.z * 200.0f) * detailOffset;
         float height = 12.0f;
         res *= height;
 

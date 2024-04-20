@@ -7,7 +7,7 @@ OctreeRenderer::OctreeRenderer(uint32_t width, uint32_t height) : width(width), 
     device = RD::GetInstance();
 }
 
-void OctreeRenderer::SetupRasterizer(ParallelOctree *octree) {
+void OctreeRenderer::SetupRasterizer() {
     RD::UniformBinding bindings[] = {
         RD::UniformBinding{RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
         RD::UniformBinding{RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0},
@@ -44,14 +44,9 @@ void OctreeRenderer::SetupRasterizer(ParallelOctree *octree) {
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
 
-    std::vector<glm::vec4> voxels;
-    octree->ListVoxels(voxels);
-    numVoxels = static_cast<uint32_t>(voxels.size());
-
-    uint32_t bufferSize = static_cast<uint32_t>(voxels.size() * sizeof(glm::vec4));
+    uint32_t bufferSize = MAX_VOXELS * sizeof(glm::vec4);
     instanceDataBuffer = device->CreateBuffer(bufferSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "InstancedDataBuffer");
-    void *bufferPtr = device->MapBuffer(instanceDataBuffer);
-    std::memcpy(bufferPtr, voxels.data(), bufferSize);
+    instanceDataBufferPtr = device->MapBuffer(instanceDataBuffer);
 
     gfx::Mesh::CreateCube(&voxelMesh);
 
@@ -62,7 +57,7 @@ void OctreeRenderer::SetupRasterizer(ParallelOctree *octree) {
     instancedUniformSet = device->CreateUniformSet(voxelRasterPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "InstancedVoxelDataSet");
 }
 
-void OctreeRenderer::Initialize(ParallelOctree *octree) {
+void OctreeRenderer::Initialize() {
     RD::TextureDescription desc = RD::TextureDescription::Initialize(width, height);
     desc.usageFlags = RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
     colorAttachment = device->CreateTexture(&desc, "MainColorAttachment");
@@ -71,7 +66,7 @@ void OctreeRenderer::Initialize(ParallelOctree *octree) {
     desc.format = RD::FORMAT_D32_SFLOAT;
     depthAttachment = device->CreateTexture(&desc, "Voxel Raster Depth Attachment");
 
-    SetupRasterizer(octree);
+    SetupRasterizer();
 }
 
 void OctreeRenderer::RasterizeVoxel(CommandBufferID commandBuffer, UniformSetID globalSet) {
@@ -123,6 +118,13 @@ void OctreeRenderer::RasterizeVoxel(CommandBufferID commandBuffer, UniformSetID 
     device->DrawElementInstanced(commandBuffer, voxelMesh.numVertices, numVoxels);
 
     device->EndRenderPass(commandBuffer);
+}
+
+void OctreeRenderer::Update(ParallelOctree *octree) {
+    std::vector<glm::vec4> voxels;
+    octree->ListVoxels(voxels);
+    numVoxels = std::min(static_cast<uint32_t>(voxels.size()), MAX_VOXELS);
+    std::memcpy(instanceDataBufferPtr, voxels.data(), numVoxels * sizeof(glm::vec4));
 }
 
 void OctreeRenderer::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {

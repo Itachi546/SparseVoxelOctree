@@ -14,7 +14,9 @@ struct OctreeRenderer {
 
     OctreeRenderer(uint32_t width, uint32_t height);
 
-    void Initialize(ParallelOctree *octree);
+    void Initialize();
+
+    void Update(ParallelOctree *octree);
 
     void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 
@@ -28,13 +30,16 @@ struct OctreeRenderer {
     RenderingDevice *device;
 
     BufferID instanceDataBuffer;
+    void *instanceDataBufferPtr;
     uint32_t numVoxels;
 
     UniformSetID instancedUniformSet;
 
     uint32_t width, height;
 
+    const uint32_t MAX_VOXELS = 10'000'000;
+
   private:
-    void SetupRasterizer(ParallelOctree *octree);
+    void SetupRasterizer();
     void RasterizeVoxel(CommandBufferID commandBuffer, UniformSetID globalSet);
 };

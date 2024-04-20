@@ -35,16 +35,17 @@ MessageCallback(GLenum source,
 
 void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
     octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
-    VoxModelData model;
-    model.Load(filename, scale);
+    VoxModelData *model = new VoxModelData();
+    model->Load(filename, scale);
     {
         auto start = std::chrono::high_resolution_clock::now();
-        octree->Generate(&model, camera->GetPosition());
+        octree->Generate(model, camera->GetPosition());
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
     }
-    model.Destroy();
+    generator = model;
+    // model->Destroy();
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
@@ -68,22 +69,23 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
-    frameData.uLightPosition = glm::vec3(0.0f, 4.0f, 32.0f);
+    frameData.uLightPosition = glm::vec3(0.0f, 4.0f, 400.0f);
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
 #if 0
     octree = new ParallelOctree("monu3x16.octree");
 #else
-    constexpr uint32_t kOctreeDims = 512;
-    PerlinVoxData generator;
+    constexpr uint32_t kOctreeDims = 256;
     octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
-    octree->Generate(&generator, camera->GetPosition());
-    //LoadFromFile("assets/models/monu3.vox", 0.5f, kOctreeDims);
-    // octree->Serialize("monu3x16.octree");
+
+    generator = new PerlinVoxData();
+    octree->Generate(generator, camera->GetPosition());
+    // LoadFromFile("assets/models/monu3.vox", 2.0f, kOctreeDims);
+    //   octree->Serialize("monu3x16.octree");
 #endif
     octreeRenderer = new OctreeRenderer(1920, 1080);
-    octreeRenderer->Initialize(octree);
+    octreeRenderer->Initialize();
     // raycaster = new OctreeRaycaster();
     // raycaster->Initialize(octree, 1920, 1080);
 
@@ -168,6 +170,13 @@ void VoxelApp::OnUpdate() {
     */
     Input *input = Input::Singleton();
     input->Update();
+
+    auto start = std::chrono::high_resolution_clock::now();
+    octree->Update(camera->GetPosition());
+    auto end = std::chrono::high_resolution_clock::now();
+    uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    ImGui::Text("Octree Update: %.2fms", (duration / 1000.0f));
+    octreeRenderer->Update(octree);
 }
 
 void VoxelApp::OnRenderUI() {
@@ -272,6 +281,7 @@ VoxelApp::~VoxelApp() {
     // GpuTimer::Shutdown();
     if (octree)
         delete octree;
+    delete generator;
     octreeRenderer->Shutdown();
     delete octreeRenderer;
 }

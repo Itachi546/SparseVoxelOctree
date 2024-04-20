@@ -11,6 +11,7 @@ namespace gfx {
 class ParallelOctree;
 struct OctreeBrick;
 struct OctreeRenderer;
+struct VoxelData;
 
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
@@ -43,6 +44,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     gfx::Camera *camera;
     ParallelOctree *octree;
     OctreeRenderer *octreeRenderer;
+    VoxelData *generator;
 
     float dt;
     float lastFrameTime;
