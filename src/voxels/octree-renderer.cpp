@@ -120,9 +120,9 @@ void OctreeRenderer::RasterizeVoxel(CommandBufferID commandBuffer, UniformSetID 
     device->EndRenderPass(commandBuffer);
 }
 
-void OctreeRenderer::Update(ParallelOctree *octree) {
+void OctreeRenderer::Update(ParallelOctree *octree, gfx::Camera* camera) {
     std::vector<glm::vec4> voxels;
-    octree->ListVoxels(voxels);
+    octree->ListVoxels(voxels, camera);
     numVoxels = std::min(static_cast<uint32_t>(voxels.size()), MAX_VOXELS);
     std::memcpy(instanceDataBufferPtr, voxels.data(), numVoxels * sizeof(glm::vec4));
 }

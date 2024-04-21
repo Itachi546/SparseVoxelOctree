@@ -7,6 +7,10 @@
 
 struct VoxelData;
 
+namespace gfx {
+    class Camera;
+};
+
 class ParallelOctree {
 
   public:
@@ -15,11 +19,11 @@ class ParallelOctree {
 
     void Generate(VoxelData *data, const glm::vec3 &cameraPosition);
 
-    void Update(const glm::vec3 &cameraPosition);
+    void Update(gfx::Camera *camera);
 
     void Serialize(const char *filename);
 
-    void ListVoxels(std::vector<glm::vec4> &voxels);
+    void ListVoxels(std::vector<glm::vec4> &voxels, gfx::Camera *camera);
 
     std::vector<Node> nodePools;
     std::vector<uint32_t> brickPools;

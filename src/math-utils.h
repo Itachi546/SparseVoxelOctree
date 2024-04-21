@@ -4,6 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/euler_angles.hpp>
 
+#include <array>
+
 constexpr const float EPSILON = 10e-7f;
 
 struct AABB {
@@ -67,4 +69,22 @@ inline glm::vec2 ConvertFromWindowToNDC(const glm::vec2 &mousePos, const glm::ve
     ndcCoord.x = ndcCoord.x * 2.0f - 1.0f;
     ndcCoord.y = 1.0f - 2.0f * ndcCoord.y;
     return ndcCoord;
+}
+
+inline bool AABBFrustumIntersection(glm::vec3 aabbMin, glm::vec3 aabbMax, std::array<glm::vec4, 6> &frustumPlanes) {
+    glm::vec3 p = glm::vec3(0.0f);
+    for (int i = 0; i < 6; ++i) {
+        p = aabbMin;
+        if (frustumPlanes[i].x > 0)
+            p.x = aabbMax.x;
+        if (frustumPlanes[i].y > 0)
+            p.y = aabbMax.y;
+        if (frustumPlanes[i].z > 0)
+            p.z = aabbMax.z;
+
+        glm::vec3 n = glm::vec3(frustumPlanes[i]);
+        if (glm::dot(n, p) + frustumPlanes[i].w < 0.0f)
+            return false;
+    }
+    return true;
 }

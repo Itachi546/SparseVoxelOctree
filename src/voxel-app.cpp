@@ -34,7 +34,7 @@ MessageCallback(GLenum source,
 }
 
 void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
-    octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
+    //octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData *model = new VoxModelData();
     model->Load(filename, scale);
     {
@@ -79,9 +79,9 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     constexpr uint32_t kOctreeDims = 256;
     octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
 
-    generator = new PerlinVoxData();
-    octree->Generate(generator, camera->GetPosition());
-    // LoadFromFile("assets/models/monu3.vox", 2.0f, kOctreeDims);
+    // generator = new PerlinVoxData();
+    // octree->Generate(generator, camera->GetPosition());
+    LoadFromFile("assets/models/monu3.vox", 5.0f, kOctreeDims);
     //   octree->Serialize("monu3x16.octree");
 #endif
     octreeRenderer = new OctreeRenderer(1920, 1080);
@@ -172,11 +172,11 @@ void VoxelApp::OnUpdate() {
     input->Update();
 
     auto start = std::chrono::high_resolution_clock::now();
-    octree->Update(camera->GetPosition());
+    octree->Update(camera);
     auto end = std::chrono::high_resolution_clock::now();
     uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     ImGui::Text("Octree Update: %.2fms", (duration / 1000.0f));
-    octreeRenderer->Update(octree);
+    octreeRenderer->Update(octree, camera);
 }
 
 void VoxelApp::OnRenderUI() {
@@ -185,7 +185,9 @@ void VoxelApp::OnRenderUI() {
     ImGui::Checkbox("Show", &show);
     if (show)
         ImGui::Checkbox("Rasterizer", &enableRasterizer);
-
+    
+    glm::vec3 camPos = camera->GetPosition();
+    ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
     // ImGui::SliderFloat3("Ray origin", &origin[0], -64.0f, 64.0f);
     // ImGui::SliderFloat3("Ray target", &target[0], -64.0f, 64.0f);
 

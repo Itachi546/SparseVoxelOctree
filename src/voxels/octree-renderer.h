@@ -8,6 +8,7 @@ class RenderingDevice;
 
 namespace gfx {
     struct Mesh;
+    class Camera;
 };
 
 struct OctreeRenderer {
@@ -16,7 +17,7 @@ struct OctreeRenderer {
 
     void Initialize();
 
-    void Update(ParallelOctree *octree);
+    void Update(ParallelOctree *octree, gfx::Camera* camera);
 
     void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 
