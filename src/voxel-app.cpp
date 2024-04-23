@@ -34,7 +34,7 @@ MessageCallback(GLenum source,
 }
 
 void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
-    //octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
+    // octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData *model = new VoxModelData();
     model->Load(filename, scale);
     {
@@ -84,8 +84,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     LoadFromFile("assets/models/monu3.vox", 5.0f, kOctreeDims);
     //   octree->Serialize("monu3x16.octree");
 #endif
-    octreeRenderer = new OctreeRenderer(1920, 1080);
-    octreeRenderer->Initialize();
+    octreeRenderer = new OctreeRenderer();
+    octreeRenderer->Initialize(1920, 1080);
     // raycaster = new OctreeRaycaster();
     // raycaster->Initialize(octree, 1920, 1080);
 
@@ -98,7 +98,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         .resourceID = globalUB,
         .offset = 0,
     };
-    globalUniformSet = device->CreateUniformSet(octreeRenderer->voxelRasterPipeline, &globalBinding, 1, 0, "GlobalUniformSet");
+    globalUniformSet = device->CreateUniformSet(octreeRenderer->raycaster->pipeline, &globalBinding, 1, 0, "GlobalUniformSet");
 }
 
 void VoxelApp::Run() {
@@ -110,7 +110,7 @@ void VoxelApp::Run() {
             device->BeginFrame();
             device->BeginCommandBuffer(commandBuffer);
             OnRender();
-            device->CopyToSwapchain(commandBuffer, octreeRenderer->colorAttachment);
+            device->CopyToSwapchain(commandBuffer, octreeRenderer->GetColorAttachment());
             OnRenderUI();
             device->PrepareSwapchain(commandBuffer);
             // Draw UI
@@ -180,12 +180,6 @@ void VoxelApp::OnUpdate() {
 }
 
 void VoxelApp::OnRenderUI() {
-
-    ImGui::Text("Total Voxel: %d", octreeRenderer->numVoxels);
-    ImGui::Checkbox("Show", &show);
-    if (show)
-        ImGui::Checkbox("Rasterizer", &enableRasterizer);
-    
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
     // ImGui::SliderFloat3("Ray origin", &origin[0], -64.0f, 64.0f);
@@ -278,7 +272,8 @@ void VoxelApp::UpdateControls() {
 
 VoxelApp::~VoxelApp() {
     device->Destroy(commandPool);
-
+    device->Destroy(globalUB);
+    device->Destroy(globalUniformSet);
     ImGuiService::Shutdown();
     // GpuTimer::Shutdown();
     if (octree)

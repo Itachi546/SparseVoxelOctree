@@ -71,6 +71,7 @@ struct AppWindow {
     }
 
     virtual ~AppWindow() {
+        RenderingDevice::GetInstance()->Shutdown();
         glfwDestroyWindow(glfwWindowPtr);
         glfwTerminate();
     }

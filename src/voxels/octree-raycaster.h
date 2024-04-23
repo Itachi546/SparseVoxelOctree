@@ -15,7 +15,9 @@ struct OctreeRaycaster {
 
     OctreeRaycaster() = default;
 
-    void Initialize(ParallelOctree *octree, uint32_t outputWidth, uint32_t outputHeight);
+    void Initialize(uint32_t outputWidth, uint32_t outputHeight);
+
+    void Update(ParallelOctree *octree);
 
     void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 
@@ -25,7 +27,11 @@ struct OctreeRaycaster {
 
     PipelineID pipeline;
     BufferID nodesBuffer;
+    void *nodeBufferPtr;
+
     BufferID brickBuffer;
+    void *brickBufferPtr;
+    
     TextureID outputTexture;
 
     glm::vec3 minBound;
@@ -36,4 +42,7 @@ struct OctreeRaycaster {
 
     uint32_t width;
     uint32_t height;
+
+    const uint32_t TOTAL_MAX_BRICK = 10000;
+    const uint32_t TOTAL_MAX_NODES = 100000;
 };

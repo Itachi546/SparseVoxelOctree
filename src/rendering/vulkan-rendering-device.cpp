@@ -1441,10 +1441,14 @@ void VulkanRenderingDevice::Destroy(UniformSetID uniformSet) {
 }
 
 void VulkanRenderingDevice::Shutdown() {
+    Destroy(CommandPoolID{0ull});
     // Release resource pool
     _shaders.Shutdown();
     _commandPools.Shutdown();
     _pipeline.Shutdown();
+    _textures.Shutdown();
+    _uniformSets.Shutdown();
+    _buffers.Shutdown();
 
     vkDestroyFence(device, uploadFence, nullptr);
     vkDestroyDescriptorPool(device, _descriptorPool, nullptr);

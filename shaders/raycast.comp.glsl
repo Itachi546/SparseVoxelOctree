@@ -40,11 +40,13 @@ vec3 ACES(vec3 x) {
 }
 
 void main() {
+    const uint width = 1920;
+    const uint height = 1080;
     ivec2 iuv = ivec2(gl_GlobalInvocationID.xy);
-    if (iuv.x > uScreenWidth || iuv.y > uScreenHeight)
+    if (iuv.x > width || iuv.y > height)
         return;
 
-    vec2 uv = (vec2(iuv) / vec2(uScreenWidth, uScreenHeight)) * 2.0f - 1.0f;
+    vec2 uv = (vec2(iuv) / vec2(width, height)) * 2.0f - 1.0f;
 
     vec3 r0 = uCameraPosition;
     vec3 rd = GenerateCameraRay(uv);

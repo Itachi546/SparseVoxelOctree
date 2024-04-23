@@ -2,45 +2,42 @@
 
 #include "rendering/rendering-device.h"
 #include "gfx/mesh.h"
+#include "octree-rasterizer.h"
+#include "octree-raycaster.h"
 
 class ParallelOctree;
-class RenderingDevice;
 
 namespace gfx {
-    struct Mesh;
     class Camera;
+}; // namespace gfx
+
+enum OctreeRenderMode {
+    RenderMode_Rasterizer = 0,
+    RenderMode_Raycaster
 };
 
 struct OctreeRenderer {
 
-    OctreeRenderer(uint32_t width, uint32_t height);
+    OctreeRenderer();
 
-    void Initialize();
+    void Initialize(uint32_t width, uint32_t height);
 
-    void Update(ParallelOctree *octree, gfx::Camera* camera);
+    void Update(ParallelOctree *octree, gfx::Camera *camera);
+
+    void AddUI();
 
     void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 
+    TextureID GetColorAttachment() const {
+        if (renderMode == RenderMode_Rasterizer)
+            return rasterizer->colorAttachment;
+        else
+            return raycaster->outputTexture;
+    }
+
     void Shutdown();
 
-    gfx::Mesh voxelMesh;
-    PipelineID voxelRasterPipeline;
-
-    TextureID colorAttachment;
-    TextureID depthAttachment;
-    RenderingDevice *device;
-
-    BufferID instanceDataBuffer;
-    void *instanceDataBufferPtr;
-    uint32_t numVoxels;
-
-    UniformSetID instancedUniformSet;
-
-    uint32_t width, height;
-
-    const uint32_t MAX_VOXELS = 10'000'000;
-
-  private:
-    void SetupRasterizer();
-    void RasterizeVoxel(CommandBufferID commandBuffer, UniformSetID globalSet);
+    OctreeRasterizer *rasterizer;
+    OctreeRaycaster *raycaster;
+    OctreeRenderMode renderMode = RenderMode_Raycaster;
 };

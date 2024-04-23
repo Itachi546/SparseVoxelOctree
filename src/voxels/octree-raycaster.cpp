@@ -5,7 +5,7 @@
 
 #include "rendering/rendering-utils.h"
 
-void OctreeRaycaster::Initialize(ParallelOctree *octree, uint32_t outputWidth, uint32_t outputHeight) {
+void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight) {
 
     width = outputWidth;
     height = outputHeight;
@@ -25,20 +25,16 @@ void OctreeRaycaster::Initialize(ParallelOctree *octree, uint32_t outputWidth, u
 
     ShaderID shaderID = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.comp.spv", bindings, static_cast<uint32_t>(std::size(bindings)), &pushConstant, 1);
     pipeline = device->CreateComputePipeline(shaderID, "Raycast Compute Pipeline");
+    device->Destroy(shaderID);
     // shader.Create("assets/shaders/raycast.vert", "assets/shaders/raycast.frag");
 
-    minBound = octree->center - octree->size;
-    maxBound = octree->center + octree->size;
-
-    uint32_t nodePoolSize = static_cast<uint32_t>(octree->nodePools.size() * sizeof(Node));
+    uint32_t nodePoolSize = static_cast<uint32_t>(TOTAL_MAX_NODES * sizeof(Node));
     nodesBuffer = device->CreateBuffer(nodePoolSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "NodeBuffer");
-    uint8_t *nodeBufferPtr = device->MapBuffer(nodesBuffer);
-    std::memcpy(nodeBufferPtr, octree->nodePools.data(), nodePoolSize);
+    nodeBufferPtr = device->MapBuffer(nodesBuffer);
 
-    uint32_t brickPoolSize = static_cast<uint32_t>(octree->brickPools.size() * sizeof(uint32_t));
+    uint32_t brickPoolSize = static_cast<uint32_t>(TOTAL_MAX_BRICK * sizeof(uint32_t));
     brickBuffer = device->CreateBuffer(brickPoolSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "BrickBuffer");
-    uint8_t *brickBufferPtr = device->MapBuffer(brickBuffer);
-    std::memcpy(brickBufferPtr, octree->brickPools.data(), brickPoolSize);
+    brickBufferPtr = device->MapBuffer(brickBuffer);
 
     RD::TextureDescription textureDescription = RD::TextureDescription::Initialize(1920, 1080);
     textureDescription.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
@@ -52,6 +48,15 @@ void OctreeRaycaster::Initialize(ParallelOctree *octree, uint32_t outputWidth, u
         {RD::BINDING_TYPE_IMAGE, 2, outputTexture},
     };
     resourceSet = device->CreateUniformSet(pipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "RaycastResourceSet");
+}
+
+void OctreeRaycaster::Update(ParallelOctree *octree) {
+    minBound = octree->center - octree->size;
+    maxBound = octree->center + octree->size;
+    assert(octree->nodePools.size() <= TOTAL_MAX_NODES);
+    assert((octree->brickPools.size() / BRICK_ELEMENT_COUNT) <= TOTAL_MAX_BRICK);
+    std::memcpy(nodeBufferPtr, octree->nodePools.data(), octree->nodePools.size() * sizeof(uint32_t));
+    std::memcpy(brickBufferPtr, octree->brickPools.data(), octree->brickPools.size() * sizeof(uint32_t));
 }
 
 void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
@@ -91,5 +96,7 @@ void OctreeRaycaster::Shutdown() {
     auto *device = RD::GetInstance();
     device->Destroy(pipeline);
     device->Destroy(nodesBuffer);
+    device->Destroy(outputTexture);
     device->Destroy(brickBuffer);
+    device->Destroy(resourceSet);
 }

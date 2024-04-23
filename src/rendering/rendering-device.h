@@ -426,6 +426,8 @@ class RenderingDevice : public Resource {
     virtual uint32_t GetDeviceCount() = 0;
     virtual Device *GetDevice(int index) = 0;
 
+    virtual ~RenderingDevice() = default;
+
     static RenderingDevice *&GetInstance() {
 #ifdef VULKAN_ENABLED
         static RenderingDevice *device = nullptr;

@@ -1,28 +1,42 @@
 #pragma once
 
-#include "gfx/opengl.h"
+#include "rendering/rendering-device.h"
+#include "gfx/mesh.h"
 
 namespace gfx {
-    struct Mesh;
     class Camera;
 } // namespace gfx
 
-struct Octree;
+class ParallelOctree;
 
 struct OctreeRasterizer {
 
     OctreeRasterizer() = default;
 
-    void Initialize(Octree *octree);
+    void Initialize(uint32_t width, uint32_t height);
 
-    void Render(gfx::Camera *camera);
+    void Render(CommandBufferID commandBuffer, UniformSetID uniformSet);
+
+    void Update(ParallelOctree *octree, gfx::Camera *camera);
 
     void Shutdown();
 
     virtual ~OctreeRasterizer() = default;
 
-    gfx::Shader shader;
-    gfx::Mesh *cubeMesh;
-    gfx::Buffer instanceBuffer;
-    uint32_t voxelCount;
+    gfx::Mesh voxelMesh;
+    PipelineID pipeline;
+
+    TextureID colorAttachment;
+    TextureID depthAttachment;
+    RenderingDevice *device;
+
+    BufferID instanceDataBuffer;
+    void *instanceDataBufferPtr;
+    uint32_t numVoxels;
+
+    UniformSetID instancedUniformSet;
+
+    uint32_t width, height;
+
+    const uint32_t MAX_VOXELS = 10'000'000;
 };
