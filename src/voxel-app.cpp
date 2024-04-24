@@ -64,7 +64,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     globalUBPtr = device->MapBuffer(globalUB);
 
     camera = new gfx::Camera();
-    camera->SetPosition(glm::vec3{0.5f, 0.5f, 32.5f});
+    camera->SetPosition(glm::vec3{0.5f, 0.5f, 64.5f});
     camera->SetNearPlane(0.1f);
 
     dt = 0.0f;
@@ -98,7 +98,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         .resourceID = globalUB,
         .offset = 0,
     };
-    globalUniformSet = device->CreateUniformSet(octreeRenderer->raycaster->pipeline, &globalBinding, 1, 0, "GlobalUniformSet");
+    gUniSetRasterizer = device->CreateUniformSet(octreeRenderer->rasterizer->pipeline, &globalBinding, 1, 0, "GlobalUniformSetRasterizer");
+    gUniSetRaycast = device->CreateUniformSet(octreeRenderer->raycaster->pipeline, &globalBinding, 1, 0, "GlobalUniformSetRaycaster");
 }
 
 void VoxelApp::Run() {
@@ -188,6 +189,7 @@ void VoxelApp::OnRenderUI() {
     ImGui::DragFloat3("Light Position", &frameData.uLightPosition[0], 0.1f, -100.0f, 100.0f);
     // GpuTimer::AddUI();
     // GpuTimer::Reset();
+    octreeRenderer->AddUI();
 
     RD::AttachmentInfo colorAttachmentInfos = {
         .loadOp = RD::LOAD_OP_LOAD,
@@ -214,7 +216,8 @@ void VoxelApp::OnRenderUI() {
 }
 
 void VoxelApp::OnRender() {
-    octreeRenderer->Render(commandBuffer, globalUniformSet);
+    UniformSetID uniformSet = octreeRenderer->renderMode == RenderMode_Rasterizer ? gUniSetRasterizer : gUniSetRaycast;
+    octreeRenderer->Render(commandBuffer, uniformSet);
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
@@ -273,7 +276,8 @@ void VoxelApp::UpdateControls() {
 VoxelApp::~VoxelApp() {
     device->Destroy(commandPool);
     device->Destroy(globalUB);
-    device->Destroy(globalUniformSet);
+    device->Destroy(gUniSetRasterizer);
+    device->Destroy(gUniSetRaycast);
     ImGuiService::Shutdown();
     // GpuTimer::Shutdown();
     if (octree)

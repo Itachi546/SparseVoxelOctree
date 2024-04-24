@@ -21,7 +21,13 @@ void OctreeRenderer::Update(ParallelOctree *octree, gfx::Camera *camera) {
 }
 
 void OctreeRenderer::AddUI() {
-    ImGui::Text("Total Voxel: %d", rasterizer->numVoxels);
+    if (renderMode == RenderMode_Rasterizer)
+        ImGui::Text("Total Voxel: %d", rasterizer->numVoxels);
+
+    static int currentItem = 0;
+    if (ImGui::Combo("RenderMode", &currentItem, "Rasterizer\0Raycaster")) {
+        renderMode = OctreeRenderMode(currentItem);
+    }
 }
 
 void OctreeRenderer::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {

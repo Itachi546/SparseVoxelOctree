@@ -43,6 +43,6 @@ struct OctreeRaycaster {
     uint32_t width;
     uint32_t height;
 
-    const uint32_t TOTAL_MAX_BRICK = 10000;
-    const uint32_t TOTAL_MAX_NODES = 100000;
+    const uint32_t TOTAL_MAX_BRICK = 20000;
+    const uint32_t TOTAL_MAX_NODES = 200000;
 };

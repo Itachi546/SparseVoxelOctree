@@ -54,7 +54,7 @@ void main() {
     RayHit hit = Trace(r0, rd);
     vec3 col = vec3(0.5f);
     if (hit.intersect) {
-        vec3 diffuseColor = pow(uintToRGB(hit.color), vec3(2.2f));
+        vec3 diffuseColor = vec3(1.0f);//pow(uintToRGB(hit.color), vec3(2.2f));
         vec3 n = normalize(hit.normal);
         vec3 p = r0 + hit.t * rd;
         vec3 ld = normalize(uLightPosition - p);

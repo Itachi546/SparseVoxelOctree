@@ -6,6 +6,14 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "*.comp.glsl"
     "*.geom.glsl"
     )
+
+file(GLOB_RECURSE GLSL_INCLUDE_FILES
+    "*.glsl"
+    "*.glsl"
+    "*.glsl"
+    "*.glsl"
+    )
+ 
     
 foreach(GLSL ${GLSL_SOURCE_FILES})
     # get only the first part of filename
@@ -17,6 +25,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
         COMMAND ${CMAKE_COMMAND} -E make_directory "${SPIRV_OUTPUT_DIR}"
         COMMAND ${GLSL_VALIDATOR} -V --target-env vulkan1.3 ${GLSL} -o ${SPIRV}
         DEPENDS ${GLSL}
+        DEPENDS ${GLSL_INCLUDE_FILES}
     )
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)

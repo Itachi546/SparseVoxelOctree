@@ -39,5 +39,5 @@ struct OctreeRenderer {
 
     OctreeRasterizer *rasterizer;
     OctreeRaycaster *raycaster;
-    OctreeRenderMode renderMode = RenderMode_Raycaster;
+    OctreeRenderMode renderMode = RenderMode_Rasterizer;
 };

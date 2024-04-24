@@ -79,5 +79,5 @@ struct VoxelApp : AppWindow<VoxelApp> {
     BufferID globalUB;
     uint8_t *globalUBPtr;
 
-    UniformSetID globalUniformSet;
+    UniformSetID gUniSetRasterizer, gUniSetRaycast;
 };
