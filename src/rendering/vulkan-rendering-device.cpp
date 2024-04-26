@@ -228,6 +228,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     deviceFeatures2.features.shaderInt16 = true;
     deviceFeatures2.features.samplerAnisotropy = true;
     deviceFeatures2.features.geometryShader = true;
+    deviceFeatures2.features.wideLines = true;
 
     deviceFeatures2.pNext = &deviceFeatures11;
     deviceFeatures11.shaderDrawParameters = true;
@@ -1143,6 +1144,11 @@ void VulkanRenderingDevice::DrawElementInstanced(CommandBufferID commandBuffer, 
     vkCmdDrawIndexed(cb, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
+void VulkanRenderingDevice::Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+    vkCmdDraw(cb, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
 void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer) {
     // Check swapchain Image layout and transition if needed
     uint32_t currentImageIndex = swapchain->currentImageIndex;
@@ -1424,6 +1430,10 @@ void VulkanRenderingDevice::Destroy(PipelineID pipeline) {
 void VulkanRenderingDevice::Destroy(ShaderID shaderModule) {
     VulkanShader *shader = _shaders.Access(shaderModule.id);
     vkDestroyShaderModule(device, shader->shaderModule, nullptr);
+    shader->layoutBindings.clear();
+    shader->pushConstants.clear();
+    shader->shaderModule = VK_NULL_HANDLE;
+    shader->stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
     _shaders.Release(shaderModule.id);
 }
 

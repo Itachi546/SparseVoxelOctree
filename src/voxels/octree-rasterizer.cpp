@@ -4,6 +4,7 @@
 #include "gfx/mesh.h"
 #include "gfx/camera.h"
 #include "gfx/gpu-timer.h"
+#include "gfx/debug.h"
 #include "rendering/rendering-utils.h"
 
 #include <algorithm>
@@ -125,6 +126,8 @@ void OctreeRasterizer::Render(CommandBufferID commandBuffer, UniformSetID global
 
     device->BindIndexBuffer(commandBuffer, voxelMesh.indexBuffer);
     device->DrawElementInstanced(commandBuffer, voxelMesh.numVertices, numVoxels);
+
+    Debug::Render(commandBuffer, globalSet);
 
     device->EndRenderPass(commandBuffer);
 }

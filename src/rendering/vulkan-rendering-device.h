@@ -59,6 +59,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) override;
 
     void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) override;
+    void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
 
     void Submit(CommandBufferID commandBuffer) override;
     void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function);

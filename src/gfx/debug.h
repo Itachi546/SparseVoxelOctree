@@ -1,24 +1,25 @@
 #pragma once
 
-#include "opengl.h"
+#include "rendering/rendering-device.h"
 #include "math-utils.h"
 
 struct Line {
     glm::vec3 p0;
-    glm::vec3 c0;
-
+    uint32_t c0;
     glm::vec3 p1;
-    glm::vec3 c1;
+    uint32_t c1;
 };
 
 namespace Debug {
     void Initialize();
 
-    void AddLine(const glm::vec3 &p0, const glm::vec3 &p1, const glm::vec3 &color = {1.0f, 0.0f, 1.0f});
+    void NewFrame();
 
-    void AddRect(const glm::vec3 &min, const glm::vec3 &max, const glm::vec3 &color = {1.0f, 0.0f, 1.0f});
+    void AddLine(const glm::vec3 &p0, const glm::vec3 &p1, uint32_t color = 0xffffffff);
 
-    void Render(glm::mat4 VP, glm::vec2 resolution);
+    void AddRect(const glm::vec3 &min, const glm::vec3 &max, uint32_t color = 0xffffffff);
+
+    void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 
     void Shutdown();
 } // namespace Debug

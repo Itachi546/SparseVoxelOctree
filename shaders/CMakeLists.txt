@@ -14,7 +14,6 @@ file(GLOB_RECURSE GLSL_INCLUDE_FILES
     "*.glsl"
     )
  
-    
 foreach(GLSL ${GLSL_SOURCE_FILES})
     # get only the first part of filename
     # strip extension and directory

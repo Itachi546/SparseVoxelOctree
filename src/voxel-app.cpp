@@ -1,7 +1,7 @@
 #include "voxel-app.h"
 #include "input.h"
 #include "math-utils.h"
-
+#include "gfx/debug.h"
 #include "gfx/camera.h"
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
@@ -49,7 +49,7 @@ void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeD
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
-    // Debug::Initialize();
+    Debug::Initialize();
     // GpuTimer::Initialize();
 
     // Initialize CommandBuffer/Pool
@@ -107,6 +107,7 @@ void VoxelApp::Run() {
         glfwPollEvents();
 
         if (!AppWindow::minimized) {
+            Debug::NewFrame();
             OnUpdate();
             device->BeginFrame();
             device->BeginCommandBuffer(commandBuffer);
@@ -151,6 +152,7 @@ void VoxelApp::OnUpdate() {
     frameData.uScreenHeight = windowSize.y;
     std::memcpy(globalUBPtr, &frameData, sizeof(FrameData));
 
+    Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
     /*
 #if 1
     Ray ray;
@@ -278,6 +280,7 @@ VoxelApp::~VoxelApp() {
     device->Destroy(globalUB);
     device->Destroy(gUniSetRasterizer);
     device->Destroy(gUniSetRaycast);
+    Debug::Shutdown();
     ImGuiService::Shutdown();
     // GpuTimer::Shutdown();
     if (octree)

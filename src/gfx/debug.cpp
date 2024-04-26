@@ -1,29 +1,60 @@
 #include "debug.h"
 
+#include "rendering/rendering-utils.h"
+
 namespace Debug {
 
-    static gfx::Buffer gLineBuffer;
+    BufferID gLineBuffer;
+    PipelineID gLinePipeline;
     static uint32_t gLineBufferOffset = 0;
     static Line *gLineBufferPtr = nullptr;
-    static gfx::Shader gLineShader;
     static const int MAX_LINE_COUNT = 100'00'000;
+    UniformSetID gUniformSet;
 
     void Initialize() {
         uint32_t bufferSize = MAX_LINE_COUNT * sizeof(Line);
+        RenderingDevice *device = RD::GetInstance();
+        gLineBuffer = device->CreateBuffer(bufferSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "Debug Draw SSBO");
 
-        gLineBuffer = gfx::CreateBuffer(nullptr, bufferSize, GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
-        gLineShader.Create("assets/shaders/debug.vert",
-                           "assets/shaders/debug.geom",
-                           "assets/shaders/debug.frag");
+        RD::UniformBinding bindings[2] = {
+            {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
+            {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0}};
+        // RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(Debug::NewFrame();glm::mat4))};
+        ShaderID shaders[2] = {};
+        shaders[0] = RenderingUtils::CreateShaderModuleFromFile("Assets/SPIRV/debug.vert.spv", bindings, 2, nullptr, 0);
+        shaders[1] = RenderingUtils::CreateShaderModuleFromFile("Assets/SPIRV/debug.frag.spv", nullptr, 0, nullptr, 0);
+
+        RD::Format colorAttachmentFormats[] = {RD::FORMAT_R8G8B8A8_UNORM};
+        RD::BlendState bs = RD::BlendState::Create();
+        RD::RasterizationState rs = RD::RasterizationState::Create();
+        rs.lineWidth = 2.0f;
+        RD::DepthState ds = RD::DepthState::Create();
+        ds.enableDepthTest = true;
+        ds.enableDepthWrite = true;
+        gLinePipeline = device->CreateGraphicsPipeline(shaders,
+                                                       static_cast<uint32_t>(std::size(shaders)),
+                                                       RD::TOPOLOGY_LINE_LIST,
+                                                       &rs,
+                                                       &ds,
+                                                       colorAttachmentFormats,
+                                                       &bs,
+                                                       1,
+                                                       RD::FORMAT_D32_SFLOAT,
+                                                       "Debug Draw Pipeline");
+
+        RD::BoundUniform boundUniform = {RD::BINDING_TYPE_STORAGE_BUFFER, 0, gLineBuffer};
+        gUniformSet = device->CreateUniformSet(gLinePipeline, &boundUniform, 1, 1, "Debug Uniform Set");
+
+        device->Destroy(shaders[0]);
+        device->Destroy(shaders[1]);
     }
 
     void InitializeBufferPtr() {
-        if (gLineBufferPtr == nullptr) {
-            gLineBufferPtr = reinterpret_cast<Line *>(glMapNamedBuffer(gLineBuffer, GL_WRITE_ONLY));
-        }
+        if (gLineBufferPtr == nullptr)
+            gLineBufferPtr = reinterpret_cast<Line *>(RD::GetInstance()->MapBuffer(gLineBuffer));
     }
 
-    void AddLine(const glm::vec3 &p0, const glm::vec3 &p1, const glm::vec3 &color) {
+    void AddLine(const glm::vec3 &p0, const glm::vec3 &p1, uint32_t color) {
         InitializeBufferPtr();
 
         Line *line = (gLineBufferPtr + gLineBufferOffset);
@@ -33,7 +64,7 @@ namespace Debug {
         gLineBufferOffset += 1;
     }
 
-    void AddRect(const glm::vec3 &min, const glm::vec3 &max, const glm::vec3 &color) {
+    void AddRect(const glm::vec3 &min, const glm::vec3 &max, uint32_t color) {
         InitializeBufferPtr();
 
         Line *line = (gLineBufferPtr + gLineBufferOffset);
@@ -104,41 +135,28 @@ namespace Debug {
         gLineBufferOffset += 12;
     }
 
-    void Render(glm::mat4 VP, glm::vec2 resolution) {
+    void NewFrame() {
+        gLineBufferOffset = 0;
+    }
+
+    void Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
         if (gLineBufferOffset == 0)
             return;
-        glUnmapNamedBuffer(gLineBuffer);
-        gLineBufferPtr = nullptr;
 
-        uint32_t numLine = gLineBufferOffset;
-        gLineBufferOffset = 0;
+        uint32_t numLines = gLineBufferOffset;
 
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        // Draw Line
-        gLineShader.Bind();
-        gLineShader.SetUniformMat4("VP", &VP[0][0]);
-
-        glm::vec2 invResolution = 1.0f / resolution;
-        gLineShader.SetUniformFloat2("uInvResolution", &invResolution[0]);
-
-        // glLineWidth(2.0f);
-        glBindBuffer(GL_ARRAY_BUFFER, gLineBuffer);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
-
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void *)(sizeof(float) * 3));
-
-        glDrawArrays(GL_LINES, 0, numLine * 2);
-
-        glDisable(GL_BLEND);
-        // glLineWidth(1.0f);
+        RenderingDevice *device = RD::GetInstance();
+        device->BindPipeline(commandBuffer, gLinePipeline);
+        device->BindUniformSet(commandBuffer, gLinePipeline, gUniformSet);
+        device->BindUniformSet(commandBuffer, gLinePipeline, gUniformSet);
+        device->Draw(commandBuffer, numLines * 2, 1, 0, 0);
     }
 
     void Shutdown() {
-        gfx::DestroyBuffer(gLineBuffer);
-        gLineShader.Destroy();
+        RenderingDevice *device = RD::GetInstance();
+        device->Destroy(gLineBuffer);
+        device->Destroy(gLinePipeline);
+        device->Destroy(gUniformSet);
     }
 
 } // namespace Debug
