@@ -13,11 +13,9 @@ struct OctreeRasterizer {
 
     OctreeRasterizer() = default;
 
-    void Initialize(uint32_t width, uint32_t height);
+    void Initialize(uint32_t width, uint32_t height, ParallelOctree *octree);
 
     void Render(CommandBufferID commandBuffer, UniformSetID uniformSet);
-
-    void Update(ParallelOctree *octree, gfx::Camera *camera);
 
     void Shutdown();
 
@@ -31,12 +29,8 @@ struct OctreeRasterizer {
     RenderingDevice *device;
 
     BufferID instanceDataBuffer;
-    void *instanceDataBufferPtr;
     uint32_t numVoxels;
 
     UniformSetID instancedUniformSet;
-
     uint32_t width, height;
-
-    const uint32_t MAX_VOXELS = 10'000'000;
 };

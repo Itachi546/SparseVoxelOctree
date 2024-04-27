@@ -14,10 +14,8 @@ inline Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {
     return Node{childPtr | (nodeMask << 30)};
 }
 
-enki::TaskScheduler ts;
 ParallelOctree::ParallelOctree(const glm::vec3 &center, float size) : center(center), size(size) {
     nodePools.push_back(CreateNode(NodeMask::InternalLeafNode));
-    ts.Initialize();
 }
 
 ParallelOctree::ParallelOctree(const char *filename) {
@@ -110,22 +108,7 @@ bool ParallelOctree::CreateBrick(VoxelData *voxels, OctreeBrick *brick, const gl
     return empty;
 }
 
-float ParallelOctree::CalculateLOD(float camDist) {
-    if (camDist < 16.0f)
-        return 1.0f;
-    else if (camDist < 32.0f)
-        return 2.0f;
-    else if (camDist < 64.0f)
-        return 4.0f;
-    else if (camDist < 128.0f)
-        return 8.0f;
-    else if (camDist < 256.0f)
-        return 16.0f;
-    else
-        return 32.0f;
-}
-
-void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosition) {
+void ParallelOctree::Generate(VoxelData *generator) {
     this->generator = generator;
 
     std::cout << "Generating Octree..." << std::endl;
@@ -141,6 +124,8 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
         center,
     });
 
+    enki::TaskScheduler ts;
+    ts.Initialize();
     for (uint32_t i = 0; i <= depth; ++i) {
         uint32_t cl = i % 2;
         uint32_t nl = 1 - cl;
@@ -152,10 +137,10 @@ void ParallelOctree::Generate(VoxelData *generator, const glm::vec3 &cameraPosit
                 NodeData &nodeData = nodeList[cl].get(work);
                 float halfSize = currentSize * 0.5f;
                 if (!this->IsRegionEmpty(generator, nodeData.center - halfSize, nodeData.center + halfSize)) {
-                    float camDist = glm::length(cameraPosition - nodeData.center);
-                    float lod = CalculateLOD(camDist);
+                    // float camDist = glm::length(cameraPosition - nodeData.center);
+                    // float lod = CalculateLOD(camDist);
 
-                    if (lod >= currentSize) {
+                    if (currentSize == LEAF_NODE_SCALE) {
                         OctreeBrick brick{};
                         brick.position = nodeData.center;
                         glm::vec3 min = nodeData.center - halfSize;
@@ -197,15 +182,17 @@ void ParallelOctree::Serialize(const char *filename) {
     outFile.write(reinterpret_cast<const char *>(brickPools.data()), sizeof(uint32_t) * brickCount * BRICK_ELEMENT_COUNT);
 }
 
-void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels, gfx::Camera *camera) {
+void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
     uint32_t dispatchCount = 1;
     float currentSize = size;
     const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
 
     ThreadSafeVector<NodeData> nodeList[2];
     nodeList[0].push(NodeData{center, 0});
-
     std::mutex insertionMutex;
+
+    enki::TaskScheduler ts;
+    ts.Initialize();
     for (uint32_t i = 0; i <= depth; ++i) {
         uint32_t cl = i % 2;
         uint32_t nl = 1 - cl;
@@ -217,8 +204,6 @@ void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels, gfx::Camera *cam
                 Node node = nodePools[nodeData.nodeIndex];
 
                 glm::vec3 center = nodeData.center;
-                if (!AABBFrustumIntersection(center - currentSize, center + currentSize, camera->frustumPlanes))
-                    continue;
 
                 if (node.GetNodeMask() == NodeMask::InternalNode) {
                     for (int i = 0; i < 8; ++i) {
@@ -261,146 +246,4 @@ void ParallelOctree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brick
             }
         }
     }
-}
-
-void ParallelOctree::Update(gfx::Camera *camera) {
-    // Traverse octree on each level
-    // Calculate new LOD
-    // Check if it matches with existing LOD
-    // If it doesn't match we process it
-
-    float currentSize = size * 2.0f;
-    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
-
-    std::vector<NodeData> nodeLists[2];
-    nodeLists[0].push_back(NodeData{center, 0});
-
-    struct NodeUpdateJob {
-        uint32_t nodeIndex;
-        glm::vec3 center;
-        float size;
-    };
-    const glm::vec3 cameraPosition = camera->GetPosition();
-    std::vector<NodeUpdateJob> updateJobs;
-
-    auto begin = std::chrono::high_resolution_clock::now();
-    for (uint32_t cd = 0; cd <= depth; ++cd) {
-        uint32_t cl = cd % 2;
-        uint32_t nl = 1 - cl;
-        float halfSize = currentSize * 0.5f;
-        for (uint32_t n = 0; n < nodeLists[cl].size(); ++n) {
-            // Be careful about reading reference from vector and using it as pointer
-            NodeData &nodeData = nodeLists[cl][n];
-            Node node = nodePools[nodeData.nodeIndex];
-
-            glm::vec3 center = nodeData.center;
-            uint32_t mask = node.GetNodeMask();
-            // Check if it is leaf node
-            float camDist = glm::compMax(glm::abs(cameraPosition - center));
-            float expectedSize = CalculateLOD(camDist);
-
-            if (mask == NodeMask::LeafNodeWithPtr || mask == NodeMask::LeafNode) {
-                // Case I, we need to remove some child nodes
-                if (expectedSize < currentSize) {
-                    // Return brick to brick pool
-                    if (mask == NodeMask::LeafNodeWithPtr)
-                        freeBrickPools.push(node.GetChildPtr());
-                    // CreateChildren(&nodeData, currentSize, nodeLists[nl]);
-                    //  Check if node pool has any free pointer
-                    uint32_t childPtr = 0;
-                    if (freeNodePools.size() > 0) {
-                        childPtr = freeNodePools.pop();
-                    } else {
-                        childPtr = static_cast<uint32_t>(nodePools.size());
-                        for (uint32_t child = 0; child < 8; ++child)
-                            nodePools.push_back(CreateNode(NodeMask::InternalNode));
-                    }
-                    float childSize = halfSize * 0.5f;
-                    for (int child = 0; child < 8; ++child) {
-                        nodePools[childPtr + child] = CreateNode(InternalLeafNode, 0);
-                        glm::vec3 childPos = center + DIRECTIONS[child] * childSize;
-                        nodeLists[nl].push_back(NodeData{
-                            childPos,
-                            childPtr + child,
-                            true});
-                    }
-                    nodePools[nodeData.nodeIndex] = CreateNode(NodeMask::InternalNode, childPtr);
-                }
-            } else if (mask == NodeMask::InternalNode) {
-                if (expectedSize >= currentSize) {
-                    // Remove child nodes
-                    uint32_t childPtr = node.GetChildPtr();
-                    freeNodePools.push(childPtr);
-
-                    updateJobs.push_back(NodeUpdateJob{nodeData.nodeIndex, nodeData.center, currentSize});
-                } else {
-                    for (int i = 0; i < 8; ++i) {
-                        glm::vec3 childPos = center + DIRECTIONS[i] * halfSize * 0.5f;
-                        nodeLists[nl].push_back(NodeData{childPos, node.GetChildPtr() + i});
-                    }
-                }
-            } else if (mask == NodeMask::InternalLeafNode && nodeData.newNode) {
-
-                if (expectedSize >= currentSize) {
-                    uint32_t childPtr = 0;
-
-                    updateJobs.push_back(NodeUpdateJob{nodeData.nodeIndex, nodeData.center, currentSize});
-                    nodePools[nodeData.nodeIndex] = CreateNode(NodeMask::LeafNodeWithPtr, childPtr);
-                }
-            }
-        }
-
-        nodeLists[cl].clear();
-        currentSize = currentSize * 0.5f;
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-    ImGui::Text("Octree traversal: %.3f", float(duration) / 1000.0f);
-
-    uint32_t freedBlock = freeBrickPools.size();
-    ImGui::Text("Total block freed: %d", freedBlock);
-    ImGui::Text("Current Size: %.2f", currentSize);
-    uint32_t dispatchCount = static_cast<uint32_t>(updateJobs.size());
-    ImGui::Text("Total new nodes: %d", dispatchCount);
-
-    begin = std::chrono::high_resolution_clock::now();
-    if (dispatchCount > 0) {
-        enki::TaskSet brickUpdateTask(dispatchCount, [&](enki::TaskSetPartition range, uint32_t threadNum) {
-            for (uint32_t work = range.start; work < range.end; ++work) {
-                NodeUpdateJob &nodeData = updateJobs[work];
-
-                OctreeBrick brick;
-                float halfSize = nodeData.size * 0.5f;
-                bool empty = CreateBrick(generator, &brick, nodeData.center - halfSize, nodeData.size);
-                if (empty) {
-                    nodePools[nodeData.nodeIndex] = CreateNode(NodeMask::InternalLeafNode);
-                } else {
-
-                    if (brick.IsConstantValue()) {
-                        uint32_t color = (brick.data[0] >> 8);
-                        nodePools[nodeData.nodeIndex] = CreateNode(NodeMask::LeafNode, color);
-                    } else {
-                        uint32_t childPtr = 0;
-                        if (freeBrickPools.try_pop(&childPtr)) {
-                            std::lock_guard<std::mutex> brickPoolLock{brickPoolMutex};
-                            std::memcpy(brickPools.data() + childPtr * BRICK_ELEMENT_COUNT, brick.data.data(), BRICK_ELEMENT_COUNT * sizeof(uint32_t));
-                            // std::memcpy(brickPools.data() + childPtr * BRICK_ELEMENT_COUNT, brick.data.data(), BRICK_ELEMENT_COUNT * sizeof(uint32_t));
-                        } else {
-                            std::lock_guard<std::mutex> brickPoolLock{brickPoolMutex};
-                            childPtr = static_cast<uint32_t>(brickPools.size() / BRICK_ELEMENT_COUNT);
-                            brickPools.insert(brickPools.end(), brick.data.begin(), brick.data.end());
-                        }
-                        nodePools[nodeData.nodeIndex] = CreateNode(NodeMask::LeafNodeWithPtr, childPtr);
-                    }
-                }
-            }
-        });
-        ts.AddTaskSetToPipe(&brickUpdateTask);
-        ts.WaitforTask(&brickUpdateTask);
-    }
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-    ImGui::Text("Brick Generation: %.2f", float(duration) / 1000.0f);
-    // std::cout << "Total free bricks: " << freeBrickPools.size() << std::endl;
 }

@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <vector>
 
-void OctreeRasterizer::Initialize(uint32_t width, uint32_t height) {
+void OctreeRasterizer::Initialize(uint32_t width, uint32_t height, ParallelOctree *octree) {
     this->width = width;
     this->height = height;
     device = RD::GetInstance();
@@ -59,9 +59,23 @@ void OctreeRasterizer::Initialize(uint32_t width, uint32_t height) {
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
 
-    uint32_t bufferSize = MAX_VOXELS * sizeof(glm::vec4);
-    instanceDataBuffer = device->CreateBuffer(bufferSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "InstancedDataBuffer");
-    instanceDataBufferPtr = device->MapBuffer(instanceDataBuffer);
+    std::vector<glm::vec4> voxels;
+    octree->ListVoxels(voxels);
+    uint32_t instancedDataSize = static_cast<uint32_t>(voxels.size() * sizeof(glm::vec4));
+
+    BufferID stagingBuffer = device->CreateBuffer(instancedDataSize, RD::BUFFER_USAGE_TRANSFER_SRC_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "StagingBuffer");
+    void *stagingBufferPtr = device->MapBuffer(stagingBuffer);
+    std::memcpy(stagingBufferPtr, voxels.data(), instancedDataSize);
+
+    instanceDataBuffer = device->CreateBuffer(instancedDataSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "InstancedDataBuffer");
+
+    device->ImmediateSubmit([&](CommandBufferID commandBuffer) {
+        RD::BufferCopyRegion copyRegion{
+            0, 0, instancedDataSize};
+        device->CopyBuffer(commandBuffer, stagingBuffer, instanceDataBuffer, &copyRegion);
+    });
+    numVoxels = static_cast<uint32_t>(voxels.size());
+    device->Destroy(stagingBuffer);
 
     gfx::Mesh::CreateCube(&voxelMesh);
 
@@ -70,13 +84,6 @@ void OctreeRasterizer::Initialize(uint32_t width, uint32_t height) {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 1, instanceDataBuffer},
     };
     instancedUniformSet = device->CreateUniformSet(pipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "InstancedVoxelDataSet");
-}
-
-void OctreeRasterizer::Update(ParallelOctree *octree, gfx::Camera *camera) {
-    std::vector<glm::vec4> voxels;
-    octree->ListVoxels(voxels, camera);
-    numVoxels = std::min(static_cast<uint32_t>(voxels.size()), MAX_VOXELS);
-    std::memcpy(instanceDataBufferPtr, voxels.data(), numVoxels * sizeof(glm::vec4));
 }
 
 void OctreeRasterizer::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {

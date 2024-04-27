@@ -20,9 +20,9 @@ struct OctreeRenderer {
 
     OctreeRenderer();
 
-    void Initialize(uint32_t width, uint32_t height);
+    void Initialize(uint32_t width, uint32_t height, ParallelOctree* octree);
 
-    void Update(ParallelOctree *octree, gfx::Camera *camera);
+    // void Update(ParallelOctree *octree, gfx::Camera *camera);
 
     void AddUI();
 

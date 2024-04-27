@@ -44,7 +44,6 @@ struct VoxelApp : AppWindow<VoxelApp> {
     gfx::Camera *camera;
     ParallelOctree *octree;
     OctreeRenderer *octreeRenderer;
-    VoxelData *generator;
 
     float dt;
     float lastFrameTime;

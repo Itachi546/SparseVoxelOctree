@@ -17,13 +17,11 @@ class ParallelOctree {
     ParallelOctree(const glm::vec3 &center, float size);
     ParallelOctree(const char *filename);
 
-    void Generate(VoxelData *data, const glm::vec3 &cameraPosition);
-
-    void Update(gfx::Camera *camera);
+    void Generate(VoxelData *data);
 
     void Serialize(const char *filename);
 
-    void ListVoxels(std::vector<glm::vec4> &voxels, gfx::Camera *camera);
+    void ListVoxels(std::vector<glm::vec4> &voxels);
 
     std::vector<Node> nodePools;
     std::vector<uint32_t> brickPools;
@@ -50,7 +48,5 @@ class ParallelOctree {
     void CreateChildren(NodeData *parent, float size, ThreadSafeVector<NodeData> &childNodes);
     bool CreateBrick(VoxelData *voxels, OctreeBrick *brick, const glm::vec3 &min, float size);
     Node InsertBrick(OctreeBrick *brick);
-
-    float CalculateLOD(float camDist);
     void ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, float size, std::vector<glm::vec4> &voxels);
 };

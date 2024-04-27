@@ -49,7 +49,7 @@ RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
             vec3 t = (p - r0) * tStep;
             float tMax = max(max(t.x, t.y), t.z);
             rayHit.normal = -nearestAxis;
-            rayHit.t = tMax * UNIT_BRICK_SIZE;
+            rayHit.t = tMax;
             rayHit.intersect = true;
             rayHit.color = color;
             rayHit.iteration = i;
@@ -146,7 +146,7 @@ RayHit Trace(vec3 r0, vec3 rd) {
                     // Debug draw nodes
                     rayHit.normal = brickHit.normal * sign(rd);
                     rayHit.intersect = true;
-                    rayHit.t = max(t.x, 0.0f) + brickHit.t;
+                    rayHit.t = max(t.x, 0.0f) + brickHit.t * (currentSize / BRICK_SIZE);
                     rayHit.color = brickHit.color;
                     rayHit.iteration = brickHit.iteration;
                     break;

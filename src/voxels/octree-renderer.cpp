@@ -8,16 +8,9 @@ OctreeRenderer::OctreeRenderer() {
     raycaster = new OctreeRaycaster();
 }
 
-void OctreeRenderer::Initialize(uint32_t width, uint32_t height) {
-    rasterizer->Initialize(width, height);
-    raycaster->Initialize(width, height);
-}
-
-void OctreeRenderer::Update(ParallelOctree *octree, gfx::Camera *camera) {
-    if (renderMode == RenderMode_Rasterizer)
-        rasterizer->Update(octree, camera);
-    else
-        raycaster->Update(octree);
+void OctreeRenderer::Initialize(uint32_t width, uint32_t height, ParallelOctree* octree) {
+    rasterizer->Initialize(width, height, octree);
+    raycaster->Initialize(width, height, octree);
 }
 
 void OctreeRenderer::AddUI() {

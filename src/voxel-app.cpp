@@ -34,23 +34,20 @@ MessageCallback(GLenum source,
 }
 
 void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
-    // octree = new ParallelOctree(glm::vec3(0.0f), float(kOctreeDims));
     VoxModelData *model = new VoxModelData();
     model->Load(filename, scale);
     {
         auto start = std::chrono::high_resolution_clock::now();
-        octree->Generate(model, camera->GetPosition());
+        octree->Generate(model);
         auto end = std::chrono::high_resolution_clock::now();
         float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
         std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
     }
-    generator = model;
-    // model->Destroy();
+    model->Destroy();
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
     Debug::Initialize();
-    // GpuTimer::Initialize();
 
     // Initialize CommandBuffer/Pool
     device = RD::GetInstance();
@@ -69,28 +66,23 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
-    frameData.uLightPosition = glm::vec3(0.0f, 4.0f, 400.0f);
+    frameData.uLightPosition = glm::vec3(0.0f, 32.0f, 32.0f);
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 0
+#if 1
     octree = new ParallelOctree("monu3x16.octree");
 #else
-    constexpr uint32_t kOctreeDims = 256;
+    constexpr uint32_t kOctreeDims = 64;
     octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
 
     // generator = new PerlinVoxData();
     // octree->Generate(generator, camera->GetPosition());
-    LoadFromFile("assets/models/monu3.vox", 5.0f, kOctreeDims);
-    //   octree->Serialize("monu3x16.octree");
+    LoadFromFile("assets/models/monu3.vox", 1.0f, kOctreeDims);
+    octree->Serialize("monu3x16.octree");
 #endif
     octreeRenderer = new OctreeRenderer();
-    octreeRenderer->Initialize(1920, 1080);
-    // raycaster = new OctreeRaycaster();
-    // raycaster->Initialize(octree, 1920, 1080);
-
-    // rasterizer = new OctreeRasterizer();
-    // rasterizer->Initialize(octree);
+    octreeRenderer->Initialize(1920, 1080, octree);
 
     RD::BoundUniform globalBinding{
         .bindingType = RD::BINDING_TYPE_UNIFORM_BUFFER,
@@ -153,44 +145,15 @@ void VoxelApp::OnUpdate() {
     std::memcpy(globalUBPtr, &frameData, sizeof(FrameData));
 
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
-    /*
-#if 1
-    Ray ray;
-    // glm::vec2 mouseCoord = ConvertFromWindowToNDC(input->mousePos, windowSize);
-    // camera->GenerateCameraRay(&ray, mouseCoord);
-    ray.origin = origin;
-    ray.direction = glm::normalize(target - origin);
-    // Debug::AddLine(ray.origin, ray.GetPointAt(500.0f));
 
-    RayHit hit = octree->Raycast(ray.origin, ray.direction);
-    if (hit.intersect) {
-        ImGui::Text("Intersect");
-        ImGui::Text("Hit distance: %.2f", hit.t);
-        glm::vec3 p = ray.GetPointAt(hit.t);
-        // Debug::AddRect(p - 0.005f, p + 0.005f, glm::vec3(1.0f));
-    }
-#endif
-    */
     Input *input = Input::Singleton();
     input->Update();
-
-    auto start = std::chrono::high_resolution_clock::now();
-    octree->Update(camera);
-    auto end = std::chrono::high_resolution_clock::now();
-    uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    ImGui::Text("Octree Update: %.2fms", (duration / 1000.0f));
-    octreeRenderer->Update(octree, camera);
 }
 
 void VoxelApp::OnRenderUI() {
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
-    // ImGui::SliderFloat3("Ray origin", &origin[0], -64.0f, 64.0f);
-    // ImGui::SliderFloat3("Ray target", &target[0], -64.0f, 64.0f);
-
     ImGui::DragFloat3("Light Position", &frameData.uLightPosition[0], 0.1f, -100.0f, 100.0f);
-    // GpuTimer::AddUI();
-    // GpuTimer::Reset();
     octreeRenderer->AddUI();
 
     RD::AttachmentInfo colorAttachmentInfos = {
@@ -285,7 +248,7 @@ VoxelApp::~VoxelApp() {
     // GpuTimer::Shutdown();
     if (octree)
         delete octree;
-    delete generator;
+    
     octreeRenderer->Shutdown();
     delete octreeRenderer;
 }
