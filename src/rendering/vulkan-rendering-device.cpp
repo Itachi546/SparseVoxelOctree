@@ -1174,6 +1174,7 @@ void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer) {
 
     VkSemaphoreSubmitInfoKHR waitSemaphores[] = {
         {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr, timelineSemaphore, lastSemaphoreValue_, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR, 0},
+        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr, imageAcquireSemaphore, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0},
     };
 
     lastSemaphoreValue_++;
@@ -1389,7 +1390,7 @@ void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID c
 
 void VulkanRenderingDevice::Present() {
 
-    VkSemaphore waitSemaphores[] = {imageAcquireSemaphore, renderEndSemaphore};
+    VkSemaphore waitSemaphores[] = {renderEndSemaphore};
     VkPresentInfoKHR presentInfo = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = static_cast<uint32_t>(std::size(waitSemaphores)),
