@@ -11,4 +11,5 @@ layout(binding = 0, set = 0) uniform GlobalData {
 
     vec3 uCameraPosition;
     float uScreenHeight;
+    float time;
 };

@@ -19,6 +19,7 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
         RD::UniformBinding{RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0},
         RD::UniformBinding{RD::BINDING_TYPE_STORAGE_BUFFER, 1, 1},
         RD::UniformBinding{RD::BINDING_TYPE_IMAGE, 1, 2},
+        RD::UniformBinding{RD::BINDING_TYPE_IMAGE, 1, 3},
     };
     RD::PushConstant pushConstant = {
         .offset = 0,
@@ -53,18 +54,23 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
     textureDescription.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
     outputTexture = device->CreateTexture(&textureDescription, "RaycastOutputTexture");
 
-    outputImageBarrier.push_back({outputTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL});
+    textureDescription.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
+    accumulationTexture = device->CreateTexture(&textureDescription, "RaycastAccumulationTexture");
 
-    RD::BoundUniform boundedUniform[3] = {
+    outputImageBarrier.push_back({outputTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL});
+    outputImageBarrier.push_back({accumulationTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_READ_BIT | RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL});
+
+    RD::BoundUniform boundedUniform[4] = {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, nodesBuffer},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 1, brickBuffer},
         {RD::BINDING_TYPE_IMAGE, 2, outputTexture},
+        {RD::BINDING_TYPE_IMAGE, 3, accumulationTexture},
     };
     resourceSet = device->CreateUniformSet(pipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "RaycastResourceSet");
 }
 
 void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
-    glm::vec4 dims[2] = {glm::vec4(minBound, 0.0f), glm::vec4(maxBound, 0.0f)};
+    glm::vec4 dims[2] = {glm::vec4{minBound, spp}, glm::vec4{maxBound, spp}};
     auto *device = RD::GetInstance();
     device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier);
     device->BindPipeline(commandBuffer, pipeline);
@@ -72,6 +78,7 @@ void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalS
     device->BindUniformSet(commandBuffer, pipeline, resourceSet);
     device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_COMPUTE, &dims, 0, sizeof(float) * 8);
     device->DispatchCompute(commandBuffer, (width / 8) + 1, (height / 8) + 1, 1);
+    spp += 1.0f;
 }
 
 void OctreeRaycaster::Shutdown() {
@@ -79,6 +86,7 @@ void OctreeRaycaster::Shutdown() {
     device->Destroy(pipeline);
     device->Destroy(nodesBuffer);
     device->Destroy(outputTexture);
+    device->Destroy(accumulationTexture);
     device->Destroy(brickBuffer);
     device->Destroy(resourceSet);
 }

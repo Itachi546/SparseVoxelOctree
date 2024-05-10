@@ -14,15 +14,21 @@ namespace gfx {
         mSpeed = 2.0f;
         mSensitivity = 0.3f;
 
+        mIsMoving = false;
+
         CalculateProjection();
         CalculateView();
     }
 
     void Camera::Update(float dt) {
-        mPosition.x += (mTargetPosition.x - mPosition.x) * 0.8f * dt;
-        mPosition.y += (mTargetPosition.y - mPosition.y) * 0.8f * dt;
-        mPosition.z += (mTargetPosition.z - mPosition.z) * 0.8f * dt;
-        mRotation += (mTargetRotation - mRotation) * 0.8f * dt;
+        glm::vec3 delta = mTargetPosition - mPosition;
+        mPosition += delta * 0.8f * dt;
+
+        glm::vec3 deltaRotation = (mTargetRotation - mRotation);
+        mRotation += deltaRotation * 0.8f * dt;
+
+        const float threshold = 0.005f;
+        mIsMoving = (glm::length(delta) > threshold) || (glm::length(deltaRotation) > threshold);
 
         CalculateView();
         mVP = mProjection * mView;

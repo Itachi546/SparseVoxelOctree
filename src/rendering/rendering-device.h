@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/resource.h"
+#include "core/bitfield.h"
 
 #include <functional>
 #include <string>
@@ -316,8 +317,8 @@ class RenderingDevice : public Resource {
 
     struct TextureBarrier {
         TextureID texture;
-        BarrierAccessBits srcAccess;
-        BarrierAccessBits dstAccess;
+        BitField<BarrierAccessBits> srcAccess;
+        BitField<BarrierAccessBits> dstAccess;
         TextureLayout newLayout;
     };
 

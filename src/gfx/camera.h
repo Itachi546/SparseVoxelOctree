@@ -80,6 +80,10 @@ namespace gfx {
             mTargetRotation.x = glm::clamp(mTargetRotation.x, -maxAngle, maxAngle);
         }
 
+        bool IsMoving() {
+            return mIsMoving;
+        }
+
         glm::vec4 ComputeNDCCoordinate(const glm::vec3 &p) const;
         glm::vec4 ComputeViewSpaceCoordinate(const glm::vec3 &p) const;
 
@@ -91,6 +95,7 @@ namespace gfx {
         std::array<glm::vec4, 6> frustumPlanes;
 
       private:
+        bool mIsMoving;
         glm::vec3 mPosition;
         glm::vec3 mRotation;
 

@@ -1275,7 +1275,7 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
                                             PipelineStageBits dstStage,
                                             std::vector<TextureBarrier> &textureBarriers) {
 
-    std::vector<VkImageMemoryBarrier> vkTextureBarriers(textureBarriers.size());
+    std::vector<VkImageMemoryBarrier> vkTextureBarriers;
     for (uint32_t i = 0; i < textureBarriers.size(); ++i) {
         TextureBarrier &textureBarrier = textureBarriers[i];
         VkImageLayout newLayout = VkImageLayout(textureBarrier.newLayout);
@@ -1283,10 +1283,10 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
         if (newLayout == vkTexture->currentLayout)
             continue;
 
-        vkTextureBarriers[i] = CreateImageBarrier(vkTexture->image, vkTexture->imageAspect,
+        vkTextureBarriers.push_back(CreateImageBarrier(vkTexture->image, vkTexture->imageAspect,
                                                   VkAccessFlags(textureBarrier.srcAccess),
                                                   VkAccessFlags(textureBarrier.dstAccess),
-                                                  vkTexture->currentLayout, newLayout);
+                                                  vkTexture->currentLayout, newLayout));
         vkTexture->currentLayout = newLayout;
     }
 

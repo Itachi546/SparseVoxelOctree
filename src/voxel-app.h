@@ -65,6 +65,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
         glm::vec3 uCameraPosition;
         float uScreenHeight;
+        float time;
     } frameData;
 
     glm::vec3 origin;

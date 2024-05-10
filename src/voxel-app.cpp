@@ -119,7 +119,7 @@ void VoxelApp::Run() {
         float currentTime = static_cast<float>(glfwGetTime());
         dt = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
-
+        
         char buffer[64];
         sprintf_s(buffer, "frameTime: %.2fms", dt * 1000.0f);
         glfwSetWindowTitle(glfwWindowPtr, buffer);
@@ -134,6 +134,10 @@ void VoxelApp::OnUpdate() {
 
     camera->Update(dt);
 
+    if (camera->IsMoving()) {
+        octreeRenderer->raycaster->spp = 0.0f;
+    }
+
     frameData.uInvP = camera->GetInvProjectionMatrix();
     frameData.uInvV = camera->GetInvViewMatrix();
     frameData.P = camera->GetProjectionMatrix();
@@ -142,6 +146,7 @@ void VoxelApp::OnUpdate() {
     frameData.uCameraPosition = camera->GetPosition();
     frameData.uScreenWidth = windowSize.x;
     frameData.uScreenHeight = windowSize.y;
+    frameData.time = lastFrameTime;
     std::memcpy(globalUBPtr, &frameData, sizeof(FrameData));
 
     Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
@@ -248,7 +253,7 @@ VoxelApp::~VoxelApp() {
     // GpuTimer::Shutdown();
     if (octree)
         delete octree;
-    
+
     octreeRenderer->Shutdown();
     delete octreeRenderer;
 }
