@@ -113,8 +113,7 @@ void ParallelOctree::Generate(VoxelData *generator) {
 
     std::cout << "Generating Octree..." << std::endl;
     std::cout << "Num Threads: " << enki::GetNumHardwareThreads() << std::endl;
-
-    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
+    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) - (std::log2(LEAF_NODE_SCALE)));
     float currentSize = size * 2.0f;
     uint32_t dispatchCount = 1;
     std::cout << "Octree Depth: " << depth << std::endl;
@@ -185,7 +184,7 @@ void ParallelOctree::Serialize(const char *filename) {
 void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
     uint32_t dispatchCount = 1;
     float currentSize = size;
-    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
+    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) - (std::log2(LEAF_NODE_SCALE)));
 
     ThreadSafeVector<NodeData> nodeList[2];
     nodeList[0].push(NodeData{center, 0});

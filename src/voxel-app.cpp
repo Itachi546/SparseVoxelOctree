@@ -70,16 +70,16 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 1
-    octree = new ParallelOctree("monu3x16.octree");
+#if 1 
+    octree = new ParallelOctree("dragon.octree");
 #else
     constexpr uint32_t kOctreeDims = 64;
     octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
 
     // generator = new PerlinVoxData();
     // octree->Generate(generator, camera->GetPosition());
-    LoadFromFile("assets/models/monu3.vox", 1.0f, kOctreeDims);
-    octree->Serialize("monu3x16.octree");
+     LoadFromFile("assets/models/dragon.vox", 1.0f, kOctreeDims);
+    octree->Serialize("dragon.octree");
 #endif
     octreeRenderer = new OctreeRenderer();
     octreeRenderer->Initialize(1920, 1080, octree);
@@ -119,7 +119,7 @@ void VoxelApp::Run() {
         float currentTime = static_cast<float>(glfwGetTime());
         dt = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
-        
+
         char buffer[64];
         sprintf_s(buffer, "frameTime: %.2fms", dt * 1000.0f);
         glfwSetWindowTitle(glfwWindowPtr, buffer);
@@ -158,7 +158,9 @@ void VoxelApp::OnUpdate() {
 void VoxelApp::OnRenderUI() {
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
-    ImGui::DragFloat3("Light Position", &frameData.uLightPosition[0], 0.1f, -100.0f, 100.0f);
+    if (ImGui::DragFloat3("Light Position", &frameData.uLightPosition[0], 0.1f, -100.0f, 100.0f)) {
+        octreeRenderer->raycaster->spp = 0;
+    }
     octreeRenderer->AddUI();
 
     RD::AttachmentInfo colorAttachmentInfos = {
