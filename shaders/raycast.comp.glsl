@@ -72,7 +72,7 @@ void main() {
         if (shadowHit.intersect) {
             shadow = 0.1f;
         }
-        col = max(dot(n, ld), 0.05f) * diffuseColor * shadow;
+        col = max(dot(n, ld), 0.1f) * diffuseColor * shadow;
     }
 
 #if 1
