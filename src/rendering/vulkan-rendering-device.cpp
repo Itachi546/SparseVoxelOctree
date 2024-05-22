@@ -225,6 +225,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
 
     deviceFeatures2.features.multiDrawIndirect = true;
     deviceFeatures2.features.pipelineStatisticsQuery = true;
+    deviceFeatures2.features.shaderInt64 = true;
     deviceFeatures2.features.shaderInt16 = true;
     deviceFeatures2.features.samplerAnisotropy = true;
     deviceFeatures2.features.geometryShader = true;

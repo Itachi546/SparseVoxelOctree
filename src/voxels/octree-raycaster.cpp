@@ -33,7 +33,7 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
     uint32_t nodeDataSize = static_cast<uint32_t>(octree->nodePools.size() * sizeof(uint32_t));
     nodesBuffer = device->CreateBuffer(nodeDataSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "NodeBuffer");
 
-    uint32_t brickDataSize = static_cast<uint32_t>(octree->brickPools.size() * sizeof(uint32_t));
+    uint32_t brickDataSize = static_cast<uint32_t>(octree->brickPools.size() * sizeof(OctreeBrick));
     brickBuffer = device->CreateBuffer(brickDataSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "BrickBuffer");
 
     BufferID stagingBuffer = device->CreateBuffer(nodeDataSize + brickDataSize, RD::BUFFER_USAGE_TRANSFER_SRC_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "StagingBuffer");

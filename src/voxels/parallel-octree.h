@@ -24,7 +24,7 @@ class ParallelOctree {
     void ListVoxels(std::vector<glm::vec4> &voxels);
 
     std::vector<Node> nodePools;
-    std::vector<uint32_t> brickPools;
+    std::vector<OctreeBrick> brickPools;
 
     ThreadSafeQueue<uint32_t> freeNodePools;
     ThreadSafeQueue<uint32_t> freeBrickPools;

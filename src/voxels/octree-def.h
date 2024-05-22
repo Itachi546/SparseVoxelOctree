@@ -41,19 +41,35 @@ struct Node {
 };
 
 constexpr const uint32_t NUM_BRICK = 8;
-constexpr const uint32_t BRICK_ELEMENT_COUNT = NUM_BRICK * NUM_BRICK * NUM_BRICK;
+constexpr const uint32_t NUM_BRICK2 = NUM_BRICK * NUM_BRICK;
 constexpr const uint32_t LEAF_NODE_SCALE = 1;
 constexpr const float BRICK_GRID_SIZE = float(LEAF_NODE_SCALE) / float(NUM_BRICK);
+
 struct OctreeBrick {
-    std::array<uint32_t, BRICK_ELEMENT_COUNT> data;
-    glm::vec3 position;
+    uint64_t occupancy[8] = {0ull, 0ull, 0ull, 0ull, 0ull, 0ull, 0ull, 0ull};
 
     bool IsConstantValue() const {
-        uint32_t value = data[0];
-        for (int i = 1; i < data.size(); ++i) {
-            if (value != data[i])
+        for (int i = 0; i < 8; ++i) {
+            if (occupancy[i] > 0)
                 return false;
         }
         return true;
+    }
+
+    void SetNonEmpty(uint32_t index) {
+        uint32_t layer = index / NUM_BRICK2;
+        uint32_t offset = index % NUM_BRICK2;
+
+        assert(layer < 8 && offset < 64);
+        occupancy[layer] |= (1ull << (NUM_BRICK2 - 1ull - offset));
+    }
+
+    bool IsEmpty(uint32_t index) {
+        uint32_t layer = index / NUM_BRICK2;
+        uint32_t offset = index % NUM_BRICK2;
+        uint64_t mask = (1ull << (NUM_BRICK2 - 1ull - offset));
+
+        assert(layer < 8 && offset < 64);
+        return (occupancy[layer] & mask) == mask;
     }
 };

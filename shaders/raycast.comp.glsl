@@ -1,6 +1,7 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_ARB_gpu_shader_int64 : enable
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -8,7 +9,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 #include "math.glsl"
 
 layout(binding = 0, set = 1) readonly buffer NodeBuffer { uint nodePools[]; };
-layout(binding = 1, set = 1) readonly buffer BrickBuffer { uint brickPools[]; };
+layout(binding = 1, set = 1) readonly buffer BrickBuffer { uint64_t brickPools[]; };
 layout(rgba8, binding = 2, set = 1) writeonly uniform image2D outputTexture;
 layout(rgba8, binding = 3, set = 1) uniform image2D accumulationTexture;
 

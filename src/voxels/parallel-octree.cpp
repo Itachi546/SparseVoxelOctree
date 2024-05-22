@@ -37,7 +37,7 @@ ParallelOctree::ParallelOctree(const char *filename) {
     uint32_t brickCount = 0;
     inFile.read(reinterpret_cast<char *>(&brickCount), sizeof(uint32_t));
     if (brickCount > 0) {
-        uint32_t brickElementCount = brickCount * BRICK_ELEMENT_COUNT;
+        uint32_t brickElementCount = brickCount * sizeof(OctreeBrick);
         brickPools.resize(brickElementCount);
         inFile.read(reinterpret_cast<char *>(brickPools.data()), sizeof(uint32_t) * brickElementCount);
     }
@@ -58,15 +58,15 @@ void ParallelOctree::CreateChildren(NodeData *parent, float size, ThreadSafeVect
 
 Node ParallelOctree::InsertBrick(OctreeBrick *brick) {
     Node node = CreateNode(NodeMask::InternalLeafNode);
-    if (brick->IsConstantValue()) {
+    /*if (brick->IsConstantValue()) {
         uint32_t color = (brick->data[0] >> 8);
         node = CreateNode(NodeMask::LeafNode, color);
-    } else {
+    } else */
+    {
         std::lock_guard lock{brickPoolMutex};
-        assert(brickPools.size() % BRICK_ELEMENT_COUNT == 0);
-        uint32_t address = static_cast<uint32_t>((brickPools.size() / BRICK_ELEMENT_COUNT));
+        uint32_t address = static_cast<uint32_t>(brickPools.size());
         node = CreateNode(NodeMask::LeafNodeWithPtr, address);
-        brickPools.insert(brickPools.end(), brick->data.begin(), brick->data.end());
+        brickPools.push_back(*brick);
     }
     return node;
 }
@@ -96,12 +96,11 @@ bool ParallelOctree::CreateBrick(VoxelData *voxels, OctreeBrick *brick, const gl
                 glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(NUM_BRICK - 1);
                 glm::vec3 p = min + t01 * size;
                 uint32_t val = voxels->Sample(p);
-                uint32_t index = x * NUM_BRICK * NUM_BRICK + y * NUM_BRICK + z;
+                uint32_t index = x * NUM_BRICK2 + y * NUM_BRICK + z;
                 if (val > 0) {
-                    brick->data[index] = val;
+                    brick->SetNonEmpty(index);
                     empty = false;
-                } else
-                    brick->data[index] = 0;
+                }
             }
         }
     }
@@ -114,7 +113,7 @@ void ParallelOctree::Generate(VoxelData *generator) {
     std::cout << "Generating Octree..." << std::endl;
     std::cout << "Num Threads: " << enki::GetNumHardwareThreads() << std::endl;
 
-    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
+    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) - (std::log2(LEAF_NODE_SCALE)));
     float currentSize = size * 2.0f;
     uint32_t dispatchCount = 1;
     std::cout << "Octree Depth: " << depth << std::endl;
@@ -137,12 +136,8 @@ void ParallelOctree::Generate(VoxelData *generator) {
                 NodeData &nodeData = nodeList[cl].get(work);
                 float halfSize = currentSize * 0.5f;
                 if (!this->IsRegionEmpty(generator, nodeData.center - halfSize, nodeData.center + halfSize)) {
-                    // float camDist = glm::length(cameraPosition - nodeData.center);
-                    // float lod = CalculateLOD(camDist);
-
                     if (currentSize == LEAF_NODE_SCALE) {
                         OctreeBrick brick{};
-                        brick.position = nodeData.center;
                         glm::vec3 min = nodeData.center - halfSize;
                         bool empty = CreateBrick(generator, &brick, min, currentSize);
                         Node node = nodePools[nodeData.nodeIndex];
@@ -177,16 +172,16 @@ void ParallelOctree::Serialize(const char *filename) {
     outFile.write(reinterpret_cast<const char *>(&nodeCount), sizeof(uint32_t));
     outFile.write(reinterpret_cast<const char *>(nodePools.data()), sizeof(uint32_t) * nodeCount);
 
-    uint32_t brickCount = static_cast<uint32_t>(brickPools.size() / BRICK_ELEMENT_COUNT);
+    uint32_t brickCount = static_cast<uint32_t>(brickPools.size());
     outFile.write(reinterpret_cast<const char *>(&brickCount), sizeof(uint32_t));
-    outFile.write(reinterpret_cast<const char *>(brickPools.data()), sizeof(uint32_t) * brickCount * BRICK_ELEMENT_COUNT);
+    outFile.write(reinterpret_cast<const char *>(brickPools.data()), brickCount * sizeof(OctreeBrick));
 }
 
 void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
     uint32_t dispatchCount = 1;
     float currentSize = size;
-    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) / (std::log2(LEAF_NODE_SCALE) + 1));
 
+    const uint32_t depth = static_cast<uint32_t>(std::log2(size * 2.0f) - (std::log2(LEAF_NODE_SCALE)));
     ThreadSafeVector<NodeData> nodeList[2];
     nodeList[0].push(NodeData{center, 0});
     std::mutex insertionMutex;
@@ -215,7 +210,7 @@ void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
                     voxels.push_back(glm::vec4{center, currentSize});
                 } else if (node.GetNodeMask() == NodeMask::LeafNodeWithPtr) {
                     std::lock_guard insertionGuard{insertionMutex};
-                    ListVoxelsFromBrick(center, node.GetChildPtr() * BRICK_ELEMENT_COUNT, currentSize * 2.0f, voxels);
+                    ListVoxelsFromBrick(center, node.GetChildPtr(), currentSize * 2.0f, voxels);
                 }
             }
         });
@@ -231,13 +226,13 @@ void ParallelOctree::ListVoxels(std::vector<glm::vec4> &voxels) {
 
 void ParallelOctree::ListVoxelsFromBrick(const glm::vec3 &center, uint32_t brickPtr, float gridSize, std::vector<glm::vec4> &voxels) {
     float unitVoxelHalfSize = (gridSize * 0.5f) / float(NUM_BRICK);
+    OctreeBrick *brick = &brickPools[brickPtr];
     glm::vec3 min = center - gridSize * 0.5f;
     for (int x = 0; x < NUM_BRICK; ++x) {
         for (int y = 0; y < NUM_BRICK; ++y) {
             for (int z = 0; z < NUM_BRICK; ++z) {
-                uint32_t offset = x * NUM_BRICK * NUM_BRICK + y * NUM_BRICK + z;
-                uint32_t val = brickPools[brickPtr + offset];
-                if (val > 0) {
+                uint32_t offset = x * NUM_BRICK2 + y * NUM_BRICK + z;
+                if (!brick->IsEmpty(offset)) {
                     glm::vec3 t01 = glm::vec3(float(x), float(y), float(z)) / float(NUM_BRICK);
                     glm::vec3 position = min + t01 * gridSize;
                     // Calculate center and size

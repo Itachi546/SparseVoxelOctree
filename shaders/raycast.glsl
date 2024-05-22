@@ -26,7 +26,7 @@ struct RayHit {
 };
 
 const int gridEndMargin = BRICK_SIZE - 1;
-RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
+RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickPtr) {
     vec3 stepDir = mix(vec3(-1.0f), vec3(1.0f), dirMask);
     vec3 tStep = invRd;
 
@@ -40,10 +40,14 @@ RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
     vec3 t = (1.0f - fract(r0)) * tStep;
 
     vec3 nearestAxis = step(t, t.yzx) * step(t, t.zxy);
+
     for (int i = 0; i < GRID_MARCH_MAX_ITERATION; ++i) {
-        uint voxelIndex = brickStart + uint(p.x * BRICK_SIZE2 + p.y * BRICK_SIZE + p.z);
-        uint color = brickPools[voxelIndex];
-        if (color > 0) {
+        uint voxelIndex = uint(p.x * BRICK_SIZE2 + p.y * BRICK_SIZE + p.z);
+        uint layer = voxelIndex / BRICK_SIZE2;
+        uint offset = voxelIndex % BRICK_SIZE2;
+        uint64_t mask = uint64_t(1) << (BRICK_SIZE2 - 1 - offset);
+        uint64_t color = brickPools[brickPtr + layer] & mask;
+        if (color == mask) {
             // Undo the reflection
             p = mix(gridEndMargin - p, p, dirMask);
             vec3 t = (p - r0) * tStep;
@@ -51,7 +55,7 @@ RayHit RaycastDDA(vec3 r0, vec3 invRd, vec3 dirMask, uint brickStart) {
             rayHit.normal = -nearestAxis;
             rayHit.t = tMax;
             rayHit.intersect = true;
-            rayHit.color = color;
+            rayHit.color = 0xffffffff;
             rayHit.iteration = i;
             return rayHit;
         }
@@ -136,7 +140,8 @@ RayHit Trace(vec3 r0, vec3 rd) {
                 rayHit.color = GET_FIRST_CHILD(nodeDescriptor);
                 break;
             } else if (mask == LeafNodeWithPtr) {
-                uint brickPointer = GET_FIRST_CHILD(nodeDescriptor) * BRICK_SIZE3;
+                // Each octree brick contains 8 uint64_t for now
+                uint brickPointer = GET_FIRST_CHILD(nodeDescriptor) * 8;
                 vec3 intersectPos = r0 + max(t.x, 0.0f) * d;
                 vec3 brickMax = vec3(BRICK_SIZE);
                 vec3 brickPos = Remap(intersectPos, p - currentSize, p, vec3(0.0f), brickMax);

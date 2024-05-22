@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.0)
 
 # set(CMAKE_TOOLCHAIN_FILE "C:/Packages/vcpkg/scripts/buildsystems/vcpkg.cmake")
 set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
