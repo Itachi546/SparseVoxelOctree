@@ -70,16 +70,16 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 1
-    octree = new ParallelOctree("monu3.octree");
+#if 1 
+    octree = new ParallelOctree("terrain.octree");
 #else
-    constexpr uint32_t kOctreeDims = 64;
+    constexpr uint32_t kOctreeDims = 256;
     octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
 
-    // generator = new PerlinVoxData();
-    // octree->Generate(generator, camera->GetPosition());
-    LoadFromFile("assets/models/dragon.vox", 1.0f, kOctreeDims);
-    octree->Serialize("dragon-new.octree");
+    VoxelData* data = new PerlinVoxData();
+    octree->Generate(data);
+    // LoadFromFile("assets/models/dragon.vox", 1.0f, kOctreeDims);
+    octree->Serialize("terrain.octree");
 #endif
     octreeRenderer = new OctreeRenderer();
     octreeRenderer->Initialize(1920, 1080, octree);

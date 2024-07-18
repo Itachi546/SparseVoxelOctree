@@ -42,6 +42,20 @@ vec3 ACES(vec3 x) {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
+#define HALF_PI 1.570796
+
+const vec3 SKY_COLOR = vec3(0.53, 0.81, 0.92);
+vec3 GetSkyColor(vec3 rd) {
+    const vec3 HORIZON_COLOR = mix(vec3(1.0), SKY_COLOR, 0.3);
+
+    // Calculate the viewing angle from the ground
+    vec3 p = normalize(vec3(rd.x, 0, rd.z));
+    float a = acos(dot(rd, p));
+    float grad = a / HALF_PI;
+    grad = 1 - pow(1 - grad, 3);
+    return mix(HORIZON_COLOR, SKY_COLOR, grad);
+}
+
 void main() {
     const uint width = 1920;
     const uint height = 1080;
@@ -58,9 +72,9 @@ void main() {
     vec3 rd = GenerateCameraRay(uv);
 
     RayHit hit = Trace(r0, rd);
-    vec3 col = vec3(0.2f);
+    vec3 col = vec3(0.0f);
     if (hit.intersect) {
-        vec3 diffuseColor = pow(uintToRGB(hit.color), vec3(2.2f));
+        vec3 diffuseColor = uintToRGB(hit.color);
         vec3 n = normalize(hit.normal);
         vec3 p = r0 + hit.t * rd;
         vec3 L = uLightPosition;
@@ -71,10 +85,12 @@ void main() {
         float shadow = 1.0f;
         RayHit shadowHit = Trace(p + n * 0.2f, ld);
         if (shadowHit.intersect) {
-            shadow = 0.1f;
+            shadow = 0.3;
         }
-        col = max(dot(n, ld), 0.1f) * diffuseColor * shadow;
-    }
+        vec3 indirect = SKY_COLOR * (n.y * 0.5 + 0.5) * 0.2;
+        col = max(dot(n, ld), 0.3f) * (diffuseColor + indirect) * shadow;
+    } else
+        col = GetSkyColor(rd);
 
 #if 1
     vec4 prevColor = imageLoad(accumulationTexture, iuv);
@@ -82,7 +98,7 @@ void main() {
     col = (prevColor.xyz * spp + col) / (spp + 1.0f);
     imageStore(accumulationTexture, iuv, vec4(col, 1.0f));
 
-    col = ACES(col);
+    //col = ACES(col);
     col = pow(col, vec3(0.4545));
     imageStore(outputTexture, iuv, vec4(col, 1.0f));
 #else

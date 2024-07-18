@@ -12,7 +12,7 @@ struct PerlinVoxData : public VoxelData {
     }
 
     uint32_t Sample(glm::vec3 p) override {
-        float frequency = 0.05f;
+        float frequency = 0.2f;
         float amplitude = 0.5f;
         float res = 0.0f;
         for (uint32_t i = 0; i < 5; ++i) {
