@@ -77,7 +77,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) override;
     void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ = 1) override;
 
-    void PrepareSwapchain(CommandBufferID commandBuffer) override;
+    void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) override;
 
     void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;
 
@@ -169,6 +169,7 @@ class VulkanRenderingDevice : public RenderingDevice {
         VkBuffer buffer;
         VmaAllocation allocation;
         uint32_t size;
+        bool mapped;
     };
 
     struct VulkanUniformSet {

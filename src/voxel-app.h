@@ -8,11 +8,6 @@ namespace gfx {
     class Camera;
 } // namespace gfx
 
-class ParallelOctree;
-struct OctreeBrick;
-struct OctreeRenderer;
-struct VoxelData;
-
 struct VoxelApp : AppWindow<VoxelApp> {
     VoxelApp();
     VoxelApp(const VoxelApp &) = delete;
@@ -37,13 +32,9 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void UpdateControls();
 
-    void LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims);
-
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Camera *camera;
-    ParallelOctree *octree;
-    OctreeRenderer *octreeRenderer;
 
     float dt;
     float lastFrameTime;
@@ -78,6 +69,4 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     BufferID globalUB;
     uint8_t *globalUBPtr;
-
-    UniformSetID gUniSetRasterizer, gUniSetRaycast;
 };

@@ -307,6 +307,7 @@ class RenderingDevice : public Resource {
         TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL,
         TEXTURE_LAYOUT_PREINITIALIZED,
         TEXTURE_LAYOUT_VRS_ATTACHMENT_OPTIMAL = 1000164003,
+        TEXTURE_LAYOUT_PRESENT_SRC = 1000001002
     };
 
     struct BufferCopyRegion {
@@ -400,7 +401,7 @@ class RenderingDevice : public Resource {
                                  PipelineStageBits dstStage,
                                  std::vector<TextureBarrier> &textureBarriers) = 0;
 
-    virtual void PrepareSwapchain(CommandBufferID commandBuffer) = 0;
+    virtual void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) = 0;
 
     virtual void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) = 0;
 

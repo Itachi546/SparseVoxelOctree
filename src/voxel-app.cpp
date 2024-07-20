@@ -5,10 +5,6 @@
 #include "gfx/camera.h"
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
-#include "voxels/parallel-octree.h"
-#include "voxels/perlin-voxdata.h"
-#include "voxels/voxel-data.h"
-#include "voxels/octree-renderer.h"
 #include "rendering/rendering-utils.h"
 
 #include <glm/gtx/component_wise.hpp>
@@ -31,19 +27,6 @@ MessageCallback(GLenum source,
             (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
             type, severity, message);
     assert(0);
-}
-
-void VoxelApp::LoadFromFile(const char *filename, float scale, uint32_t kOctreeDims) {
-    VoxModelData *model = new VoxModelData();
-    model->Load(filename, scale);
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        octree->Generate(model);
-        auto end = std::chrono::high_resolution_clock::now();
-        float duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0f;
-        std::cout << "Total time to generate chunk: " << duration << "ms" << std::endl;
-    }
-    model->Destroy();
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
@@ -70,28 +53,12 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-#if 1 
-    octree = new ParallelOctree("dragon.octree");
-#else
-    constexpr uint32_t kOctreeDims = 64;
-    octree = new ParallelOctree(glm::vec3(0.0f), kOctreeDims);
-
-    // generator = new PerlinVoxData();
-    // octree->Generate(generator, camera->GetPosition());
-     LoadFromFile("assets/models/dragon.vox", 1.0f, kOctreeDims);
-    octree->Serialize("dragon.octree");
-#endif
-    octreeRenderer = new OctreeRenderer();
-    octreeRenderer->Initialize(1920, 1080, octree);
-
     RD::BoundUniform globalBinding{
         .bindingType = RD::BINDING_TYPE_UNIFORM_BUFFER,
         .binding = 0,
         .resourceID = globalUB,
         .offset = 0,
     };
-    gUniSetRasterizer = device->CreateUniformSet(octreeRenderer->rasterizer->pipeline, &globalBinding, 1, 0, "GlobalUniformSetRasterizer");
-    gUniSetRaycast = device->CreateUniformSet(octreeRenderer->raycaster->pipeline, &globalBinding, 1, 0, "GlobalUniformSetRaycaster");
 }
 
 void VoxelApp::Run() {
@@ -103,10 +70,10 @@ void VoxelApp::Run() {
             OnUpdate();
             device->BeginFrame();
             device->BeginCommandBuffer(commandBuffer);
+            device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             OnRender();
-            device->CopyToSwapchain(commandBuffer, octreeRenderer->GetColorAttachment());
             OnRenderUI();
-            device->PrepareSwapchain(commandBuffer);
+            device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_PRESENT_SRC);
             // Draw UI
             device->EndCommandBuffer(commandBuffer);
             device->Submit(commandBuffer);
@@ -134,10 +101,6 @@ void VoxelApp::OnUpdate() {
 
     camera->Update(dt);
 
-    if (camera->IsMoving()) {
-        octreeRenderer->raycaster->spp = 0.0f;
-    }
-
     frameData.uInvP = camera->GetInvProjectionMatrix();
     frameData.uInvV = camera->GetInvViewMatrix();
     frameData.P = camera->GetProjectionMatrix();
@@ -149,8 +112,6 @@ void VoxelApp::OnUpdate() {
     frameData.time = lastFrameTime;
     std::memcpy(globalUBPtr, &frameData, sizeof(FrameData));
 
-    Debug::AddRect(octree->center - octree->size, octree->center + octree->size);
-
     Input *input = Input::Singleton();
     input->Update();
 }
@@ -158,13 +119,8 @@ void VoxelApp::OnUpdate() {
 void VoxelApp::OnRenderUI() {
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
-    if (ImGui::DragFloat3("Light Position", &frameData.uLightPosition[0], 0.1f, -100.0f, 100.0f)) {
-        octreeRenderer->raycaster->spp = 0;
-    }
-    octreeRenderer->AddUI();
-
     RD::AttachmentInfo colorAttachmentInfos = {
-        .loadOp = RD::LOAD_OP_LOAD,
+        .loadOp = RD::LOAD_OP_CLEAR,
         .storeOp = RD::STORE_OP_STORE,
         .clearColor = {0.5f, 0.5f, 0.5f, 1.0f},
         .clearDepth = 0,
@@ -188,8 +144,6 @@ void VoxelApp::OnRenderUI() {
 }
 
 void VoxelApp::OnRender() {
-    UniformSetID uniformSet = octreeRenderer->renderMode == RenderMode_Rasterizer ? gUniSetRasterizer : gUniSetRaycast;
-    octreeRenderer->Render(commandBuffer, uniformSet);
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
@@ -248,14 +202,6 @@ void VoxelApp::UpdateControls() {
 VoxelApp::~VoxelApp() {
     device->Destroy(commandPool);
     device->Destroy(globalUB);
-    device->Destroy(gUniSetRasterizer);
-    device->Destroy(gUniSetRaycast);
     Debug::Shutdown();
     ImGuiService::Shutdown();
-    // GpuTimer::Shutdown();
-    if (octree)
-        delete octree;
-
-    octreeRenderer->Shutdown();
-    delete octreeRenderer;
 }

@@ -966,6 +966,7 @@ BufferID VulkanRenderingDevice::CreateBuffer(uint32_t size, uint32_t usageFlags,
 
     uint64_t bufferID = _buffers.Obtain();
     VulkanBuffer *buffer = _buffers.Access(bufferID);
+    buffer->mapped = false;
     buffer->buffer = vkBuffer;
     buffer->allocation = allocation;
     buffer->size = size;
@@ -976,6 +977,7 @@ uint8_t *VulkanRenderingDevice::MapBuffer(BufferID buffer) {
     VulkanBuffer *vkBuffer = _buffers.Access(buffer.id);
     void *ptr = nullptr;
     VK_CHECK(vmaMapMemory(vmaAllocator, vkBuffer->allocation, &ptr));
+    vkBuffer->mapped = true;
     return (uint8_t *)ptr;
 }
 
@@ -1149,20 +1151,45 @@ void VulkanRenderingDevice::Draw(CommandBufferID commandBuffer, uint32_t vertexC
     vkCmdDraw(cb, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer) {
+void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) {
     // Check swapchain Image layout and transition if needed
     uint32_t currentImageIndex = swapchain->currentImageIndex;
+    VkImageLayout dstLayout = VkImageLayout(layout);
+    VkImageLayout srcLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VkPipelineStageFlagBits srcStage, dstStage;
+    VkAccessFlags srcAccessFlag, dstAccessFlag;
+
+    switch (dstLayout) {
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        srcAccessFlag = 0;
+        dstAccessFlag = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        srcLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        break;
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+        srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        srcAccessFlag = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dstAccessFlag = 0;
+        break;
+    default:
+        LOGE("Undefined texture layout for swapchain");
+        return;
+    }
 
     VkImageMemoryBarrier presentBarrier = CreateImageBarrier(swapchain->images[currentImageIndex],
                                                              VK_IMAGE_ASPECT_COLOR_BIT,
-                                                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                                             0,
-                                                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                                                             srcAccessFlag,
+                                                             dstAccessFlag,
+                                                             srcLayout,
+                                                             dstLayout);
 
     VkCommandBuffer vkCommandBuffer = _commandBuffers[commandBuffer.id];
     vkCmdPipelineBarrier(vkCommandBuffer,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                         srcStage,
+                         dstStage,
                          VK_DEPENDENCY_BY_REGION_BIT,
                          0, nullptr, 0, nullptr,
                          1, &presentBarrier);
@@ -1284,9 +1311,9 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
             continue;
 
         vkTextureBarriers.push_back(CreateImageBarrier(vkTexture->image, vkTexture->imageAspect,
-                                                  VkAccessFlags(textureBarrier.srcAccess),
-                                                  VkAccessFlags(textureBarrier.dstAccess),
-                                                  vkTexture->currentLayout, newLayout));
+                                                       VkAccessFlags(textureBarrier.srcAccess),
+                                                       VkAccessFlags(textureBarrier.dstAccess),
+                                                       vkTexture->currentLayout, newLayout));
         vkTexture->currentLayout = newLayout;
     }
 
@@ -1406,7 +1433,7 @@ void VulkanRenderingDevice::Present() {
 
 void VulkanRenderingDevice::Destroy(BufferID buffer) {
     VulkanBuffer *vkBuffer = _buffers.Access(buffer.id);
-    if (vkBuffer->allocation->IsMappingAllowed()) {
+    if (vkBuffer->mapped) {
         vmaUnmapMemory(vmaAllocator, vkBuffer->allocation);
     }
     vmaDestroyBuffer(vmaAllocator, vkBuffer->buffer, vkBuffer->allocation);
