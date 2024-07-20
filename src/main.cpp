@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "voxel-app.h"
 
 #include "voxels/parallel-octree.h"

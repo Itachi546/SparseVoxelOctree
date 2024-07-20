@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "octree-renderer.h"
 
 #include "octree-rasterizer.h"

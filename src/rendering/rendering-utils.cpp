@@ -1,8 +1,7 @@
+#include "pch.h"
 #include "rendering-utils.h"
 
 #include "utils.h"
-#include <assert.h>
-#include <iostream>
 
 namespace RenderingUtils {
 

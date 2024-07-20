@@ -1,19 +1,9 @@
+#include "pch.h"
 #include "vulkan-rendering-device.h"
 
 #define VMA_IMPLEMENTATION
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #include <vma/vk_mem_alloc.h>
-
-#include <iostream>
-#include <string>
-#include <assert.h>
-#include <vector>
-#include <array>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#endif
 
 #define VK_LOAD_FUNCTION(instance, pFuncName) (vkGetInstanceProcAddr(instance, pFuncName))
 #define LOGE(err)                      \
@@ -118,7 +108,6 @@ void VulkanRenderingDevice::FindValidationLayers(std::vector<const char *> &enab
 
 void VulkanRenderingDevice::InitializeInstanceExtensions(std::vector<const char *> &enabledExtensions) {
     std::vector<const char *> requestedInstanceExtensions{
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
@@ -173,8 +162,6 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
 
     std::vector<const char *> requestedExts{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
     };
 
     uint32_t availableExtCount = 0;
@@ -507,12 +494,13 @@ void VulkanRenderingDevice::Initialize() {
     // Create debug messenger
     VkDebugUtilsMessengerCreateInfoEXT debugUtilsCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
     if (enableValidation) {
-        debugUtilsCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-        debugUtilsCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
-        debugUtilsCreateInfo.pfnUserCallback = DebugUtilsMessengerCallback;
+        if (enableValidation) {
+            debugUtilsCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+            debugUtilsCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
+            debugUtilsCreateInfo.pfnUserCallback = DebugUtilsMessengerCallback;
+        }
+        createInfo.pNext = &debugUtilsCreateInfo;
     }
-    createInfo.pNext = &debugUtilsCreateInfo;
-
     // Create Instance
     VK_CHECK(vkCreateInstance(&createInfo, nullptr, &instance));
     volkLoadInstance(instance);

@@ -1,9 +1,10 @@
+#include "pch.h"
 #include "voxel-data.h"
 
-#include <ogt_vox/ogt_vox.h>
 #include "math-utils.h"
 
-#include <iostream>
+#define OGT_VOX_IMPLEMENTATION
+#include <ogt_vox/ogt_vox.h>
 
 void VoxModelData::Load(const char *filename, float scale) {
     this->scale = scale;

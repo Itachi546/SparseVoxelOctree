@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "octree-rasterizer.h"
 
 #include "parallel-octree.h"
@@ -6,9 +7,6 @@
 #include "gfx/gpu-timer.h"
 #include "gfx/debug.h"
 #include "rendering/rendering-utils.h"
-
-#include <algorithm>
-#include <vector>
 
 void OctreeRasterizer::Initialize(uint32_t width, uint32_t height, ParallelOctree *octree) {
     this->width = width;

@@ -1,4 +1,6 @@
+#include "pch.h"
 #include "voxel-app.h"
+
 #include "input.h"
 #include "math-utils.h"
 #include "gfx/debug.h"
@@ -8,8 +10,6 @@
 #include "rendering/rendering-utils.h"
 
 #include <glm/gtx/component_wise.hpp>
-#include <thread>
-#include <algorithm>
 
 using namespace std::chrono_literals;
 

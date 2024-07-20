@@ -1,7 +1,5 @@
+#include "pch.h"
 #include "mesh.h"
-
-#include <iostream>
-#include <vector>
 
 namespace gfx {
 

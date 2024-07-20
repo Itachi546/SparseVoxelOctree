@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "parallel-octree.h"
 
 #include "TaskScheduler.h"
@@ -6,8 +7,7 @@
 #include "gfx/camera.h"
 #include "math-utils.h"
 #include "gfx/imgui-service.h"
-#include <fstream>
-#include <iostream>
+
 #include <glm/gtx/component_wise.hpp>
 
 inline Node CreateNode(NodeMask nodeMask, uint32_t childPtr = 0) {

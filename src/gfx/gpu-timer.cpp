@@ -1,10 +1,8 @@
+#include "pch.h"
 #include "gpu-timer.h"
-#include "opengl.h"
 
-#include <imgui.h>
-#include <stack>
-#include <map>
-#include <iostream>
+#include "imgui/imgui.h"
+#include "opengl.h"
 
 namespace GpuTimer {
     static const uint32_t QUERY_COUNT = 64;

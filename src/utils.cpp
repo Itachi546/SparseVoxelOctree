@@ -1,10 +1,5 @@
+#include "pch.h"
 #include "utils.h"
-
-#define OGT_VOX_IMPLEMENTATION
-#include "ogt_vox/ogt_vox.h"
-
-#include <assert.h>
-#include <iostream>
 
 namespace utils {
     std::optional<std::string> ReadFile(const std::string &filename, std::ios::openmode mode) {

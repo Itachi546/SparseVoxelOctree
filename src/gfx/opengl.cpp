@@ -1,9 +1,7 @@
+#include "pch.h"
 #include "opengl.h"
 
 #include "utils.h"
-
-#include <assert.h>
-#include <iostream>
 
 namespace gfx {
 

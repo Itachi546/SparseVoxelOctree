@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
+add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
 
 # set(CMAKE_TOOLCHAIN_FILE "C:/Packages/vcpkg/scripts/buildsystems/vcpkg.cmake")
 set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
@@ -35,6 +36,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         src/
         external/
     )
+
+target_precompile_headers(${PROJECT_NAME} PRIVATE src/pch.h)
 target_compile_definitions(${PROJECT_NAME} PRIVATE   
         GLM_FORCE_XYZW_ONLY
         GLM_ENABLE_EXPERIMENTAL

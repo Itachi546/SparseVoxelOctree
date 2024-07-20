@@ -1,15 +1,10 @@
+#include "pch.h"
 #include "octree.h"
 
 #include "voxel-data.h"
 #include "gfx/debug.h"
 
 #include <glm/gtx/component_wise.hpp>
-#include <execution>
-#include <iostream>
-#include <fstream>
-#include <stack>
-
-#include "gfx/debug.h"
 
 #define DEBUG_OCTREE_TRAVERSAL 0
 
