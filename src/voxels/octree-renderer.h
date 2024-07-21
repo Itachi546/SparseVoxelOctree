@@ -2,7 +2,6 @@
 
 #include "rendering/rendering-device.h"
 #include "gfx/mesh.h"
-#include "octree-rasterizer.h"
 #include "octree-raycaster.h"
 
 class ParallelOctree;
@@ -20,7 +19,7 @@ struct OctreeRenderer {
 
     OctreeRenderer();
 
-    void Initialize(uint32_t width, uint32_t height, ParallelOctree* octree);
+    void Initialize(uint32_t width, uint32_t height, ParallelOctree *octree);
 
     // void Update(ParallelOctree *octree, gfx::Camera *camera);
 
@@ -29,15 +28,11 @@ struct OctreeRenderer {
     void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
 
     TextureID GetColorAttachment() const {
-        if (renderMode == RenderMode_Rasterizer)
-            return rasterizer->colorAttachment;
-        else
-            return raycaster->outputTexture;
+        return raycaster->outputTexture;
     }
 
     void Shutdown();
 
-    OctreeRasterizer *rasterizer;
     OctreeRaycaster *raycaster;
     OctreeRenderMode renderMode = RenderMode_Rasterizer;
 };

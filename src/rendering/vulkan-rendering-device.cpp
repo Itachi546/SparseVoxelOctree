@@ -6,15 +6,6 @@
 #include <vma/vk_mem_alloc.h>
 
 #define VK_LOAD_FUNCTION(instance, pFuncName) (vkGetInstanceProcAddr(instance, pFuncName))
-#define LOGE(err)                      \
-    {                                  \
-        std::cout << err << std::endl; \
-        assert(0);                     \
-    }
-
-#define LOG(msg) \
-    std::cout << msg << std::endl;
-
 #define VK_CHECK(x)                                             \
     do {                                                        \
         VkResult err = x;                                       \
@@ -30,11 +21,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessengerCallback(VkDebugUtilsMessageSe
 
     if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         LOGE(pCallbackData->pMessage);
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-        std::cout << "Warning: " << pCallbackData->pMessage << std::endl;
-    else
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        LOGW(pCallbackData->pMessage);
+    } else {
         LOG(pCallbackData->pMessage);
-
+    }
     return VK_FALSE;
 }
 

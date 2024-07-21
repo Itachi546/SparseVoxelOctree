@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "voxelizer.h"
 
-#include "rendering/scene.h"
+#include "gfx/scene.h"
 
 void Voxelizer::Initialize(std::shared_ptr<Scene> scene) {
 

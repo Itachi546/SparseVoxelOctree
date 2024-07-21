@@ -21,7 +21,7 @@ struct AppWindow {
 
     AppWindow(const char *title, const glm::vec2 &windowSize) : windowSize(windowSize) {
         if (!glfwInit()) {
-            std::cout << "Failed to initialize GLFW" << std::endl;
+            LOGE("Failed to initialize GLFW");
             return;
         }
 

@@ -7,6 +7,7 @@
 #include "gfx/camera.h"
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
+#include "gfx/scene.h"
 #include "rendering/rendering-utils.h"
 
 #include <glm/gtx/component_wise.hpp>
@@ -59,6 +60,18 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         .resourceID = globalUB,
         .offset = 0,
     };
+
+    std::shared_ptr<Scene> scene = std::make_shared<Scene>();
+
+    std::vector<MeshGroup> meshes;
+
+    auto begin = std::chrono::high_resolution_clock::now();
+    if (scene->LoadMeshes({"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf"}, meshes)) {
+        scene->PrepareDrawData(meshes);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+    LOG("Total time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
 }
 
 void VoxelApp::Run() {

@@ -35,7 +35,8 @@ struct ResourcePool {
 
     void Shutdown() {
         if (_freeLists.size() < _size) {
-            std::cout << _name << "[ResourcePool] has unfreed resources" << std::endl;
+            std::string message = _name + "[ResourcePool] has unfreed resources";
+            LOG(message)
         }
         _resources.clear();
         _freeLists.clear();

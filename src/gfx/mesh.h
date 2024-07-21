@@ -1,32 +1,45 @@
 #pragma once
 
+#include <glm/glm.hpp>
+
 #include "rendering/rendering-device.h"
-#include "math-utils.h"
 
-#include <stdint.h>
+struct Vertex {
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 uv;
+};
 
-namespace gfx {
+struct MaterialInfo {
+    glm::vec4 albedo;
+    glm::vec4 emissive;
 
-    struct Vertex {
-        glm::vec3 position;
-        glm::vec3 normal;
-        glm::vec2 uv;
-    };
+    float metallic;
+    float roughness;
+    float ao;
+    float transparency;
 
-    struct Mesh {
+    std::string albedoMap;
+    std::string emissiveMap;
+    std::string metallicRoughnessMap;
 
-        Mesh(float *vertices, uint32_t vertexCount, uint32_t *indices, uint32_t indexCount);
-        Mesh() = default;
+    void Initialize() {
+        albedo = {1.0f, 1.0f, 1.0f, 1.0f};
+        emissive = {0.0f, 0.0f, 0.0f, 0.0f};
 
-        BufferID vertexBuffer;
-        BufferID indexBuffer;
-        uint32_t numVertices;
+        metallic = 0.1f;
+        roughness = 0.5f;
+        ao = 1.0f;
+        transparency = 1.0f;
+    }
+};
 
-        void Initialize(float *vertices, uint32_t vertexCount, uint32_t *indices, uint32_t indexCount);
+struct MeshGroup {
+    std::vector<glm::mat4> transforms;
+    std::vector<MaterialInfo> materials;
+    std::vector<std::string> names;
+    std::vector<RD::DrawElementsIndirectCommand> drawCommands;
 
-        static void CreatePlane(Mesh *mesh, int width = 10, int height = 10);
-        static void CreateCube(Mesh *mesh);
-
-        ~Mesh();
-    };
-} // namespace gfx
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+};
