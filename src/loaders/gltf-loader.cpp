@@ -16,7 +16,7 @@ static uint8_t *getBufferPtr(tinygltf::Model *model, const tinygltf::Accessor &a
     return model->buffers[bufferView.buffer].data.data() + accessor.byteOffset + bufferView.byteOffset;
 }
 
-static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint32_t matIndex) {
+static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint32_t matIndex, std::vector<std::string> &textures) {
     if (matIndex == -1)
         return;
 
@@ -38,34 +38,37 @@ static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint3
     component->roughness = (float)pbr.roughnessFactor;
     std::vector<double> &emissiveColor = material.emissiveFactor;
     component->emissive = glm::vec4((float)emissiveColor[0], (float)emissiveColor[1], (float)emissiveColor[2], 1.0f);
-    /*
+
     // Parse Material texture
+    /*
     auto loadTexture = [&](uint32_t index) {
         tinygltf::Texture& texture = model->textures[index];
         tinygltf::Image& image = model->images[texture.source];
         const std::string& name = image.uri.length() == 0 ? image.name : image.uri;
         return TextureCache::LoadTexture(name, image.width, image.height, image.image.data(), image.component, true);
         };
-
+    */
+    auto loadTexture = [&](uint32_t index) {
+        tinygltf::Texture &texture = model->textures[index];
+        tinygltf::Image &image = model->images[texture.source];
+        if (image.uri.length() > 0) {
+            textures.push_back(image.uri);
+            return static_cast<uint32_t>(textures.size() - 1);
+        }
+        return ~0u;
+    };
 
     if (pbr.baseColorTexture.index >= 0)
         component->albedoMap = loadTexture(pbr.baseColorTexture.index);
 
     if (pbr.metallicRoughnessTexture.index >= 0)
-        component->metallicMap = component->roughnessMap = loadTexture(pbr.metallicRoughnessTexture.index);
-
-    if (material.normalTexture.index >= 0)
-        component->normalMap = loadTexture(material.normalTexture.index);
-
-    if (material.occlusionTexture.index >= 0)
-        component->ambientOcclusionMap = loadTexture(material.occlusionTexture.index);
+        component->metallicRoughnessMap = loadTexture(pbr.metallicRoughnessTexture.index);
 
     if (material.emissiveTexture.index >= 0)
         component->emissiveMap = loadTexture(material.emissiveTexture.index);
-     */
 }
 
-static bool parseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, const glm::mat4 &transform) {
+static bool parseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, std::vector<std::string> &textures, const glm::mat3 &transform) {
     for (auto &primitive : mesh.primitives) {
         // Parse position
         const tinygltf::Accessor &positionAccessor = model->accessors[primitive.attributes["POSITION"]];
@@ -149,14 +152,14 @@ static bool parseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *m
         MaterialInfo material = {};
         std::string materialName = model->materials[primitive.material].name;
         meshGroup->names.push_back(materialName);
-        parseMaterial(model, &material, primitive.material);
+        parseMaterial(model, &material, primitive.material, textures);
         meshGroup->materials.push_back(std::move(material));
     }
 
     return true;
 }
 
-void parseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup) {
+void parseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup, std::vector<std::string> &textures) {
     tinygltf::Node &node = model->nodes[nodeIndex];
 
     // Create entity and write the transforms
@@ -174,21 +177,21 @@ void parseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGr
     // Update MeshData
     if (node.mesh >= 0) {
         tinygltf::Mesh &mesh = model->meshes[node.mesh];
-        parseMesh(model, mesh, meshGroup, transform);
+        parseMesh(model, mesh, meshGroup, textures, transform);
     }
 
     for (auto child : node.children)
-        parseNodeHierarchy(model, child, meshGroup);
+        parseNodeHierarchy(model, child, meshGroup, textures);
 }
 
 void parseScene(tinygltf::Model *model,
                 tinygltf::Scene *scene,
-                MeshGroup *meshGroup) {
+                MeshGroup *meshGroup, std::vector<std::string> &textures) {
     for (auto node : scene->nodes)
-        parseNodeHierarchy(model, node, meshGroup);
+        parseNodeHierarchy(model, node, meshGroup, textures);
 }
 
-bool GLTFLoader::Load(const char *filename, MeshGroup *meshGroup) {
+bool GLTFLoader::Load(const std::string &filename, MeshGroup *meshGroup, std::vector<std::string> &textures) {
     tinygltf::TinyGLTF loader;
     tinygltf::Model model;
     std::string err, warn;
@@ -206,8 +209,14 @@ bool GLTFLoader::Load(const char *filename, MeshGroup *meshGroup) {
         }
     }
 
+    size_t textureStart = textures.size();
     for (auto &scene : model.scenes)
-        parseScene(&model, &scene, meshGroup);
+        parseScene(&model, &scene, meshGroup, textures);
+
+    std::string basePath = std::filesystem::path(filename).remove_filename().string();
+    for (size_t i = textureStart; i < textures.size(); ++i) {
+        textures[i] = basePath + textures[i];
+    }
 
     return true;
 }

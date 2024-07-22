@@ -8,6 +8,7 @@
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
 #include "gfx/scene.h"
+#include "gfx/async-loader.h"
 #include "rendering/rendering-utils.h"
 
 #include <glm/gtx/component_wise.hpp>
@@ -35,7 +36,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // Initialize CommandBuffer/Pool
     device = RD::GetInstance();
-    commandPool = device->CreateCommandPool("RenderCommandPool");
+    QueueID graphicsQueue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
+    commandPool = device->CreateCommandPool(graphicsQueue, "RenderCommandPool");
     commandBuffer = device->CreateCommandBuffer(commandPool, "RenderCommandBuffer");
 
     Input::Singleton()->Initialize();
@@ -64,10 +66,20 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     std::shared_ptr<Scene> scene = std::make_shared<Scene>();
 
     std::vector<MeshGroup> meshes;
+    std::vector<std::string> textures;
 
     auto begin = std::chrono::high_resolution_clock::now();
-    if (scene->LoadMeshes({"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf"}, meshes)) {
+    asyncLoader = std::make_shared<AsyncLoader>();
+    asyncLoader->Initialize();
+    asyncLoader->Start();
+    if (scene->LoadMeshes({"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf"}, meshes, textures)) {
+        // Run a texture loader task
+        // TextureLoader loader;
+        // std::thread(loader.load);
+        for (auto &texture : textures)
+            asyncLoader->RequestTextureLoad(texture, TextureID{0ull});
         scene->PrepareDrawData(meshes);
+        // loader.wait();
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
@@ -213,6 +225,7 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
+    asyncLoader->Shutdown();
     device->Destroy(commandPool);
     device->Destroy(globalUB);
     Debug::Shutdown();

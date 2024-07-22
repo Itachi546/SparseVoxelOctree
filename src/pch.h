@@ -23,6 +23,7 @@
 #include <random>
 #include <mutex>
 #include <thread>
+#include <filesystem>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -30,7 +31,7 @@
 #include <Windows.h>
 #endif
 
-#define ASSERT(message) (assert(0 && message))
+#define ASSERT(condition, message) (assert(condition && message))
 #define LOGE(err)                                   \
     {                                               \
         std::cerr << "ERROR::" << err << std::endl; \

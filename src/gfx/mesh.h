@@ -19,9 +19,10 @@ struct MaterialInfo {
     float ao;
     float transparency;
 
-    std::string albedoMap;
-    std::string emissiveMap;
-    std::string metallicRoughnessMap;
+    uint32_t albedoMap;
+    uint32_t emissiveMap;
+    uint32_t metallicRoughnessMap;
+    uint32_t padding_;
 
     void Initialize() {
         albedo = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -31,6 +32,11 @@ struct MaterialInfo {
         roughness = 0.5f;
         ao = 1.0f;
         transparency = 1.0f;
+
+        albedoMap = ~0u;
+        emissiveMap = ~0u;
+        metallicRoughnessMap = ~0u;
+        padding_ = ~0u;
     }
 };
 

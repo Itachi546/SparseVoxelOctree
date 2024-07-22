@@ -40,7 +40,7 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name);
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name) override;
-    CommandPoolID CreateCommandPool(const std::string &name = "CommandPool") override;
+    CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "CommandPool") override;
     TextureID CreateTexture(TextureDescription *description, const std::string &name) override;
     UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) override;
 
@@ -52,6 +52,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;
     void EndCommandBuffer(CommandBufferID commandBuffer) override;
 
+    QueueID GetDeviceQueue(QueueType queueType) override;
+
     void BeginRenderPass(CommandBufferID commandBuffer, RenderingInfo *renderingInfo) override;
     void EndRenderPass(CommandBufferID commandBuffer) override;
 
@@ -62,7 +64,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
 
     void Submit(CommandBufferID commandBuffer) override;
-    void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function);
+    void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, CommandBufferID commandBuffer = CommandBufferID{~0ull}, CommandPoolID commandPool = CommandPoolID{~0ull});
 
     void Present() override;
 
@@ -109,8 +111,10 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     VkDevice device = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
     std::vector<VkQueueFamilyProperties> queueFamilyProperties;
     std::vector<uint32_t> selectedQueueFamilies;
+    uint32_t _graphicsQueue = ~0u;
     std::vector<VkQueue> _queues;
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;

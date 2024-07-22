@@ -2,7 +2,10 @@
 
 #include "gfx/mesh.h"
 
+#include <vector>
+#include <string>
+
 namespace GLTFLoader {
 
-    bool Load(const char *filename, MeshGroup* meshGroup);
+    bool Load(const std::string& filename, MeshGroup* meshGroup, std::vector<std::string>& textures);
 };

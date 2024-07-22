@@ -36,7 +36,7 @@ DEFINE_ID(Pipeline)
 DEFINE_ID(Texture)
 DEFINE_ID(UniformSet)
 DEFINE_ID(Buffer)
-
+DEFINE_ID(Queue)
 class RenderingDevice : public Resource {
   public:
     enum class DeviceType {
@@ -139,6 +139,9 @@ class RenderingDevice : public Resource {
         FORMAT_R10G10B10A2_UNORM = 0,
         FORMAT_B8G8R8A8_UNORM,
         FORMAT_R8G8B8A8_UNORM,
+        FORMAT_R8G8B8_UNORM,
+        FORMAT_R8G8_UNORM,
+        FORMAT_R8_UNORM,
         FORMAT_R16_SFLOAT,
         FORMAT_R16G16_SFLOAT,
         FORMAT_R16G16B16_SFLOAT,
@@ -353,6 +356,13 @@ class RenderingDevice : public Resource {
         }
     };
 
+    enum QueueType {
+        QUEUE_TYPE_INVALID = 0,
+        QUEUE_TYPE_GRAPHICS = 1,
+        QUEUE_TYPE_COMPUTE = 2,
+        QUEUE_TYPE_TRANSFER = 4
+    };
+
     struct DrawElementsIndirectCommand {
         uint32_t count;
         uint32_t instanceCount;
@@ -368,6 +378,8 @@ class RenderingDevice : public Resource {
     virtual void Initialize() = 0;
 
     virtual void SetValidationMode(bool state) = 0;
+
+    virtual QueueID GetDeviceQueue(QueueType queueType) = 0;
 
     virtual void CreateSurface(void *platformData) = 0;
     virtual void CreateSwapchain(bool vsync = true) = 0;
@@ -385,7 +397,7 @@ class RenderingDevice : public Resource {
     virtual TextureID CreateTexture(TextureDescription *description, const std::string &name) = 0;
     virtual ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInBytes, ShaderDescription *desc, const std::string &name = "shader") = 0;
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
-    virtual CommandPoolID CreateCommandPool(const std::string &name = "commandPool") = 0;
+    virtual CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "commandPool") = 0;
     virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) = 0;
 
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
@@ -403,7 +415,7 @@ class RenderingDevice : public Resource {
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
     virtual void Submit(CommandBufferID commandBuffer) = 0;
 
-    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function) = 0;
+    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, CommandBufferID cb = CommandBufferID{~0ull}, CommandPoolID commandPool = CommandPoolID{~0ull}) = 0;
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
                                  PipelineStageBits srcStage,
                                  PipelineStageBits dstStage,

@@ -4,6 +4,7 @@
 
 #include <chrono>
 
+class AsyncLoader;
 namespace gfx {
     class Camera;
 } // namespace gfx
@@ -66,6 +67,8 @@ struct VoxelApp : AppWindow<VoxelApp> {
     RenderingDevice *device;
     CommandPoolID commandPool;
     CommandBufferID commandBuffer;
+
+    std::shared_ptr<AsyncLoader> asyncLoader;
 
     BufferID globalUB;
     uint8_t *globalUBPtr;

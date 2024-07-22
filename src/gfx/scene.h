@@ -7,7 +7,7 @@
 #include <string>
 
 struct Scene {
-    static bool LoadMeshes(const std::vector<std::string>& filenames, std::vector<MeshGroup>& meshGroups);
+    static bool LoadMeshes(const std::vector<std::string>& filenames, std::vector<MeshGroup>& meshGroups, std::vector<std::string>& textures);
 
     void PrepareDrawData(const std::vector<MeshGroup>& meshGroups);
 
