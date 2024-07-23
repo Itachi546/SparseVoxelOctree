@@ -37,6 +37,8 @@ DEFINE_ID(Texture)
 DEFINE_ID(UniformSet)
 DEFINE_ID(Buffer)
 DEFINE_ID(Queue)
+DEFINE_ID(Fence)
+
 class RenderingDevice : public Resource {
   public:
     enum class DeviceType {
@@ -87,6 +89,13 @@ class RenderingDevice : public Resource {
     struct PushConstant {
         uint32_t offset;
         uint32_t size;
+    };
+
+    struct SubmitQueueInfo {
+        QueueID queue;
+        CommandPoolID commandPool;
+        CommandBufferID commandBuffer;
+        FenceID fence;
     };
 
     struct ShaderDescription {
@@ -319,6 +328,10 @@ class RenderingDevice : public Resource {
         uint64_t size;
     };
 
+    struct BufferImageCopyRegion {
+        uint64_t bufferOffset;
+    };
+
     struct TextureBarrier {
         TextureID texture;
         BitField<BarrierAccessBits> srcAccess;
@@ -380,6 +393,7 @@ class RenderingDevice : public Resource {
     virtual void SetValidationMode(bool state) = 0;
 
     virtual QueueID GetDeviceQueue(QueueType queueType) = 0;
+    virtual FenceID GetRenderEndFence() = 0;
 
     virtual void CreateSurface(void *platformData) = 0;
     virtual void CreateSwapchain(bool vsync = true) = 0;
@@ -399,10 +413,13 @@ class RenderingDevice : public Resource {
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "commandPool") = 0;
     virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) = 0;
+    virtual FenceID CreateFence(const std::string &name = "fence", bool signalled = false) = 0;
+    virtual void WaitForFence(FenceID* fence, uint32_t fenceCount, uint64_t timeout) = 0;
 
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
     virtual void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) = 0;
+    virtual void CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region) = 0;
 
     virtual void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
     virtual void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
@@ -415,7 +432,7 @@ class RenderingDevice : public Resource {
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
     virtual void Submit(CommandBufferID commandBuffer) = 0;
 
-    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, CommandBufferID cb = CommandBufferID{~0ull}, CommandPoolID commandPool = CommandPoolID{~0ull}) = 0;
+    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, SubmitQueueInfo *queueInfo) = 0;
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
                                  PipelineStageBits srcStage,
                                  PipelineStageBits dstStage,
@@ -443,7 +460,8 @@ class RenderingDevice : public Resource {
     virtual void Destroy(TextureID texture) = 0;
     virtual void Destroy(UniformSetID uniformSet) = 0;
     virtual void Destroy(BufferID buffer) = 0;
-
+    virtual void Destroy(FenceID fence) = 0;
+    
     virtual void Shutdown() = 0;
 
     virtual uint32_t GetDeviceCount() = 0;

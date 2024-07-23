@@ -26,13 +26,6 @@ class ThreadSafeQueue {
         return false;
     }
 
-    T pop() {
-        std::lock_guard queueLock{mutex_};
-        T res = queue_.front();
-        queue_.pop();
-        return res;
-    }
-
     uint32_t size() {
         std::lock_guard queueLock{mutex_};
         return static_cast<uint32_t>(queue_.size());

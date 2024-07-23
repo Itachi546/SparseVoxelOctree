@@ -48,7 +48,7 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
         copyRegion.srcOffset = nodeDataSize;
         copyRegion.size = brickDataSize;
         device->CopyBuffer(commandBuffer, stagingBuffer, brickBuffer, &copyRegion);
-    });
+    }, nullptr);
     device->Destroy(stagingBuffer);
 
     RD::TextureDescription textureDescription = RD::TextureDescription::Initialize(1920, 1080);

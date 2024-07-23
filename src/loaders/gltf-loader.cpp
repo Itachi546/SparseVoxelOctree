@@ -52,7 +52,12 @@ static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint3
         tinygltf::Texture &texture = model->textures[index];
         tinygltf::Image &image = model->images[texture.source];
         if (image.uri.length() > 0) {
-            textures.push_back(image.uri);
+            // @TODO implement better mechanism 
+            auto found = std::find(textures.begin(), textures.end(), image.uri);
+            if (found != textures.end()) {
+                return (uint32_t)std::distance(textures.begin(), found);
+            } else
+                textures.push_back(image.uri);
             return static_cast<uint32_t>(textures.size() - 1);
         }
         return ~0u;

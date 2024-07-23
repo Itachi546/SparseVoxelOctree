@@ -3,7 +3,7 @@
 #include "rendering/rendering-device.h"
 
 #include <thread>
-#include <queue>
+#include "core/thread-safe-queue.h"
 
 struct TextureLoadRequest {
     std::string path;
@@ -25,7 +25,7 @@ class AsyncLoader {
     void Start();
 
     void RequestTextureLoad(std::string filename, TextureID textureId) {
-        textureLoadQueue.emplace(TextureLoadRequest{filename, textureId});
+        textureLoadQueue.push(TextureLoadRequest{filename, textureId});
     }
 
     void Shutdown();
@@ -34,11 +34,11 @@ class AsyncLoader {
     bool execute;
     std::thread _thread;
 
-    std::queue<TextureLoadRequest> textureLoadQueue;
+    ThreadSafeQueue<TextureLoadRequest> textureLoadQueue;
 
     BufferID stagingBuffer;
-    CommandBufferID commandBuffer;
-    CommandPoolID commandPool;
+    uint8_t *stagingBufferPtr;
+    RD::SubmitQueueInfo submitQueueInfo;
     RD *device;
     void ProcessQueue(RD *device);
 };

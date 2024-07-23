@@ -3,6 +3,7 @@
 #include "app-window.h"
 
 #include <chrono>
+#include <vector>
 
 class AsyncLoader;
 namespace gfx {
@@ -32,6 +33,8 @@ struct VoxelApp : AppWindow<VoxelApp> {
     void OnResize(float width, float height);
 
     void UpdateControls();
+
+    void LoadTextures(std::vector<std::string> &textures);
 
     using Clock = std::chrono::high_resolution_clock;
 

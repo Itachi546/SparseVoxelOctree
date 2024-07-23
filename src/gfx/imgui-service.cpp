@@ -46,7 +46,7 @@ namespace ImGuiService {
         device->ImmediateSubmit([&device](CommandBufferID commandBuffer) {
             VkCommandBuffer cb = device->_commandBuffers[commandBuffer.id];
             ImGui_ImplVulkan_CreateFontsTexture(cb);
-        });
+        }, nullptr);
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 

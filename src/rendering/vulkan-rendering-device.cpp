@@ -5,6 +5,10 @@
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #include <vma/vk_mem_alloc.h>
 
+constexpr const uint64_t MAIN_QUEUE = 0;
+constexpr const uint64_t TRANSFER_QUEUE = 1;
+constexpr const uint64_t COMPUTE_QUEUE = 2;
+
 #define VK_LOAD_FUNCTION(instance, pFuncName) (vkGetInstanceProcAddr(instance, pFuncName))
 #define VK_CHECK(x)                                             \
     do {                                                        \
@@ -176,35 +180,79 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
             LOGE("Failed to find device extension: " + std::string(requestedExt));
     }
 
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    VkQueueFlags queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT;
-    //  @TODO support multiple queue later
-    float queuePriorities[] = {0.0f};
-    for (uint32_t i = 0; i < queueFamilyProperties.size(); ++i) {
-        queueCreateInfos.push_back({
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = i,
-            .queueCount = std::min(queueFamilyProperties[i].queueCount, 1u),
-            .pQueuePriorities = queuePriorities,
-        });
-        selectedQueueFamilies.push_back(i);
+    uint32_t queueCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, nullptr);
+    ASSERT(queueCount > 0, "Queue count is zero");
 
-        if ((queueFlags & queueFamilyProperties[i].queueFlags) == queueFlags)
-            _graphicsQueue = i;
+    std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, queueFamilyProperties.data());
+
+    _queueFamilyIndices[MAIN_QUEUE] = _queueFamilyIndices[TRANSFER_QUEUE] = _queueFamilyIndices[COMPUTE_QUEUE] = ~0u;
+    for (uint32_t i = 0; i < queueCount; ++i) {
+        VkQueueFamilyProperties &queueFamily = queueFamilyProperties[i];
+        if (queueFamilyProperties[i].queueCount == 0)
+            continue;
+
+        std::string log = "Family: " + std::to_string(i) + " flags: " + std::to_string(queueFamily.queueFlags) + " queueCount: " + std::to_string(queueFamily.queueCount);
+        LOG(log);
+
+        // Search for main queue that should be able to do all work (graphics, compute and transfer)
+        if ((queueFamily.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) == (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
+            _queueFamilyIndices[MAIN_QUEUE] = i;
+        }
+        // Search for transfer queue
+        if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) == 0 && (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+            _queueFamilyIndices[TRANSFER_QUEUE] = i;
+        }
+
+        if ((queueFamily.queueFlags & (VK_QUEUE_TRANSFER_BIT | VK_QUEUE_GRAPHICS_BIT)) == 0 && (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+            _queueFamilyIndices[COMPUTE_QUEUE] = i;
+        }
     }
 
-    ASSERT(_graphicsQueue != ~0u, "Graphics Queue is not supported...");
+    ASSERT(_queueFamilyIndices[MAIN_QUEUE] != ~0u, "Graphics Queue is not supported...");
 
 #if _WIN32
     static PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkCheckPresentationSupport = (PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)VK_LOAD_FUNCTION(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
-    if (!vkCheckPresentationSupport(physicalDevice, selectedQueueFamilies[_graphicsQueue])) {
+    if (!vkCheckPresentationSupport(physicalDevice, _queueFamilyIndices[MAIN_QUEUE])) {
         LOGE("Selected Device/Queue doesn't support presentation");
         exit(-1);
     }
 #endif
 
+    float queuePriorities[] = {0.0f};
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+    uint32_t mainQueueIndex = _queueFamilyIndices[MAIN_QUEUE];
+    queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = mainQueueIndex,
+        .queueCount = 1,
+        .pQueuePriorities = queuePriorities,
+    });
+
+    uint32_t transferQueueIndex = _queueFamilyIndices[TRANSFER_QUEUE];
+    if (transferQueueIndex < queueCount) {
+        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = transferQueueIndex,
+            .queueCount = 1,
+            .pQueuePriorities = queuePriorities,
+        });
+    }
+
+    uint32_t computeQueueIndex = _queueFamilyIndices[COMPUTE_QUEUE];
+    if (computeQueueIndex < queueCount) {
+        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = computeQueueIndex,
+            .queueCount = 1,
+            .pQueuePriorities = queuePriorities,
+        });
+    }
+
     assert(queueCreateInfos.size() > 0);
-    LOG("Total queue: " + std::to_string(queueCreateInfos.size()));
+    LOG("Total queue selected: " + std::to_string(queueCreateInfos.size()));
 
     deviceFeatures2.features.multiDrawIndirect = true;
     deviceFeatures2.features.pipelineStatisticsQuery = true;
@@ -238,18 +286,40 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
 
     VkDevice device = VK_NULL_HANDLE;
     VK_CHECK(vkCreateDevice(physicalDevice, &createInfo, nullptr, &device));
+
+    vkGetDeviceQueue(device, mainQueueIndex, 0, &_queues[MAIN_QUEUE]);
+
+    LOG("MainQueue: " + std::to_string(mainQueueIndex));
+    LOG("TransferQueue: " + std::to_string(transferQueueIndex));
+    LOG("ComputeQueue: " + std::to_string(computeQueueIndex));
+
+    _queues[TRANSFER_QUEUE] = _queues[COMPUTE_QUEUE] = VK_NULL_HANDLE;
+    if (transferQueueIndex < queueCount)
+        vkGetDeviceQueue(device, transferQueueIndex, 0, &_queues[TRANSFER_QUEUE]);
+    if (computeQueueIndex < queueCount)
+        vkGetDeviceQueue(device, computeQueueIndex, 0, &_queues[COMPUTE_QUEUE]);
+
     return device;
 }
 
-VkFence VulkanRenderingDevice::CreateFence(const std::string &name) {
-    VkFence fence = 0;
+FenceID VulkanRenderingDevice::CreateFence(const std::string &name, bool signalled) {
+    uint64_t fenceId = _fences.Obtain();
+    VkFence *fence = _fences.Access(fenceId);
     VkFenceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = signalled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags(0),
     };
-    VK_CHECK(vkCreateFence(device, &createInfo, nullptr, &fence));
+    VK_CHECK(vkCreateFence(device, &createInfo, nullptr, fence));
 
-    SetDebugMarkerObjectName(VK_OBJECT_TYPE_FENCE, (uint64_t)fence, name.c_str());
-    return fence;
+    SetDebugMarkerObjectName(VK_OBJECT_TYPE_FENCE, (uint64_t)*fence, name.c_str());
+    return FenceID{fenceId};
+}
+
+void VulkanRenderingDevice::WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout) {
+    std::vector<VkFence> fences(fenceCount);
+    for (uint32_t i = 0; i < fenceCount; ++i)
+        fences[i] = *_fences.Access(fence[i].id);
+    vkWaitForFences(device, fenceCount, fences.data(), true, timeout);
 }
 
 VkSemaphore VulkanRenderingDevice::CreateVulkanSemaphore(const std::string &name) {
@@ -426,21 +496,7 @@ void VulkanRenderingDevice::InitializeDevice(uint32_t deviceIndex) {
     vkGetPhysicalDeviceProperties2(physicalDevice, &properties);
     LOG("Selected Device: " + std::string(properties.properties.deviceName));
 
-    uint32_t queuePropertiesCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queuePropertiesCount, nullptr);
-    assert(queuePropertiesCount > 0);
-    queueFamilyProperties.resize(queuePropertiesCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queuePropertiesCount, queueFamilyProperties.data());
-
     device = CreateDevice(physicalDevice, enabledDeviceExtensions);
-
-    uint32_t queueCount = static_cast<uint32_t>(selectedQueueFamilies.size());
-    assert(queueCount > 0);
-
-    _queues.resize(queueCount);
-    for (uint32_t i = 0; i < queueCount; ++i) {
-        vkGetDeviceQueue(device, selectedQueueFamilies[i], 0, &_queues[i]);
-    }
 }
 
 void VulkanRenderingDevice::InitializeAllocator() {
@@ -541,13 +597,15 @@ void VulkanRenderingDevice::Initialize() {
     _buffers.Initialize(64, "BufferPool");
     _uniformSets.Initialize(64, "UniformSetPool");
     _commandPools.Initialize(16, "CommandPool");
-    _commandBuffers.reserve(16);
+    _fences.Initialize(16, "Fences");
+    _commandBuffers.reserve(32);
 
     _descriptorPool = CreateDescriptorPool();
 
-    CommandPoolID commandPool = CreateCommandPool(QueueID{_graphicsQueue}, "Upload CommandPool");
+    CommandPoolID commandPool = CreateCommandPool(QueueID{MAIN_QUEUE}, "Upload CommandPool");
     uploadCommandBuffer = CreateCommandBuffer(commandPool, "Upload Command Buffer");
     uploadFence = CreateFence("Upload Fence");
+    renderEndFence = CreateFence("RenderEnd Fence", true);
 }
 
 void VulkanRenderingDevice::CreateSurface(void *platformData) {
@@ -564,7 +622,7 @@ void VulkanRenderingDevice::CreateSurface(void *platformData) {
 #error "Unsupported Platform"
 #endif
     VkBool32 presentSupport = false;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, selectedQueueFamilies[_graphicsQueue], surface, &presentSupport));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, _queueFamilyIndices[MAIN_QUEUE], surface, &presentSupport));
     if (!presentSupport) {
         LOGE("Presentation is supported by the device");
         exit(-1);
@@ -813,7 +871,7 @@ CommandPoolID VulkanRenderingDevice::CreateCommandPool(QueueID queue, const std:
     VkCommandPoolCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = selectedQueueFamilies[queue.id],
+        .queueFamilyIndex = _queueFamilyIndices[queue.id],
     };
 
     uint64_t commandPoolID = _commandPools.Obtain();
@@ -971,6 +1029,28 @@ void VulkanRenderingDevice::CopyBuffer(CommandBufferID commandBuffer, BufferID s
     vkCmdCopyBuffer(_commandBuffers[commandBuffer.id], vkSrc->buffer, vkDst->buffer, 1, (const VkBufferCopy *)region);
 }
 
+void VulkanRenderingDevice::CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region) {
+    VulkanBuffer *buffer = _buffers.Access(src.id);
+    VulkanTexture *texture = _textures.Access(dst.id);
+    VkBufferImageCopy copyRegion = {};
+    copyRegion.bufferOffset = region->bufferOffset;
+    copyRegion.bufferRowLength = 0;
+    copyRegion.bufferImageHeight = 0;
+
+    copyRegion.imageSubresource.aspectMask = texture->imageAspect;
+    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.layerCount = texture->arrayLevels;
+    copyRegion.imageSubresource.mipLevel = texture->mipLevels - 1;
+
+    copyRegion.imageOffset = {0, 0, 0};
+    copyRegion.imageExtent = {texture->width, texture->height, texture->depth};
+
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+
+    ASSERT(texture->currentLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, "Error texture layout is not transfer dst optimal...");
+    vkCmdCopyBufferToImage(cb, buffer->buffer, texture->image, texture->currentLayout, 1, &copyRegion);
+}
+
 UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) {
     std::vector<VkWriteDescriptorSet> writeSets(uniformCount);
 
@@ -1058,6 +1138,10 @@ void VulkanRenderingDevice::BeginFrame() {
     if (resized)
         ResizeSwapchain();
 
+    VkFence *fence = _fences.Access(renderEndFence);
+    vkWaitForFences(device, 1, fence, true, UINT64_MAX);
+    vkResetFences(device, 1, fence);
+
     VK_CHECK(vkAcquireNextImageKHR(device, swapchain->swapchain, ~0ul, imageAcquireSemaphore, VK_NULL_HANDLE, &swapchain->currentImageIndex));
 }
 
@@ -1077,16 +1161,15 @@ void VulkanRenderingDevice::EndCommandBuffer(CommandBufferID commandBuffer) {
 }
 
 QueueID VulkanRenderingDevice::GetDeviceQueue(QueueType queueType) {
-    if (queueType == RD::QUEUE_TYPE_GRAPHICS)
-        return QueueID{_graphicsQueue};
-
-    VkQueueFlags queueFlag = VkQueueFlags(queueType);
-    size_t queueId = 0;
-    for (size_t i = 0; i < queueFamilyProperties.size(); ++i) {
-        if ((queueFamilyProperties[i].queueFlags & queueFlag) == queueFlag)
-            queueId = i;
+    switch (queueType) {
+    case RD::QUEUE_TYPE_GRAPHICS:
+        return QueueID{MAIN_QUEUE};
+    case RD::QUEUE_TYPE_TRANSFER:
+        return QueueID{TRANSFER_QUEUE};
+    case RD::QUEUE_TYPE_COMPUTE:
+        return QueueID{COMPUTE_QUEUE};
     }
-    return QueueID{queueId};
+    return QueueID{MAIN_QUEUE};
 }
 
 void VulkanRenderingDevice::BeginRenderPass(CommandBufferID commandBuffer, RenderingInfo *renderInfo) {
@@ -1225,7 +1308,8 @@ void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer) {
         .pSignalSemaphoreInfos = signalSemaphores,
     };
 
-    VK_CHECK(vkQueueSubmit2(queue, 1, &submitInfo, VK_NULL_HANDLE));
+    VkFence *signalFence = _fences.Access(renderEndFence.id);
+    VK_CHECK(vkQueueSubmit2(queue, 1, &submitInfo, *signalFence));
 }
 
 void VulkanRenderingDevice::SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) {
@@ -1381,10 +1465,19 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
 }
 
-void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)> &&function, CommandBufferID cb, CommandPoolID cp) {
-    if (cb.id == ~0ull) {
-        cb = uploadCommandBuffer;
+void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)> &&function, SubmitQueueInfo *queueInfo) {
+    size_t queueType = MAIN_QUEUE;
+    CommandBufferID cb = uploadCommandBuffer;
+    CommandPoolID cp = uploadCommandPool;
+    FenceID fence = uploadFence;
+
+    if (queueInfo) {
+        queueType = queueInfo->queue.id;
+        cb = queueInfo->commandBuffer;
+        cp = queueInfo->commandPool;
+        fence = queueInfo->fence;
     }
+
     VkCommandBuffer cmd = _commandBuffers[cb.id];
     VkCommandBufferBeginInfo cmdBeginInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1397,22 +1490,24 @@ void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)>
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
+
     VkSubmitInfo submitInfo{
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 0,
         .pWaitSemaphores = nullptr,
+        .pWaitDstStageMask = waitStages,
         .commandBufferCount = 1,
         .pCommandBuffers = &cmd,
         .signalSemaphoreCount = 0,
         .pSignalSemaphores = nullptr,
     };
 
-    VK_CHECK(vkQueueSubmit(_queues[0], 1, &submitInfo, uploadFence));
+    VkFence *vkFence = _fences.Access(fence.id);
+    VK_CHECK(vkQueueSubmit(_queues[queueType], 1, &submitInfo, *vkFence));
 
-    vkWaitForFences(device, 1, &uploadFence, true, UINT64_MAX);
-    vkResetFences(device, 1, &uploadFence);
-    if (cp.id == ~0ull)
-        cp = uploadCommandPool;
+    vkWaitForFences(device, 1, vkFence, true, UINT64_MAX);
+    vkResetFences(device, 1, vkFence);
     vkResetCommandPool(device, *_commandPools.Access(cp.id), 0);
 }
 
@@ -1429,7 +1524,6 @@ void VulkanRenderingDevice::Present() {
     };
 
     VK_CHECK(vkQueuePresentKHR(_queues[0], &presentInfo));
-    vkDeviceWaitIdle(device);
 }
 
 void VulkanRenderingDevice::Destroy(BufferID buffer) {
@@ -1479,8 +1573,15 @@ void VulkanRenderingDevice::Destroy(UniformSetID uniformSet) {
     _uniformSets.Release(uniformSet.id);
 }
 
+void VulkanRenderingDevice::Destroy(FenceID fence) {
+    VkFence vkFence = *_fences.Access(fence.id);
+    vkDestroyFence(device, vkFence, nullptr);
+}
+
 void VulkanRenderingDevice::Shutdown() {
     Destroy(CommandPoolID{0ull});
+    Destroy(uploadFence);
+    Destroy(renderEndFence);
     // Release resource pool
     _shaders.Shutdown();
     _commandPools.Shutdown();
@@ -1489,7 +1590,6 @@ void VulkanRenderingDevice::Shutdown() {
     _uniformSets.Shutdown();
     _buffers.Shutdown();
 
-    vkDestroyFence(device, uploadFence, nullptr);
     vkDestroyDescriptorPool(device, _descriptorPool, nullptr);
     vkDestroySemaphore(device, timelineSemaphore, nullptr);
     vkDestroySemaphore(device, imageAcquireSemaphore, nullptr);

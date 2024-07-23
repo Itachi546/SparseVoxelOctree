@@ -24,6 +24,10 @@ class VulkanRenderingDevice : public RenderingDevice {
         return static_cast<uint32_t>(gpus.size());
     }
 
+    FenceID GetRenderEndFence() override {
+        return renderEndFence;
+    }
+
     void CreateSurface(void *platformData) override;
     void CreateSwapchain(bool vsync = true) override;
     ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name) override;
@@ -43,10 +47,15 @@ class VulkanRenderingDevice : public RenderingDevice {
     CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "CommandPool") override;
     TextureID CreateTexture(TextureDescription *description, const std::string &name) override;
     UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) override;
+    FenceID CreateFence(const std::string &name = "fence", bool signalled = false) override;
+
+    void WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout);
 
     BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) override;
     uint8_t *MapBuffer(BufferID buffer) override;
+
     void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) override;
+    void CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region);
 
     void BeginFrame() override;
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;
@@ -64,7 +73,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
 
     void Submit(CommandBufferID commandBuffer) override;
-    void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, CommandBufferID commandBuffer = CommandBufferID{~0ull}, CommandPoolID commandPool = CommandPoolID{~0ull});
+    void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, SubmitQueueInfo *queueInfo) override;
 
     void Present() override;
 
@@ -89,6 +98,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Destroy(TextureID texture) override;
     void Destroy(UniformSetID uniformSet) override;
     void Destroy(BufferID buffer) override;
+    void Destroy(FenceID fence) override;
 
     Device *GetDevice(int index) override {
         return &gpus[index];
@@ -112,10 +122,11 @@ class VulkanRenderingDevice : public RenderingDevice {
     VkDevice device = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-    std::vector<VkQueueFamilyProperties> queueFamilyProperties;
-    std::vector<uint32_t> selectedQueueFamilies;
-    uint32_t _graphicsQueue = ~0u;
-    std::vector<VkQueue> _queues;
+    // 0 - mainQueue
+    // 1 - transferQueue
+    // 2 - computeQueue
+    uint32_t _queueFamilyIndices[3];
+    VkQueue _queues[3];
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -195,11 +206,13 @@ class VulkanRenderingDevice : public RenderingDevice {
     ResourcePool<VulkanTexture> _textures;
     ResourcePool<VulkanUniformSet> _uniformSets;
     ResourcePool<VulkanBuffer> _buffers;
-
+    ResourcePool<VkFence> _fences;
     std::vector<VkCommandBuffer> _commandBuffers;
+
     CommandBufferID uploadCommandBuffer;
     CommandPoolID uploadCommandPool;
-    VkFence uploadFence;
+    FenceID uploadFence;
+    FenceID renderEndFence;
 
     VkDescriptorPool _descriptorPool;
 
@@ -231,6 +244,5 @@ class VulkanRenderingDevice : public RenderingDevice {
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
     void ResizeSwapchain();
 
-    VkFence CreateFence(const std::string &name = "fence");
     VkSemaphore CreateVulkanSemaphore(const std::string &name = "semaphore");
 };
