@@ -34,7 +34,7 @@ struct OctreeRaycaster {
     glm::vec3 maxBound;
 
     UniformSetID resourceSet;
-    std::vector<RD::TextureBarrier> outputImageBarrier;
+    RD::TextureBarrier outputImageBarrier[2];
 
     uint32_t width;
     uint32_t height;

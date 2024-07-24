@@ -6,6 +6,7 @@
 #include <vector>
 
 class AsyncLoader;
+struct RenderScene;
 namespace gfx {
     class Camera;
 } // namespace gfx
@@ -72,6 +73,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     CommandBufferID commandBuffer;
 
     std::shared_ptr<AsyncLoader> asyncLoader;
+    std::shared_ptr<RenderScene> scene;
 
     BufferID globalUB;
     uint8_t *globalUBPtr;

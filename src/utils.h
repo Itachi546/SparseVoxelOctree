@@ -11,8 +11,4 @@ namespace utils {
         return filename.substr(filename.find_last_of('.'));
     }
 
-    template <typename T>
-    inline bool HasFlag(T val, T flag) {
-        return (val & flag) == flag;
-    }
 } // namespace utils

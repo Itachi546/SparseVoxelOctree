@@ -7,11 +7,10 @@
 #include "gfx/camera.h"
 #include "gfx/imgui-service.h"
 #include "gfx/gpu-timer.h"
-#include "gfx/scene.h"
+#include "gfx/gltf-scene.h"
 #include "gfx/async-loader.h"
 #include "rendering/rendering-utils.h"
 
-#include <stb_image.h>
 #include <glm/gtx/component_wise.hpp>
 
 using namespace std::chrono_literals;
@@ -30,27 +29,6 @@ MessageCallback(GLenum source,
             (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
             type, severity, message);
     assert(0);
-}
-
-void VoxelApp::LoadTextures(std::vector<std::string> &textures) {
-    RD::TextureDescription desc = RD::TextureDescription::Initialize(1024, 1024);
-    desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
-    int width, height, comp;
-    for (auto &texture : textures) {
-        int res = stbi_info(texture.c_str(), &width, &height, &comp);
-        if (res == 0) {
-            LOGE("Failed to get texture info from the file" + texture);
-            return;
-        }
-        desc.width = width;
-        desc.height = height;
-        desc.format = RD::FORMAT_R8G8B8A8_UNORM;
-        desc.mipMaps = 1;
-
-        std::string name = std::filesystem::path(texture).filename().string();
-        TextureID textureId = device->CreateTexture(&desc, name.c_str());
-        asyncLoader->RequestTextureLoad(texture, textureId);
-    }
 }
 
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
@@ -85,23 +63,18 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         .offset = 0,
     };
 
-    std::shared_ptr<Scene> scene = std::make_shared<Scene>();
-
-    std::vector<MeshGroup> meshes;
-    std::vector<std::string> textures;
 
     auto begin = std::chrono::high_resolution_clock::now();
     asyncLoader = std::make_shared<AsyncLoader>();
 
     asyncLoader->Initialize();
     asyncLoader->Start();
-    if (scene->LoadMeshes({"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf"}, meshes, textures)) {
-        // Run a texture loader task
-        // TextureLoader loader;
-        // std::thread(loader.load);
-        LoadTextures(textures);
-        scene->PrepareDrawData(meshes);
-        // loader.wait();
+
+    // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
+    scene = std::make_shared<GLTFScene>();
+    const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
+    if (!scene->Initialize({meshPath}, asyncLoader)) {
+        LOGE("Failed to initialize scene");
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
@@ -249,6 +222,7 @@ void VoxelApp::UpdateControls() {
 VoxelApp::~VoxelApp() {
     FenceID renderEndFence = device->GetRenderEndFence();
     device->WaitForFence(&renderEndFence, 1, UINT64_MAX);
+    scene->Shutdown();
     asyncLoader->Shutdown();
     device->Destroy(commandPool);
     device->Destroy(globalUB);

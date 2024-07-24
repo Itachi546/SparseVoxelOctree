@@ -31,7 +31,7 @@
 #include <Windows.h>
 #endif
 
-#define ASSERT(condition, message) (assert(condition && message))
+#define ASSERT(condition, message) (assert(condition &&message))
 #define LOGE(err)                                   \
     {                                               \
         std::cerr << "ERROR::" << err << std::endl; \
@@ -47,3 +47,18 @@
     {                                                 \
         std::cout << "WARNING::" << msg << std::endl; \
     }
+
+template <typename T>
+inline bool HasFlag(T val, T flag) {
+    return (val & flag) == flag;
+}
+
+// Godot String::hash()
+inline uint32_t DJB2Hash(const std::string &message) {
+    /* simple djb2 hashing */
+    uint32_t hashv = 5381;
+    for (auto c : message) {
+        hashv = ((hashv << 3) + hashv) + c;
+    }
+    return hashv;
+}

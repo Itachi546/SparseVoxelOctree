@@ -1,22 +1,21 @@
 #include "pch.h"
-#include "gltf-loader.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define TINYGLTF_IMPLEMENTATION
+#include "gltf-scene.h"
+
+#include "gltf-loader.h"
 #include "tinygltf/tinygltf.h"
+#include "stb_image.h"
+#include "async-loader.h"
 
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/euler_angles.hpp>
-#include <glm/gtc/matrix_access.hpp>
 
 static uint8_t *getBufferPtr(tinygltf::Model *model, const tinygltf::Accessor &accessor) {
     tinygltf::BufferView &bufferView = model->bufferViews[accessor.bufferView];
     return model->buffers[bufferView.buffer].data.data() + accessor.byteOffset + bufferView.byteOffset;
 }
 
-static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint32_t matIndex, std::vector<std::string> &textures) {
+void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, uint32_t matIndex) {
     if (matIndex == -1)
         return;
 
@@ -52,15 +51,32 @@ static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint3
         tinygltf::Texture &texture = model->textures[index];
         tinygltf::Image &image = model->images[texture.source];
         if (image.uri.length() > 0) {
-            // @TODO implement better mechanism 
-            auto found = std::find(textures.begin(), textures.end(), image.uri);
-            if (found != textures.end()) {
-                return (uint32_t)std::distance(textures.begin(), found);
-            } else
-                textures.push_back(image.uri);
-            return static_cast<uint32_t>(textures.size() - 1);
+            // @TODO implement better mechanism
+            std::string texturePath = _meshBasePath + image.uri;
+            uint32_t hash = DJB2Hash(texturePath);
+            auto found = textureMap.find(hash);
+            if (found != textureMap.end()) {
+                return found->second;
+            } else {
+                int width, height, comp;
+                int res = stbi_info(texturePath.c_str(), &width, &height, &comp);
+
+                RD::TextureDescription desc = RD::TextureDescription::Initialize(width, height);
+                desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
+                if (res == 0) {
+                    LOGE("Failed to get texture info from the file" + texturePath);
+                    return TextureID{~0u};
+                }
+                desc.format = RD::FORMAT_R8G8B8A8_UNORM;
+                desc.mipMaps = 1;
+
+                TextureID textureId = device->CreateTexture(&desc, image.uri);
+                textureMap[hash] = textureId;
+                asyncLoader->RequestTextureLoad(texturePath, textureId);
+                return textureId;
+            }
         }
-        return ~0u;
+        return TextureID{~0u};
     };
 
     if (pbr.baseColorTexture.index >= 0)
@@ -73,7 +89,7 @@ static void parseMaterial(tinygltf::Model *model, MaterialInfo *component, uint3
         component->emissiveMap = loadTexture(material.emissiveTexture.index);
 }
 
-static bool parseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, std::vector<std::string> &textures, const glm::mat3 &transform) {
+bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, const glm::mat3 &transform) {
     for (auto &primitive : mesh.primitives) {
         // Parse position
         const tinygltf::Accessor &positionAccessor = model->accessors[primitive.attributes["POSITION"]];
@@ -157,14 +173,14 @@ static bool parseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *m
         MaterialInfo material = {};
         std::string materialName = model->materials[primitive.material].name;
         meshGroup->names.push_back(materialName);
-        parseMaterial(model, &material, primitive.material, textures);
+        ParseMaterial(model, &material, primitive.material);
         meshGroup->materials.push_back(std::move(material));
     }
 
     return true;
 }
 
-void parseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup, std::vector<std::string> &textures) {
+void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup) {
     tinygltf::Node &node = model->nodes[nodeIndex];
 
     // Create entity and write the transforms
@@ -182,21 +198,21 @@ void parseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGr
     // Update MeshData
     if (node.mesh >= 0) {
         tinygltf::Mesh &mesh = model->meshes[node.mesh];
-        parseMesh(model, mesh, meshGroup, textures, transform);
+        ParseMesh(model, mesh, meshGroup, transform);
     }
 
     for (auto child : node.children)
-        parseNodeHierarchy(model, child, meshGroup, textures);
+        ParseNodeHierarchy(model, child, meshGroup);
 }
 
-void parseScene(tinygltf::Model *model,
-                tinygltf::Scene *scene,
-                MeshGroup *meshGroup, std::vector<std::string> &textures) {
+void GLTFScene::ParseScene(tinygltf::Model *model,
+                           tinygltf::Scene *scene,
+                           MeshGroup *meshGroup) {
     for (auto node : scene->nodes)
-        parseNodeHierarchy(model, node, meshGroup, textures);
+        ParseNodeHierarchy(model, node, meshGroup);
 }
 
-bool GLTFLoader::Load(const std::string &filename, MeshGroup *meshGroup, std::vector<std::string> &textures) {
+bool GLTFScene::LoadFile(const std::string &filename, MeshGroup *meshGroup) {
     tinygltf::TinyGLTF loader;
     tinygltf::Model model;
     std::string err, warn;
@@ -214,14 +230,33 @@ bool GLTFLoader::Load(const std::string &filename, MeshGroup *meshGroup, std::ve
         }
     }
 
-    size_t textureStart = textures.size();
     for (auto &scene : model.scenes)
-        parseScene(&model, &scene, meshGroup, textures);
-
-    std::string basePath = std::filesystem::path(filename).remove_filename().string();
-    for (size_t i = textureStart; i < textures.size(); ++i) {
-        textures[i] = basePath + textures[i];
-    }
+        ParseScene(&model, &scene, meshGroup);
 
     return true;
+}
+
+bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader) {
+    device = RD::GetInstance();
+    asyncLoader = loader;
+
+    meshGroups.resize(filenames.size());
+    for (int i = 0; i < filenames.size(); ++i) {
+        MeshGroup &meshGroup = meshGroups[i];
+        _meshBasePath = std::filesystem::path(filenames[i]).remove_filename().string();
+        if (!LoadFile(filenames[i].c_str(), &meshGroup))
+            return false;
+    }
+    return true;
+}
+
+void GLTFScene::PrepareDraws() {
+}
+
+void GLTFScene::Render() {
+}
+
+void GLTFScene::Shutdown() {
+    for (auto &[key, val] : textureMap)
+        device->Destroy(val);
 }

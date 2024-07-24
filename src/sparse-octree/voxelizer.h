@@ -4,7 +4,7 @@
 
 #include <memory>
 
-struct Scene;
+class Scene;
 
 class Voxelizer {
 

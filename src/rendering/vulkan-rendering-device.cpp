@@ -1264,7 +1264,7 @@ void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, Text
                                                              srcAccessFlag,
                                                              dstAccessFlag,
                                                              srcLayout,
-                                                             dstLayout);
+                                                             dstLayout, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED);
 
     VkCommandBuffer vkCommandBuffer = _commandBuffers[commandBuffer.id];
     vkCmdPipelineBarrier(vkCommandBuffer,
@@ -1357,6 +1357,8 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
                                                                VkAccessFlags dstAccessMask,
                                                                VkImageLayout oldLayout,
                                                                VkImageLayout newLayout,
+                                                               uint32_t srcQueueFamily,
+                                                               uint32_t dstQueueFamily,
                                                                uint32_t mipLevel,
                                                                uint32_t arrLayer,
                                                                uint32_t mipCount,
@@ -1367,6 +1369,8 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
         .dstAccessMask = dstAccessMask,
         .oldLayout = oldLayout,
         .newLayout = newLayout,
+        .srcQueueFamilyIndex = srcQueueFamily,
+        .dstQueueFamilyIndex = dstQueueFamily,
         .image = image,
         .subresourceRange = {
             .aspectMask = aspect,
@@ -1381,20 +1385,24 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
 void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
                                             PipelineStageBits srcStage,
                                             PipelineStageBits dstStage,
-                                            std::vector<TextureBarrier> &textureBarriers) {
-
+                                            TextureBarrier *textureBarriers,
+                                            uint32_t barrierCount) {
     std::vector<VkImageMemoryBarrier> vkTextureBarriers;
-    for (uint32_t i = 0; i < textureBarriers.size(); ++i) {
+    for (uint32_t i = 0; i < barrierCount; ++i) {
         TextureBarrier &textureBarrier = textureBarriers[i];
         VkImageLayout newLayout = VkImageLayout(textureBarrier.newLayout);
         VulkanTexture *vkTexture = _textures.Access(textureBarrier.texture.id);
         if (newLayout == vkTexture->currentLayout)
             continue;
 
+        uint32_t srcQueueFamily = textureBarrier.srcQueueFamily.id == VK_QUEUE_FAMILY_IGNORED ? VK_QUEUE_FAMILY_IGNORED : _queueFamilyIndices[textureBarrier.srcQueueFamily.id];
+        uint32_t dstQueueFamily = textureBarrier.dstQueueFamily.id == VK_QUEUE_FAMILY_IGNORED ? VK_QUEUE_FAMILY_IGNORED : _queueFamilyIndices[textureBarrier.dstQueueFamily.id];
         vkTextureBarriers.push_back(CreateImageBarrier(vkTexture->image, vkTexture->imageAspect,
                                                        VkAccessFlags(textureBarrier.srcAccess),
                                                        VkAccessFlags(textureBarrier.dstAccess),
-                                                       vkTexture->currentLayout, newLayout));
+                                                       vkTexture->currentLayout, newLayout,
+                                                       srcQueueFamily,
+                                                       dstQueueFamily));
         vkTexture->currentLayout = newLayout;
     }
 
@@ -1422,7 +1430,9 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
                                               VK_ACCESS_SHADER_WRITE_BIT,
                                               VK_ACCESS_TRANSFER_READ_BIT,
                                               src->currentLayout,
-                                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL));
+                                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                              VK_QUEUE_FAMILY_IGNORED,
+                                              VK_QUEUE_FAMILY_IGNORED));
         src->currentLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     }
 
@@ -1431,7 +1441,9 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
                                           VK_ACCESS_NONE,
                                           VK_ACCESS_TRANSFER_WRITE_BIT,
                                           VK_IMAGE_LAYOUT_UNDEFINED,
-                                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+                                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                          VK_QUEUE_FAMILY_IGNORED,
+                                          VK_QUEUE_FAMILY_IGNORED));
 
     VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -1461,7 +1473,9 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
                                                                VK_ACCESS_TRANSFER_WRITE_BIT,
                                                                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                                                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                                                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                                               VK_QUEUE_FAMILY_IGNORED,
+                                                               VK_QUEUE_FAMILY_IGNORED);
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
 }
 
@@ -1506,6 +1520,7 @@ void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)>
     VkFence *vkFence = _fences.Access(fence.id);
     VK_CHECK(vkQueueSubmit(_queues[queueType], 1, &submitInfo, *vkFence));
 
+    // @TODO this is not where it belongs
     vkWaitForFences(device, 1, vkFence, true, UINT64_MAX);
     vkResetFences(device, 1, vkFence);
     vkResetCommandPool(device, *_commandPools.Access(cp.id), 0);

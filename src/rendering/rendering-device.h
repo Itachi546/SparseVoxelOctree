@@ -332,11 +332,15 @@ class RenderingDevice : public Resource {
         uint64_t bufferOffset;
     };
 
+#define QUEUE_FAMILY_IGNORED QueueID(~0u)
+
     struct TextureBarrier {
         TextureID texture;
         BitField<BarrierAccessBits> srcAccess;
         BitField<BarrierAccessBits> dstAccess;
         TextureLayout newLayout;
+        QueueID srcQueueFamily;
+        QueueID dstQueueFamily;
     };
 
     enum MemoryAllocationType {
@@ -414,7 +418,7 @@ class RenderingDevice : public Resource {
     virtual CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "commandPool") = 0;
     virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) = 0;
     virtual FenceID CreateFence(const std::string &name = "fence", bool signalled = false) = 0;
-    virtual void WaitForFence(FenceID* fence, uint32_t fenceCount, uint64_t timeout) = 0;
+    virtual void WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout) = 0;
 
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
@@ -436,7 +440,8 @@ class RenderingDevice : public Resource {
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
                                  PipelineStageBits srcStage,
                                  PipelineStageBits dstStage,
-                                 std::vector<TextureBarrier> &textureBarriers) = 0;
+                                 TextureBarrier *barriers,
+                                 uint32_t barrierCount) = 0;
 
     virtual void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) = 0;
 
@@ -461,7 +466,7 @@ class RenderingDevice : public Resource {
     virtual void Destroy(UniformSetID uniformSet) = 0;
     virtual void Destroy(BufferID buffer) = 0;
     virtual void Destroy(FenceID fence) = 0;
-    
+
     virtual void Shutdown() = 0;
 
     virtual uint32_t GetDeviceCount() = 0;

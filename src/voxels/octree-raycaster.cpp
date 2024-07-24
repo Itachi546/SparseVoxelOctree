@@ -48,7 +48,8 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
         copyRegion.srcOffset = nodeDataSize;
         copyRegion.size = brickDataSize;
         device->CopyBuffer(commandBuffer, stagingBuffer, brickBuffer, &copyRegion);
-    }, nullptr);
+    },
+                            nullptr);
     device->Destroy(stagingBuffer);
 
     RD::TextureDescription textureDescription = RD::TextureDescription::Initialize(1920, 1080);
@@ -58,8 +59,8 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
     textureDescription.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
     accumulationTexture = device->CreateTexture(&textureDescription, "RaycastAccumulationTexture");
 
-    outputImageBarrier.push_back({outputTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL});
-    outputImageBarrier.push_back({accumulationTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_READ_BIT | RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL});
+    outputImageBarrier[0] = {outputTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED};
+    outputImageBarrier[1] = {accumulationTexture, RD::BARRIER_ACCESS_NONE, RD::BARRIER_ACCESS_SHADER_READ_BIT | RD::BARRIER_ACCESS_SHADER_WRITE_BIT, RD::TEXTURE_LAYOUT_GENERAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED};
 
     RD::BoundUniform boundedUniform[4] = {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, nodesBuffer},
@@ -73,7 +74,7 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
 void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
     glm::vec4 dims[2] = {glm::vec4{minBound, spp}, glm::vec4{maxBound, spp}};
     auto *device = RD::GetInstance();
-    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier);
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier, 2);
     device->BindPipeline(commandBuffer, pipeline);
     device->BindUniformSet(commandBuffer, pipeline, globalSet);
     device->BindUniformSet(commandBuffer, pipeline, resourceSet);

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "rendering/rendering-device.h"
+#include "core/thread-safe-queue.h"
 
 #include <thread>
-#include "core/thread-safe-queue.h"
 
 struct TextureLoadRequest {
     std::string path;
@@ -34,6 +34,7 @@ class AsyncLoader {
     bool execute;
     std::thread _thread;
 
+    QueueID mainQueue;
     ThreadSafeQueue<TextureLoadRequest> textureLoadQueue;
 
     BufferID stagingBuffer;

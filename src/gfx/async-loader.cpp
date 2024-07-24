@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "async-loader.h"
+
+#include "gltf-loader.h"
 #include "stb_image.h"
 
 #include <thread>
@@ -10,6 +12,8 @@ void AsyncLoader::Initialize() {
     execute = true;
 
     submitQueueInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_TRANSFER);
+    mainQueue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
+
     submitQueueInfo.commandPool = device->CreateCommandPool(submitQueueInfo.queue, "Async Transfer Command Pool");
     submitQueueInfo.commandBuffer = device->CreateCommandBuffer(submitQueueInfo.commandPool, "Async Transfer Command Buffer");
     submitQueueInfo.fence = device->CreateFence("Async Transfer Fence");
@@ -51,17 +55,20 @@ void AsyncLoader::ProcessQueue(RD *device) {
         RD::BufferImageCopyRegion copyRegion = {};
         copyRegion.bufferOffset = 0;
 
-        std::vector<RD::TextureBarrier> transferBarrier = {
-            RD::TextureBarrier{request.textureId, 0, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL}};
+        RD::TextureBarrier transferBarrier[] = {
+            RD::TextureBarrier{request.textureId, 0, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED},
+            RD::TextureBarrier{request.textureId, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, 0, RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED},
+        };
 
         device->ImmediateSubmit([&](CommandBufferID cb) {
-            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, transferBarrier);
+            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, &transferBarrier[0], 1);
 
             device->CopyBufferToTexture(cb, stagingBuffer, request.textureId, &copyRegion);
+
+            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, &transferBarrier[1], 1);
         },
                                 &submitQueueInfo);
         stbi_image_free(data);
-        device->Destroy(request.textureId);
     } else {
         std::this_thread::sleep_for(200ms);
     }

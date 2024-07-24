@@ -80,7 +80,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     void PipelineBarrier(CommandBufferID commandBuffer,
                          PipelineStageBits srcStage,
                          PipelineStageBits dstStage,
-                         std::vector<TextureBarrier> &textureBarriers) override;
+                         TextureBarrier *barrier,
+                         uint32_t barrierCount) override;
 
     void BindIndexBuffer(CommandBufferID commandBuffer, BufferID buffer) override;
     void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
@@ -236,6 +237,8 @@ class VulkanRenderingDevice : public RenderingDevice {
                                             VkAccessFlags dstAccessMask,
                                             VkImageLayout oldLayout,
                                             VkImageLayout newLayout,
+                                            uint32_t srcQueueFamilyIndex,
+                                            uint32_t dstQueueFamilyIndex,
                                             uint32_t mipLevel = 0,
                                             uint32_t arrLayer = 0,
                                             uint32_t mipCount = ~0u,
