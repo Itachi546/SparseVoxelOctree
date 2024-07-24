@@ -66,11 +66,12 @@ class VulkanRenderingDevice : public RenderingDevice {
     void BeginRenderPass(CommandBufferID commandBuffer, RenderingInfo *renderingInfo) override;
     void EndRenderPass(CommandBufferID commandBuffer) override;
 
-    void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) override;
-    void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) override;
+    void SetViewport(CommandBufferID commandBuffer, float offsetX, float offsetY, float width, float height) override;
+    void SetScissor(CommandBufferID commandBuffer, int offsetX, int offsetY, uint32_t width, uint32_t height) override;
 
     void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) override;
     void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
+    void DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride);
 
     void Submit(CommandBufferID commandBuffer) override;
     void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, SubmitQueueInfo *queueInfo) override;

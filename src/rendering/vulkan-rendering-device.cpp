@@ -273,6 +273,13 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     deviceFeatures13.dynamicRendering = true;
     deviceFeatures13.synchronization2 = true;
 
+    VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT dynamicRenderingUnusedAttachmentExt = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT,
+        .pNext = nullptr,
+        .dynamicRenderingUnusedAttachments = true,
+    };
+    deviceFeatures13.pNext = &dynamicRenderingUnusedAttachmentExt;
+
     VkDeviceCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &deviceFeatures2,
@@ -1231,6 +1238,13 @@ void VulkanRenderingDevice::Draw(CommandBufferID commandBuffer, uint32_t vertexC
     vkCmdDraw(cb, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
+void VulkanRenderingDevice::DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride) {
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+    VulkanBuffer *buffer = _buffers.Access(indirectBuffer.id);
+
+    vkCmdDrawIndexedIndirect(cb, buffer->buffer, offset, drawCount, stride);
+}
+
 void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) {
     // Check swapchain Image layout and transition if needed
     uint32_t currentImageIndex = swapchain->currentImageIndex;
@@ -1312,15 +1326,15 @@ void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer) {
     VK_CHECK(vkQueueSubmit2(queue, 1, &submitInfo, *signalFence));
 }
 
-void VulkanRenderingDevice::SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) {
+void VulkanRenderingDevice::SetViewport(CommandBufferID commandBuffer, float offsetX, float offsetY, float width, float height) {
     VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
-    VkViewport viewport{(float)offsetX, (float)offsetY, (float)width, (float)height, 0.0f, 1.0f};
+    VkViewport viewport{offsetX, offsetY, width, height, 0.0f, 1.0f};
     vkCmdSetViewport(cb, 0, 1, &viewport);
 }
 
-void VulkanRenderingDevice::SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) {
+void VulkanRenderingDevice::SetScissor(CommandBufferID commandBuffer, int offsetX, int offsetY, uint32_t width, uint32_t height) {
     VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
-    VkRect2D scissor{(int)offsetX, (int)offsetY, width, height};
+    VkRect2D scissor{offsetX, offsetY, width, height};
     vkCmdSetScissor(cb, 0, 1, &scissor);
 }
 

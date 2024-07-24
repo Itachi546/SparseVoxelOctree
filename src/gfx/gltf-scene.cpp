@@ -6,10 +6,10 @@
 #include "tinygltf/tinygltf.h"
 #include "stb_image.h"
 #include "async-loader.h"
+#include "rendering/rendering-utils.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtx/euler_angles.hpp>
-
 static uint8_t *getBufferPtr(tinygltf::Model *model, const tinygltf::Accessor &accessor) {
     tinygltf::BufferView &bufferView = model->bufferViews[accessor.bufferView];
     return model->buffers[bufferView.buffer].data.data() + accessor.byteOffset + bufferView.byteOffset;
@@ -168,6 +168,7 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
         drawCommand.firstIndex = indexOffset / sizeof(uint32_t);
         drawCommand.baseVertex = vertexOffset / sizeof(Vertex);
         drawCommand.baseInstance = 0;
+        drawCommand.drawId = (uint32_t)meshGroup->drawCommands.size();
         meshGroup->drawCommands.push_back(std::move(drawCommand));
 
         MaterialInfo material = {};
@@ -236,13 +237,58 @@ bool GLTFScene::LoadFile(const std::string &filename, MeshGroup *meshGroup) {
     return true;
 }
 
-bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader) {
+bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader, BufferID globalUB) {
     device = RD::GetInstance();
     asyncLoader = loader;
 
-    meshGroups.resize(filenames.size());
+    RD::UniformBinding vsBindings[] = {
+        {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 1},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 2},
+    };
+
+    RD::UniformBinding fsBindings[] = {
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 3},
+    };
+
+    ShaderID shaders[2] = {
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/mesh.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/mesh.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
+    };
+
+    RD::Format colorAttachmentFormat[] = {RD::FORMAT_B8G8R8A8_UNORM};
+    RD::BlendState blendState = RD::BlendState::Create();
+    RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
+    rasterizationState.frontFace = RD::FRONT_FACE_COUNTER_CLOCKWISE;
+    RD::DepthState depthState = RD::DepthState::Create();
+    depthState.enableDepthWrite = true;
+    depthState.enableDepthTest = true;
+
+    renderPipeline = device->CreateGraphicsPipeline(shaders,
+                                                    (uint32_t)std::size(shaders),
+                                                    RD::TOPOLOGY_TRIANGLE_LIST,
+                                                    &rasterizationState,
+                                                    &depthState,
+                                                    colorAttachmentFormat,
+                                                    &blendState,
+                                                    1,
+                                                    RD::FORMAT_D24_UNORM_S8_UINT,
+                                                    "MeshDrawPipeline");
+
+    device->Destroy(shaders[0]);
+    device->Destroy(shaders[1]);
+
+    RD::BoundUniform globalBinding{
+        .bindingType = RD::BINDING_TYPE_UNIFORM_BUFFER,
+        .binding = 0,
+        .resourceID = globalUB,
+        .offset = 0,
+    };
+
+    globalSet = device->CreateUniformSet(renderPipeline, &globalBinding, 1, 0, "GlobalUniformSet");
+
     for (int i = 0; i < filenames.size(); ++i) {
-        MeshGroup &meshGroup = meshGroups[i];
         _meshBasePath = std::filesystem::path(filenames[i]).remove_filename().string();
         if (!LoadFile(filenames[i].c_str(), &meshGroup))
             return false;
@@ -251,12 +297,74 @@ bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::share
 }
 
 void GLTFScene::PrepareDraws() {
+    uint32_t vertexSize = static_cast<uint32_t>(meshGroup.vertices.size() * sizeof(Vertex));
+    vertexBuffer = device->CreateBuffer(vertexSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "VertexBuffer");
+
+    uint32_t indexSize = static_cast<uint32_t>(meshGroup.indices.size() * sizeof(uint32_t));
+    indexBuffer = device->CreateBuffer(indexSize, RD::BUFFER_USAGE_INDEX_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "IndexBuffer");
+
+    uint32_t drawCommandSize = static_cast<uint32_t>(meshGroup.drawCommands.size() * sizeof(RD::DrawElementsIndirectCommand));
+    drawCommandBuffer = device->CreateBuffer(drawCommandSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT | RD::BUFFER_USAGE_INDIRECT_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "DrawCommandBuffer");
+
+    uint32_t transformSize = static_cast<uint32_t>(meshGroup.transforms.size() * sizeof(glm::mat4));
+    transformBuffer = device->CreateBuffer(transformSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "TransformBuffer");
+
+    uint32_t materialSize = static_cast<uint32_t>(meshGroup.materials.size() * sizeof(MaterialInfo));
+    materialBuffer = device->CreateBuffer(materialSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "Material Buffer");
+
+    uint32_t maxSize = std::max({vertexSize, indexSize, transformSize, materialSize, drawCommandSize});
+
+    BufferID stagingBuffer = device->CreateBuffer(maxSize, RD::BUFFER_USAGE_TRANSFER_SRC_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "Temp Staging Buffer");
+    uint8_t *stagingBufferPtr = device->MapBuffer(stagingBuffer);
+
+    BufferUploadRequest uploadRequests[] = {
+        {meshGroup.vertices.data(), vertexBuffer, vertexSize},
+        {meshGroup.indices.data(), indexBuffer, indexSize},
+        {meshGroup.drawCommands.data(), drawCommandBuffer, drawCommandSize},
+        {meshGroup.transforms.data(), transformBuffer, transformSize},
+        {meshGroup.materials.data(), materialBuffer, materialSize},
+    };
+
+    // Move to transfer queue
+    for (auto &request : uploadRequests) {
+        std::memcpy(stagingBufferPtr, request.data, request.size);
+
+        device->ImmediateSubmit([&](CommandBufferID commandBuffer) {
+            RD::BufferCopyRegion copyRegion{
+                0, 0, request.size};
+            device->CopyBuffer(commandBuffer, stagingBuffer, request.bufferId, &copyRegion);
+        },
+                                nullptr);
+    }
+
+    device->Destroy(stagingBuffer);
+
+    RD::BoundUniform boundedUniform[] = {
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, vertexBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, drawCommandBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 2, transformBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 3, materialBuffer},
+    };
+    meshBindingSet = device->CreateUniformSet(renderPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "MeshBindingSet");
 }
 
-void GLTFScene::Render() {
+void GLTFScene::Render(CommandBufferID commandBuffer) {
+    device->BindPipeline(commandBuffer, renderPipeline);
+    device->BindUniformSet(commandBuffer, renderPipeline, globalSet);
+    device->BindUniformSet(commandBuffer, renderPipeline, meshBindingSet);
+    device->BindIndexBuffer(commandBuffer, indexBuffer);
+    device->DrawIndexedIndirect(commandBuffer, drawCommandBuffer, 0, (uint32_t)meshGroup.drawCommands.size(), sizeof(RD::DrawElementsIndirectCommand));
 }
 
 void GLTFScene::Shutdown() {
+    device->Destroy(globalSet);
+    device->Destroy(meshBindingSet);
+    device->Destroy(renderPipeline);
+    device->Destroy(vertexBuffer);
+    device->Destroy(indexBuffer);
+    device->Destroy(transformBuffer);
+    device->Destroy(drawCommandBuffer);
+    device->Destroy(materialBuffer);
     for (auto &[key, val] : textureMap)
         device->Destroy(val);
 }

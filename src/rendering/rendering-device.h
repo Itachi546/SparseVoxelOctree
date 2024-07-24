@@ -386,6 +386,7 @@ class RenderingDevice : public Resource {
         uint32_t firstIndex;
         uint32_t baseVertex;
         uint32_t baseInstance;
+        uint32_t drawId;
     };
 
     struct WindowPlatformData {
@@ -425,8 +426,8 @@ class RenderingDevice : public Resource {
     virtual void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) = 0;
     virtual void CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region) = 0;
 
-    virtual void SetViewport(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
-    virtual void SetScissor(CommandBufferID commandBuffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) = 0;
+    virtual void SetViewport(CommandBufferID commandBuffer, float offsetX, float offsetY, float width, float height) = 0;
+    virtual void SetScissor(CommandBufferID commandBuffer, int offsetX, int offsetY, uint32_t width, uint32_t height) = 0;
 
     virtual void BindIndexBuffer(CommandBufferID commandBuffer, BufferID buffer) = 0;
 
@@ -456,6 +457,7 @@ class RenderingDevice : public Resource {
 
     virtual void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) = 0;
     virtual void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) = 0;
+    virtual void DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride) = 0;
 
     virtual void Present() = 0;
 

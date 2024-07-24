@@ -12,10 +12,8 @@ struct TextureLoadRequest {
 
 struct BufferUploadRequest {
     void *data;
-    union {
-        TextureID textureId;
-        BufferID bufferId;
-    } resource;
+    BufferID bufferId;
+    uint32_t size;
 };
 
 class AsyncLoader {

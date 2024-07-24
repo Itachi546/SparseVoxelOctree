@@ -46,8 +46,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     globalUB = device->CreateBuffer(sizeof(FrameData), RD::BUFFER_USAGE_UNIFORM_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "GlobalUniformBuffer");
     globalUBPtr = device->MapBuffer(globalUB);
 
+    RD::TextureDescription desc = RD::TextureDescription::Initialize((uint32_t)windowSize.x, (uint32_t)windowSize.y);
+    desc.usageFlags = RD::TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT;
+    desc.format = RD::FORMAT_D24_UNORM_S8_UINT;
+    depthAttachment = device->CreateTexture(&desc, "Swapchain Depth Attachment");
+
     camera = new gfx::Camera();
-    camera->SetPosition(glm::vec3{0.5f, 0.5f, 64.5f});
+    camera->SetPosition(glm::vec3{0.5f, 2.0f, 0.5f});
+    camera->SetRotation(glm::vec3(0.0f, glm::radians(90.0f), 0.0f));
     camera->SetNearPlane(0.1f);
 
     dt = 0.0f;
@@ -55,14 +61,6 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     frameData.uLightPosition = glm::vec3(0.0f, 32.0f, 32.0f);
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
-
-    RD::BoundUniform globalBinding{
-        .bindingType = RD::BINDING_TYPE_UNIFORM_BUFFER,
-        .binding = 0,
-        .resourceID = globalUB,
-        .offset = 0,
-    };
-
 
     auto begin = std::chrono::high_resolution_clock::now();
     asyncLoader = std::make_shared<AsyncLoader>();
@@ -73,9 +71,11 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     scene = std::make_shared<GLTFScene>();
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (!scene->Initialize({meshPath}, asyncLoader)) {
+    if (!scene->Initialize({meshPath}, asyncLoader, globalUB)) {
         LOGE("Failed to initialize scene");
     }
+    scene->PrepareDraws();
+
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
     LOG("Total time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
@@ -92,7 +92,6 @@ void VoxelApp::Run() {
             device->BeginCommandBuffer(commandBuffer);
             device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             OnRender();
-            OnRenderUI();
             device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_PRESENT_SRC);
             // Draw UI
             device->EndCommandBuffer(commandBuffer);
@@ -139,6 +138,10 @@ void VoxelApp::OnUpdate() {
 void VoxelApp::OnRenderUI() {
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
+    ImGuiService::Render(commandBuffer);
+}
+
+void VoxelApp::OnRender() {
     RD::AttachmentInfo colorAttachmentInfos = {
         .loadOp = RD::LOAD_OP_CLEAR,
         .storeOp = RD::STORE_OP_STORE,
@@ -148,22 +151,33 @@ void VoxelApp::OnRenderUI() {
         .attachment = TextureID{~0u},
     };
 
+    RD::AttachmentInfo depthStencilAttachmentInfo = {
+        .loadOp = RD::LOAD_OP_CLEAR,
+        .storeOp = RD::STORE_OP_STORE,
+        .clearDepth = 1.0f,
+        .clearStencil = 0,
+        .attachment = depthAttachment,
+    };
+
     RD::RenderingInfo renderingInfo = {
         .width = (uint32_t)windowSize.x,
         .height = (uint32_t)windowSize.y,
         .layerCount = 1,
         .colorAttachmentCount = 1,
         .pColorAttachments = &colorAttachmentInfos,
-        .pDepthStencilAttachment = nullptr,
+        .pDepthStencilAttachment = &depthStencilAttachmentInfo,
     };
 
-    device->BeginRenderPass(commandBuffer, &renderingInfo);
-    device->SetViewport(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
-    ImGuiService::Render(commandBuffer);
-    device->EndRenderPass(commandBuffer);
-}
+    device->SetViewport(commandBuffer, 0.0f, windowSize.y, windowSize.x, -windowSize.y);
+    device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
 
-void VoxelApp::OnRender() {
+    device->BeginRenderPass(commandBuffer, &renderingInfo);
+
+    scene->Render(commandBuffer);
+
+    OnRenderUI();
+
+    device->EndRenderPass(commandBuffer);
 }
 
 void VoxelApp::OnMouseMove(float x, float y) {
@@ -188,6 +202,12 @@ void VoxelApp::OnResize(float width, float height) {
     if (!minimized && resized) {
         windowSize.x = width;
         windowSize.y = height;
+
+        device->Destroy(depthAttachment);
+        RD::TextureDescription desc = RD::TextureDescription::Initialize((uint32_t)windowSize.x, (uint32_t)windowSize.y);
+        desc.usageFlags = RD::TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT;
+        desc.format = RD::FORMAT_D24_UNORM_S8_UINT;
+        depthAttachment = device->CreateTexture(&desc, "Swapchain Depth Attachment");
     }
 }
 
@@ -224,6 +244,7 @@ VoxelApp::~VoxelApp() {
     device->WaitForFence(&renderEndFence, 1, UINT64_MAX);
     scene->Shutdown();
     asyncLoader->Shutdown();
+    device->Destroy(depthAttachment);
     device->Destroy(commandPool);
     device->Destroy(globalUB);
     Debug::Shutdown();

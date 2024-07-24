@@ -1,6 +1,5 @@
 #pragma once
 
-#include <rendering/rendering-device.h>
 #include "render-scene.h"
 #include "mesh.h"
 
@@ -17,21 +16,21 @@ class AsyncLoader;
 
 class GLTFScene : public RenderScene {
   public:
-    bool Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader) override;
+    bool Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader, BufferID globalUB) override;
     void PrepareDraws() override;
-    void Render() override;
+    void Render(CommandBufferID commandBuffer) override;
     void Shutdown() override;
 
     BufferID vertexBuffer;
     BufferID indexBuffer;
     BufferID transformBuffer;
     BufferID materialBuffer;
-    BufferID drawCommands;
+    BufferID drawCommandBuffer;
 
     virtual ~GLTFScene() {}
 
   private:
-    std::vector<MeshGroup> meshGroups;
+    MeshGroup meshGroup;
     std::unordered_map<uint32_t, TextureID> textureMap;
 
     bool LoadFile(const std::string &filename, MeshGroup *meshGroup);
@@ -43,4 +42,8 @@ class GLTFScene : public RenderScene {
     RD *device;
     std::shared_ptr<AsyncLoader> asyncLoader;
     std::string _meshBasePath;
+
+    // @TODO shared among different scene
+    PipelineID renderPipeline;
+    UniformSetID globalSet, meshBindingSet;
 };

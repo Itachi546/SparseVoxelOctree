@@ -35,8 +35,6 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     void UpdateControls();
 
-    void LoadTextures(std::vector<std::string> &textures);
-
     using Clock = std::chrono::high_resolution_clock;
 
     gfx::Camera *camera;
@@ -71,6 +69,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     RenderingDevice *device;
     CommandPoolID commandPool;
     CommandBufferID commandBuffer;
+    TextureID depthAttachment;
 
     std::shared_ptr<AsyncLoader> asyncLoader;
     std::shared_ptr<RenderScene> scene;
