@@ -13,7 +13,7 @@ namespace gfx {
         mFarPlane = 1000.0f;
 
         mSpeed = 2.0f;
-        mSensitivity = 0.3f;
+        mSensitivity = 0.8f;
 
         mIsMoving = false;
 

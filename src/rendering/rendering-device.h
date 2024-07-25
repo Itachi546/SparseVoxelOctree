@@ -348,6 +348,52 @@ class RenderingDevice : public Resource {
         MEMORY_ALLOCATION_TYPE_GPU
     };
 
+    enum Filter {
+        FILTER_NEAREST = 0,
+        FILTER_LINEAR = 1,
+    };
+
+    enum AddressMode {
+        ADDRESS_MODE_REPEAT = 0,
+        ADDRESS_MODE_MIRRORED_REPEAT = 1,
+        ADDRESS_MODE_CLAMP_TO_EDGE = 2,
+        ADDRESS_MODE_CLAMP_TO_BORDER = 3,
+        ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE = 4
+    };
+
+    enum MipmapMode {
+        MIPMAP_MODE_NEAREST = 0,
+        MIPMAP_MODE_LINEAR = 1
+    };
+
+    struct SamplerDescription {
+        Filter minFilter;
+        Filter magFilter;
+        // Same for uvw
+        AddressMode addressMode;
+        MipmapMode mipmapMode;
+
+        float lodBias;
+        float maxAnisotropy;
+        float minLod;
+        float maxLod;
+        bool enableAnisotropy;
+
+        static SamplerDescription Initialize() {
+            return SamplerDescription{
+                .minFilter = FILTER_LINEAR,
+                .magFilter = FILTER_LINEAR,
+                .addressMode = ADDRESS_MODE_CLAMP_TO_EDGE,
+                .mipmapMode = MIPMAP_MODE_LINEAR,
+                .lodBias = 0,
+                .maxAnisotropy = 16,
+                .minLod = 0,
+                .maxLod = 16,
+                .enableAnisotropy = false,
+            };
+        }
+    };
+
     struct TextureDescription {
         Format format;
         uint32_t width;
@@ -359,6 +405,8 @@ class RenderingDevice : public Resource {
         TextureType textureType;
         uint32_t usageFlags;
 
+        SamplerDescription *samplerDescription;
+
         static TextureDescription Initialize(uint32_t width, uint32_t height, uint32_t depth = 1) {
             return TextureDescription{
                 .format = FORMAT_R8G8B8A8_UNORM,
@@ -369,6 +417,7 @@ class RenderingDevice : public Resource {
                 .mipMaps = 1,
                 .textureType = TEXTURE_TYPE_2D,
                 .usageFlags = 0,
+                .samplerDescription = nullptr,
             };
         }
     };
@@ -460,6 +509,8 @@ class RenderingDevice : public Resource {
     virtual void DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride) = 0;
 
     virtual void Present() = 0;
+
+    virtual void UpdateBindlessTexture(TextureID texture) = 0;
 
     virtual void Destroy(PipelineID pipeline) = 0;
     virtual void Destroy(ShaderID shaderModule) = 0;

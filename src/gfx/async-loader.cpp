@@ -35,6 +35,7 @@ void AsyncLoader::Shutdown() {
     if (_thread.joinable()) {
         _thread.join();
     }
+
     device->Destroy(submitQueueInfo.commandPool);
     device->Destroy(stagingBuffer);
     device->Destroy(submitQueueInfo.fence);
@@ -49,7 +50,7 @@ void AsyncLoader::ProcessQueue(RD *device) {
         RD::TextureDescription desc = RD::TextureDescription::Initialize(width, height);
         desc.format = RD::FORMAT_R8G8B8A8_UNORM;
         desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
-        std::cout << "Loading texture: " << request.path << std::endl;
+        LOG("Loading texture: " + request.path);
         std::memcpy(stagingBufferPtr, data, width * height * 4);
 
         RD::BufferImageCopyRegion copyRegion = {};

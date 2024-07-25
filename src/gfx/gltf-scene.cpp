@@ -61,6 +61,7 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                 int width, height, comp;
                 int res = stbi_info(texturePath.c_str(), &width, &height, &comp);
 
+                RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
                 RD::TextureDescription desc = RD::TextureDescription::Initialize(width, height);
                 desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
                 if (res == 0) {
@@ -69,6 +70,7 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                 }
                 desc.format = RD::FORMAT_R8G8B8A8_UNORM;
                 desc.mipMaps = 1;
+                desc.samplerDescription = &samplerDesc;
 
                 TextureID textureId = device->CreateTexture(&desc, image.uri);
                 textureMap[hash] = textureId;

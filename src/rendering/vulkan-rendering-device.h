@@ -93,6 +93,9 @@ class VulkanRenderingDevice : public RenderingDevice {
     void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) override;
 
     void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;
+    void UpdateBindlessTexture(TextureID texture) override {
+        bindlessTextureToUpdate.push_back(texture);
+    }
 
     void Destroy(PipelineID pipeline) override;
     void Destroy(CommandPoolID commandPool) override;
@@ -180,12 +183,14 @@ class VulkanRenderingDevice : public RenderingDevice {
         VmaAllocation allocation;
 
         VkImageLayout currentLayout;
+        VkSampler sampler;
     };
 
     struct VulkanBuffer {
         VkBuffer buffer;
         VmaAllocation allocation;
         uint32_t size;
+        uint32_t samplerId;
         bool mapped;
     };
 
@@ -217,8 +222,16 @@ class VulkanRenderingDevice : public RenderingDevice {
     FenceID renderEndFence;
 
     VkDescriptorPool _descriptorPool;
+    VkDescriptorPool _bindlessDescriptorPool;
+    VkDescriptorSetLayout _bindlessDescriptorSetLayout;
+    VkDescriptorSet _bindlessDescriptorSet;
 
     static const uint32_t MAX_SET_COUNT = 4;
+    static const uint32_t MAX_BINDLESS_RESOURCES = 16536;
+    static const uint32_t BINDLESS_TEXTUERE_BINDING = 10;
+    static const uint32_t BINDLESS_TEXTURE_SET = 1;
+
+    std::vector<TextureID> bindlessTextureToUpdate;
 
   private:
     void FindValidationLayers(std::vector<const char *> &enabledLayers);
@@ -229,8 +242,8 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     VkDevice CreateDevice(VkPhysicalDevice physicalDevice, std::vector<const char *> &enabledExtensions);
     VkSwapchainKHR CreateSwapchainInternal(std::unique_ptr<VulkanSwapchain> &swapchain);
-    VkDescriptorPool CreateDescriptorPool();
-    VkDescriptorSetLayout CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding> &binding, uint32_t bindingCount);
+    VkDescriptorPool CreateDescriptorPool(VkDescriptorPoolSize *poolSizes, uint32_t poolCount, VkDescriptorPoolCreateFlags flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
+    VkDescriptorSetLayout CreateDescriptorSetLayout(VkDescriptorSetLayoutBinding *binding, uint32_t bindingCount, VkDescriptorSetLayoutCreateFlags flags = 0);
     VkPipelineLayout CreatePipelineLayout(std::vector<VkDescriptorSetLayout> &setLayouts, std::vector<VkPushConstantRange> &pushConstantRanges);
     VkImageMemoryBarrier CreateImageBarrier(VkImage image,
                                             VkImageAspectFlags aspect,
@@ -249,4 +262,6 @@ class VulkanRenderingDevice : public RenderingDevice {
     void ResizeSwapchain();
 
     VkSemaphore CreateVulkanSemaphore(const std::string &name = "semaphore");
+
+    VkSampler CreateSampler(SamplerDescription *desc);
 };

@@ -254,6 +254,17 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     assert(queueCreateInfos.size() > 0);
     LOG("Total queue selected: " + std::to_string(queueCreateInfos.size()));
 
+    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT, nullptr};
+    VkPhysicalDeviceFeatures2 supportedFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &indexingFeatures};
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &supportedFeatures);
+    bool bindlessSupported = indexingFeatures.descriptorBindingPartiallyBound && indexingFeatures.runtimeDescriptorArray;
+    if (!bindlessSupported) {
+        LOGE("Bindless resources is not supported ...");
+        exit(0);
+    }
+
+    LOG("Bindless support found ...");
+
     deviceFeatures2.features.multiDrawIndirect = true;
     deviceFeatures2.features.pipelineStatisticsQuery = true;
     deviceFeatures2.features.shaderInt16 = true;
@@ -261,14 +272,15 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     deviceFeatures2.features.geometryShader = true;
     deviceFeatures2.features.wideLines = true;
 
-    deviceFeatures2.pNext = &deviceFeatures11;
     deviceFeatures11.shaderDrawParameters = true;
-    deviceFeatures11.pNext = &deviceFeatures12;
 
     deviceFeatures12.drawIndirectCount = true;
     deviceFeatures12.shaderInt8 = true;
     deviceFeatures12.timelineSemaphore = true;
-    deviceFeatures12.pNext = &deviceFeatures13;
+    deviceFeatures12.descriptorBindingPartiallyBound = true;
+    deviceFeatures12.descriptorBindingSampledImageUpdateAfterBind = true;
+    deviceFeatures12.descriptorBindingVariableDescriptorCount = true;
+    deviceFeatures12.runtimeDescriptorArray = true;
 
     deviceFeatures13.dynamicRendering = true;
     deviceFeatures13.synchronization2 = true;
@@ -278,6 +290,10 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
         .pNext = nullptr,
         .dynamicRenderingUnusedAttachments = true,
     };
+
+    deviceFeatures2.pNext = &deviceFeatures11;
+    deviceFeatures11.pNext = &deviceFeatures12;
+    deviceFeatures12.pNext = &deviceFeatures13;
     deviceFeatures13.pNext = &dynamicRenderingUnusedAttachmentExt;
 
     VkDeviceCreateInfo createInfo = {
@@ -289,7 +305,8 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
         .ppEnabledLayerNames = nullptr,
         .enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size()),
         .ppEnabledExtensionNames = enabledExtensions.data(),
-        .pEnabledFeatures = nullptr};
+        .pEnabledFeatures = nullptr,
+    };
 
     VkDevice device = VK_NULL_HANDLE;
     VK_CHECK(vkCreateDevice(physicalDevice, &createInfo, nullptr, &device));
@@ -336,6 +353,29 @@ VkSemaphore VulkanRenderingDevice::CreateVulkanSemaphore(const std::string &name
 
     SetDebugMarkerObjectName(VK_OBJECT_TYPE_SEMAPHORE, (uint64_t)semaphore, name.c_str());
     return semaphore;
+}
+
+VkSampler VulkanRenderingDevice::CreateSampler(SamplerDescription *desc) {
+
+    VkSamplerAddressMode addressMode = VkSamplerAddressMode(desc->addressMode);
+    VkSamplerCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext = nullptr,
+        .magFilter = VkFilter(desc->magFilter),
+        .minFilter = VkFilter(desc->minFilter),
+        .mipmapMode = VkSamplerMipmapMode(desc->mipmapMode),
+        .addressModeU = addressMode,
+        .addressModeV = addressMode,
+        .addressModeW = addressMode,
+        .mipLodBias = desc->lodBias,
+        .anisotropyEnable = desc->enableAnisotropy,
+        .maxAnisotropy = desc->maxAnisotropy,
+        .minLod = desc->minLod,
+        .maxLod = desc->maxLod,
+    };
+    VkSampler sampler = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateSampler(device, &createInfo, nullptr, &sampler));
+    return sampler;
 }
 
 VkSwapchainKHR VulkanRenderingDevice::CreateSwapchainInternal(std::unique_ptr<VulkanSwapchain> &swapchain) {
@@ -471,24 +511,13 @@ void VulkanRenderingDevice::CreateSwapchain(bool vsync) {
     }
 }
 
-VkDescriptorPool VulkanRenderingDevice::CreateDescriptorPool() {
-    VkDescriptorPoolSize poolSizes[3] = {
-        {
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            32,
-        },
-        {
-            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            32,
-        },
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-         32},
-    };
+VkDescriptorPool VulkanRenderingDevice::CreateDescriptorPool(VkDescriptorPoolSize *poolSizes, uint32_t poolCount, VkDescriptorPoolCreateFlags flags) {
+
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .flags = flags, // VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 10,
-        .poolSizeCount = static_cast<uint32_t>(std::size(poolSizes)),
+        .poolSizeCount = poolCount,
         .pPoolSizes = poolSizes,
     };
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
@@ -607,8 +636,55 @@ void VulkanRenderingDevice::Initialize() {
     _fences.Initialize(16, "Fences");
     _commandBuffers.reserve(32);
 
-    _descriptorPool = CreateDescriptorPool();
+    // Global Descriptor Pool
+    VkDescriptorPoolSize poolSizes[] = {
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32},
+        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 32},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32},
+    };
+    _descriptorPool = CreateDescriptorPool(poolSizes, (uint32_t)std::size(poolSizes));
 
+    // Bindless Descriptor Pool
+    VkDescriptorPoolSize bindlessPoolSize[] = {
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_RESOURCES},
+    };
+    _bindlessDescriptorPool = CreateDescriptorPool(bindlessPoolSize, (uint32_t)std::size(bindlessPoolSize), VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
+
+    // Bindless Descriptor Layout
+    VkDescriptorSetLayoutBinding _bindlessSetLayouts[] = {
+        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_RESOURCES, VK_SHADER_STAGE_ALL, nullptr},
+    };
+
+    VkDescriptorSetLayoutCreateInfo bindlessLayoutInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    bindlessLayoutInfo.bindingCount = (uint32_t)std::size(_bindlessSetLayouts);
+    bindlessLayoutInfo.pBindings = _bindlessSetLayouts;
+    bindlessLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+
+    VkDescriptorBindingFlags bindlessLayoutFlag = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extended_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr};
+    extended_info.bindingCount = 1;
+    extended_info.pBindingFlags = &bindlessLayoutFlag;
+
+    bindlessLayoutInfo.pNext = &extended_info;
+
+    VK_CHECK(vkCreateDescriptorSetLayout(device, &bindlessLayoutInfo, nullptr, &_bindlessDescriptorSetLayout));
+
+    uint32_t maxBinding = MAX_BINDLESS_RESOURCES - 1;
+    VkDescriptorSetVariableDescriptorCountAllocateInfo countInfo{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .descriptorSetCount = 1,
+        .pDescriptorCounts = &maxBinding};
+
+    VkDescriptorSetAllocateInfo bindlessDescriptorSetAllocateInfo{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = &countInfo,
+        .descriptorPool = _bindlessDescriptorPool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &_bindlessDescriptorSetLayout};
+    VK_CHECK(vkAllocateDescriptorSets(device, &bindlessDescriptorSetAllocateInfo, &_bindlessDescriptorSet));
+
+    // Upload Resource Creation
     CommandPoolID commandPool = CreateCommandPool(QueueID{MAIN_QUEUE}, "Upload CommandPool");
     uploadCommandBuffer = CreateCommandBuffer(commandPool, "Upload Command Buffer");
     uploadFence = CreateFence("Upload Fence");
@@ -682,11 +758,12 @@ VkPipelineLayout VulkanRenderingDevice::CreatePipelineLayout(std::vector<VkDescr
     return pipelineLayout;
 }
 
-VkDescriptorSetLayout VulkanRenderingDevice::CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding> &bindings, uint32_t bindingCount) {
+VkDescriptorSetLayout VulkanRenderingDevice::CreateDescriptorSetLayout(VkDescriptorSetLayoutBinding *bindings, uint32_t bindingCount, VkDescriptorSetLayoutCreateFlags flags) {
     VkDescriptorSetLayoutCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .flags = flags,
         .bindingCount = bindingCount,
-        .pBindings = bindings.data(),
+        .pBindings = bindings,
     };
 
     VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
@@ -811,7 +888,7 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
     std::vector<VkDescriptorSetLayout> &setLayouts = pipeline->setLayout;
     setLayouts.reserve(setCount);
     for (auto &setBinding : setBindings)
-        setLayouts.push_back(CreateDescriptorSetLayout(setBinding, static_cast<uint32_t>(setBinding.size())));
+        setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
 
     VkPipelineLayout layout = CreatePipelineLayout(setLayouts, pushConstants);
     createInfo.layout = layout;
@@ -856,7 +933,7 @@ PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, c
     std::vector<VkDescriptorSetLayout> &setLayouts = pipeline->setLayout;
     setLayouts.reserve(setCount);
     for (auto &setBinding : setBindings)
-        setLayouts.push_back(CreateDescriptorSetLayout(setBinding, static_cast<uint32_t>(setBinding.size())));
+        setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
 
     VkPipelineLayout layout = CreatePipelineLayout(setLayouts, vkShader->pushConstants);
     VkComputePipelineCreateInfo createInfo = {
@@ -917,6 +994,12 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description, 
     texture->arrayLevels = description->arrayLayers;
     texture->imageType = VkImageType(description->textureType);
     texture->currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    // @TODO cache sampler
+    if (description->samplerDescription)
+        texture->sampler = CreateSampler(description->samplerDescription);
+    else
+        texture->sampler = VK_NULL_HANDLE;
 
     VkImageUsageFlags usage = 0;
     if ((description->usageFlags & TEXTURE_USAGE_TRANSFER_SRC_BIT))
@@ -1553,6 +1636,33 @@ void VulkanRenderingDevice::Present() {
     };
 
     VK_CHECK(vkQueuePresentKHR(_queues[0], &presentInfo));
+
+    uint32_t textureUpdateCount = static_cast<uint32_t>(bindlessTextureToUpdate.size());
+    if (textureUpdateCount > 0) {
+        std::vector<VkWriteDescriptorSet> writeSets(textureUpdateCount);
+        std::vector<VkDescriptorImageInfo> imageInfos(textureUpdateCount);
+
+        for (uint32_t i = 0; i < textureUpdateCount; ++i) {
+            VulkanTexture *texture = _textures.Access(bindlessTextureToUpdate[i].id);
+            VkWriteDescriptorSet &writeSet = writeSets[i];
+            writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writeSet.pNext = nullptr;
+            writeSet.dstSet = _bindlessDescriptorSet;
+            writeSet.dstBinding = BINDLESS_TEXTUERE_BINDING,
+            writeSet.dstArrayElement = (uint32_t)bindlessTextureToUpdate[i].id;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorCount = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+            VkDescriptorImageInfo &imageInfo = imageInfos[i];
+            imageInfo.sampler = texture->sampler;
+            imageInfo.imageLayout = texture->currentLayout;
+            imageInfo.imageView = texture->imageView;
+            writeSet.pImageInfo = &imageInfo;
+        }
+
+        vkUpdateDescriptorSets(device, textureUpdateCount, writeSets.data(), 0, nullptr);
+        bindlessTextureToUpdate.clear();
+    }
 }
 
 void VulkanRenderingDevice::Destroy(BufferID buffer) {
@@ -1591,6 +1701,7 @@ void VulkanRenderingDevice::Destroy(ShaderID shaderModule) {
 
 void VulkanRenderingDevice::Destroy(TextureID texture) {
     VulkanTexture *vkTexture = _textures.Access(texture.id);
+    vkDestroySampler(device, vkTexture->sampler, nullptr);
     vkDestroyImageView(device, vkTexture->imageView, nullptr);
     vmaDestroyImage(vmaAllocator, vkTexture->image, vkTexture->allocation);
     _textures.Release(texture.id);
@@ -1618,6 +1729,10 @@ void VulkanRenderingDevice::Shutdown() {
     _textures.Shutdown();
     _uniformSets.Shutdown();
     _buffers.Shutdown();
+
+    vkDestroyDescriptorSetLayout(device, _bindlessDescriptorSetLayout, nullptr);
+    // vkFreeDescriptorSets(device, _bindlessDescriptorPool, 1, &_bindlessDescriptorSet);
+    vkDestroyDescriptorPool(device, _bindlessDescriptorPool, nullptr);
 
     vkDestroyDescriptorPool(device, _descriptorPool, nullptr);
     vkDestroySemaphore(device, timelineSemaphore, nullptr);

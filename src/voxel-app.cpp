@@ -240,10 +240,11 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
+    asyncLoader->Shutdown();
+
     FenceID renderEndFence = device->GetRenderEndFence();
     device->WaitForFence(&renderEndFence, 1, UINT64_MAX);
     scene->Shutdown();
-    asyncLoader->Shutdown();
     device->Destroy(depthAttachment);
     device->Destroy(commandPool);
     device->Destroy(globalUB);
