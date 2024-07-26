@@ -86,13 +86,15 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     void BindIndexBuffer(CommandBufferID commandBuffer, BufferID buffer) override;
     void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
-    void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) override;
+    void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) override;
     void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) override;
     void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ = 1) override;
 
     void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) override;
 
     void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;
+    
+    // Single Threaded, can only be called from main thread after ownership transfer
     void UpdateBindlessTexture(TextureID texture) override {
         bindlessTextureToUpdate.push_back(texture);
     }
@@ -228,8 +230,8 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     static const uint32_t MAX_SET_COUNT = 4;
     static const uint32_t MAX_BINDLESS_RESOURCES = 16536;
-    static const uint32_t BINDLESS_TEXTUERE_BINDING = 10;
-    static const uint32_t BINDLESS_TEXTURE_SET = 1;
+    static const uint32_t BINDLESS_TEXTUERE_BINDING = 0;
+    static const uint32_t BINDLESS_TEXTURE_SET = 2;
 
     std::vector<TextureID> bindlessTextureToUpdate;
 

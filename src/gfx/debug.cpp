@@ -40,7 +40,7 @@ namespace Debug {
                                                        colorAttachmentFormats,
                                                        &bs,
                                                        1,
-                                                       RD::FORMAT_D32_SFLOAT,
+                                                       RD::FORMAT_D24_UNORM_S8_UINT,
                                                        "Debug Draw Pipeline");
 
         RD::BoundUniform boundUniform = {RD::BINDING_TYPE_STORAGE_BUFFER, 0, gLineBuffer};
@@ -148,8 +148,7 @@ namespace Debug {
 
         RenderingDevice *device = RD::GetInstance();
         device->BindPipeline(commandBuffer, gLinePipeline);
-        device->BindUniformSet(commandBuffer, gLinePipeline, gUniformSet);
-        device->BindUniformSet(commandBuffer, gLinePipeline, gUniformSet);
+        device->BindUniformSet(commandBuffer, gLinePipeline, &gUniformSet, 1);
         device->Draw(commandBuffer, numLines * 2, 1, 0, 0);
     }
 

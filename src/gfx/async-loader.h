@@ -10,6 +10,8 @@ struct TextureLoadRequest {
     TextureID textureId;
 };
 
+struct RenderScene;
+
 struct BufferUploadRequest {
     void *data;
     BufferID bufferId;
@@ -18,7 +20,7 @@ struct BufferUploadRequest {
 
 class AsyncLoader {
   public:
-    void Initialize();
+    void Initialize(std::shared_ptr<RenderScene> scene);
 
     void Start();
 
@@ -40,4 +42,6 @@ class AsyncLoader {
     RD::SubmitQueueInfo submitQueueInfo;
     RD *device;
     void ProcessQueue(RD *device);
+
+    std::shared_ptr<RenderScene> scene;
 };

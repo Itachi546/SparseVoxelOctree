@@ -5,6 +5,8 @@
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #include <vma/vk_mem_alloc.h>
 
+#define USE_INTEGRATED_GPU 0
+
 constexpr const uint64_t MAIN_QUEUE = 0;
 constexpr const uint64_t TRANSFER_QUEUE = 1;
 constexpr const uint64_t COMPUTE_QUEUE = 2;
@@ -88,7 +90,7 @@ void VulkanRenderingDevice::FindValidationLayers(std::vector<const char *> &enab
     std::vector<VkLayerProperties> availableLayers(instanceLayerCount);
     VK_CHECK(vkEnumerateInstanceLayerProperties(&instanceLayerCount, availableLayers.data()));
 
-    std::vector<const char *> requestedLayers{"VK_LAYER_KHRONOS_validation"};
+    std::vector<const char *> requestedLayers{"VK_LAYER_KHRONOS_validation", "VK_LAYER_KHRONOS_synchronization2"};
     for (auto &requested : requestedLayers) {
         bool available = false;
         for (auto &layer : availableLayers) {
@@ -239,6 +241,9 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
             .queueCount = 1,
             .pQueuePriorities = queuePriorities,
         });
+    } else {
+        ASSERT(0, "Transfer Queue is not supported");
+        exit(0);
     }
 
     uint32_t computeQueueIndex = _queueFamilyIndices[COMPUTE_QUEUE];
@@ -281,6 +286,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     deviceFeatures12.descriptorBindingSampledImageUpdateAfterBind = true;
     deviceFeatures12.descriptorBindingVariableDescriptorCount = true;
     deviceFeatures12.runtimeDescriptorArray = true;
+    deviceFeatures12.shaderSampledImageArrayNonUniformIndexing = true;
 
     deviceFeatures13.dynamicRendering = true;
     deviceFeatures13.synchronization2 = true;
@@ -320,9 +326,16 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     _queues[TRANSFER_QUEUE] = _queues[COMPUTE_QUEUE] = VK_NULL_HANDLE;
     if (transferQueueIndex < queueCount)
         vkGetDeviceQueue(device, transferQueueIndex, 0, &_queues[TRANSFER_QUEUE]);
+    else {
+        _queueFamilyIndices[TRANSFER_QUEUE] = mainQueueIndex;
+        _queues[TRANSFER_QUEUE] = _queues[MAIN_QUEUE];
+    }
     if (computeQueueIndex < queueCount)
         vkGetDeviceQueue(device, computeQueueIndex, 0, &_queues[COMPUTE_QUEUE]);
-
+    else {
+        _queueFamilyIndices[COMPUTE_QUEUE] = mainQueueIndex;
+        _queues[COMPUTE_QUEUE] = _queues[MAIN_QUEUE];
+    }
     return device;
 }
 
@@ -512,11 +525,15 @@ void VulkanRenderingDevice::CreateSwapchain(bool vsync) {
 }
 
 VkDescriptorPool VulkanRenderingDevice::CreateDescriptorPool(VkDescriptorPoolSize *poolSizes, uint32_t poolCount, VkDescriptorPoolCreateFlags flags) {
-
+    uint32_t maxSets = 0;
+    for (uint32_t i = 0; i < poolCount; ++i) {
+        maxSets += poolSizes[i].descriptorCount;
+    }
+    maxSets *= poolCount;
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = flags, // VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 10,
+        .maxSets = maxSets,
         .poolSizeCount = poolCount,
         .pPoolSizes = poolSizes,
     };
@@ -583,7 +600,7 @@ void VulkanRenderingDevice::Initialize() {
     VkDebugUtilsMessengerCreateInfoEXT debugUtilsCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
     if (enableValidation) {
         if (enableValidation) {
-            debugUtilsCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+            debugUtilsCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
             debugUtilsCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
             debugUtilsCreateInfo.pfnUserCallback = DebugUtilsMessengerCallback;
         }
@@ -599,8 +616,14 @@ void VulkanRenderingDevice::Initialize() {
 
     InitializeDevices();
 
+#if USE_INTEGRATED_GPU
+    DeviceType deviceType = DeviceType::DEVICE_TYPE_INTEGRATED_GPU;
+#else
+    DeviceType deviceType = DeviceType::DEVICE_TYPE_DISCRETE_GPU;
+#endif
+
     for (uint32_t deviceIndex = 0; deviceIndex < gpus.size(); ++deviceIndex) {
-        if (gpus[deviceIndex].deviceType == DeviceType::DEVICE_TYPE_DISCRETE_GPU) {
+        if (gpus[deviceIndex].deviceType == deviceType) {
             InitializeDevice(deviceIndex);
             break;
         }
@@ -656,16 +679,16 @@ void VulkanRenderingDevice::Initialize() {
     };
 
     VkDescriptorSetLayoutCreateInfo bindlessLayoutInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    bindlessLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
     bindlessLayoutInfo.bindingCount = (uint32_t)std::size(_bindlessSetLayouts);
     bindlessLayoutInfo.pBindings = _bindlessSetLayouts;
-    bindlessLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
 
     VkDescriptorBindingFlags bindlessLayoutFlag = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extended_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr};
-    extended_info.bindingCount = 1;
-    extended_info.pBindingFlags = &bindlessLayoutFlag;
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extendedInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr};
+    extendedInfo.bindingCount = 1;
+    extendedInfo.pBindingFlags = &bindlessLayoutFlag;
 
-    bindlessLayoutInfo.pNext = &extended_info;
+    bindlessLayoutInfo.pNext = &extendedInfo;
 
     VK_CHECK(vkCreateDescriptorSetLayout(device, &bindlessLayoutInfo, nullptr, &_bindlessDescriptorSetLayout));
 
@@ -873,12 +896,13 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
 
     VkFormat depthFormat = RD_FORMAT_TO_VK_FORMAT[depthAttachmentFormat];
 
+    VkFormat stencilFormat = depthFormat == VK_FORMAT_D24_UNORM_S8_UINT ? depthFormat : VK_FORMAT_UNDEFINED;
     VkPipelineRenderingCreateInfo renderingCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = colorAttachmentCount,
         .pColorAttachmentFormats = colorFormats.data(),
         .depthAttachmentFormat = depthFormat,
-        .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+        .stencilAttachmentFormat = stencilFormat,
     };
     createInfo.pNext = &renderingCreateInfo;
 
@@ -887,10 +911,16 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
 
     std::vector<VkDescriptorSetLayout> &setLayouts = pipeline->setLayout;
     setLayouts.reserve(setCount);
-    for (auto &setBinding : setBindings)
-        setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
-
+    for (auto &setBinding : setBindings) {
+        if (setBinding.size() > 0)
+            setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
+    }
+    // Temporarily push back the bindlessSetLayout to create pipeline layout
+    setLayouts.push_back(_bindlessDescriptorSetLayout);
     VkPipelineLayout layout = CreatePipelineLayout(setLayouts, pushConstants);
+    // Remove bindlessDescriptorSetLayout as it is already destroyed
+    setLayouts.pop_back();
+
     createInfo.layout = layout;
 
     VK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
@@ -932,8 +962,10 @@ PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, c
 
     std::vector<VkDescriptorSetLayout> &setLayouts = pipeline->setLayout;
     setLayouts.reserve(setCount);
-    for (auto &setBinding : setBindings)
-        setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
+    for (auto &setBinding : setBindings) {
+        if (setBinding.size() > 0)
+            setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
+    }
 
     VkPipelineLayout layout = CreatePipelineLayout(setLayouts, vkShader->pushConstants);
     VkComputePipelineCreateInfo createInfo = {
@@ -1017,8 +1049,15 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description, 
     if ((description->usageFlags & TEXTURE_USAGE_STORAGE_BIT))
         usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 
+    VkImageAspectFlags imageAspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    if (description->usageFlags & TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT) {
+        imageAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        if (description->usageFlags & TEXTURE_USAGE_STENCIL_ATTACHMENT_BIT)
+            imageAspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
     texture->format = RD_FORMAT_TO_VK_FORMAT[description->format];
-    texture->imageAspect = (description->usageFlags & TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    texture->imageAspect = imageAspect;
 
     VkImageCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -1294,8 +1333,9 @@ void VulkanRenderingDevice::BeginRenderPass(CommandBufferID commandBuffer, Rende
     if (renderInfo->pDepthStencilAttachment != nullptr) {
         AttachmentInfo *attachment = renderInfo->pDepthStencilAttachment;
         VulkanTexture *texture = _textures.Access(attachment->attachment.id);
+        ASSERT(texture->currentLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL || texture->currentLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, "Invalid image layout for depth image");
         depthAttachment.imageView = texture->imageView;
-        depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        depthAttachment.imageLayout = texture->currentLayout;
         depthAttachment.loadOp = VkAttachmentLoadOp(attachment->loadOp);
         depthAttachment.storeOp = VkAttachmentStoreOp(attachment->storeOp);
         depthAttachment.clearValue.depthStencil = {attachment->clearDepth, attachment->clearStencil};
@@ -1339,15 +1379,15 @@ void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, Text
 
     switch (dstLayout) {
     case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-        srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         srcAccessFlag = 0;
         dstAccessFlag = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        srcLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         break;
     case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
         srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        srcLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         srcAccessFlag = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         dstAccessFlag = 0;
         break;
@@ -1356,6 +1396,7 @@ void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, Text
         return;
     }
 
+    VkCommandBuffer vkCommandBuffer = _commandBuffers[commandBuffer.id];
     VkImageMemoryBarrier presentBarrier = CreateImageBarrier(swapchain->images[currentImageIndex],
                                                              VK_IMAGE_ASPECT_COLOR_BIT,
                                                              srcAccessFlag,
@@ -1363,7 +1404,6 @@ void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, Text
                                                              srcLayout,
                                                              dstLayout, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED);
 
-    VkCommandBuffer vkCommandBuffer = _commandBuffers[commandBuffer.id];
     vkCmdPipelineBarrier(vkCommandBuffer,
                          srcStage,
                          dstStage,
@@ -1429,7 +1469,10 @@ void VulkanRenderingDevice::BindIndexBuffer(CommandBufferID commandBuffer, Buffe
 
 void VulkanRenderingDevice::BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) {
     VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
-    vkCmdBindPipeline(_commandBuffers[commandBuffer.id], vkPipeline->bindPoint, vkPipeline->pipeline);
+
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+    vkCmdBindPipeline(cb, vkPipeline->bindPoint, vkPipeline->pipeline);
+    vkCmdBindDescriptorSets(cb, vkPipeline->bindPoint, vkPipeline->layout, BINDLESS_TEXTURE_SET, 1, &_bindlessDescriptorSet, 0, nullptr);
 }
 
 void VulkanRenderingDevice::BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) {
@@ -1438,10 +1481,13 @@ void VulkanRenderingDevice::BindPushConstants(CommandBufferID commandBuffer, Pip
     vkCmdPushConstants(cb, vkPipeline->layout, RD_STAGE_TO_VK_SHADER_STAGE_BITS[shaderStage], offset, size, data);
 }
 
-void VulkanRenderingDevice::BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) {
+void VulkanRenderingDevice::BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSets, uint32_t uniformSetCount) {
     VulkanPipeline *vkPipeline = _pipeline.Access(pipeline.id);
-    VulkanUniformSet *vkUniformSet = _uniformSets.Access(uniformSet.id);
-    vkCmdBindDescriptorSets(_commandBuffers[commandBuffer.id], vkPipeline->bindPoint, vkPipeline->layout, vkUniformSet->set, 1, &vkUniformSet->descriptorSet, 0, nullptr);
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+    for (uint32_t i = 0; i < uniformSetCount; ++i) {
+        VulkanUniformSet *vkUniformSet = _uniformSets.Access(uniformSets[i].id);
+        vkCmdBindDescriptorSets(cb, vkPipeline->bindPoint, vkPipeline->layout, vkUniformSet->set, 1, &vkUniformSet->descriptorSet, 0, nullptr);
+    }
 }
 
 void VulkanRenderingDevice::DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) {
@@ -1651,7 +1697,7 @@ void VulkanRenderingDevice::Present() {
             writeSet.dstBinding = BINDLESS_TEXTUERE_BINDING,
             writeSet.dstArrayElement = (uint32_t)bindlessTextureToUpdate[i].id;
             writeSet.descriptorCount = 1;
-            writeSet.descriptorCount = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
             VkDescriptorImageInfo &imageInfo = imageInfos[i];
             imageInfo.sampler = texture->sampler;

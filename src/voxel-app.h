@@ -34,6 +34,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
     void OnResize(float width, float height);
 
     void UpdateControls();
+    TextureID CreateSwapchainDepthAttachment();
 
     using Clock = std::chrono::high_resolution_clock;
 

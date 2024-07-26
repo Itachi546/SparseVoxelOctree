@@ -253,8 +253,9 @@ class RenderingDevice : public Resource {
         TEXTURE_USAGE_SAMPLED_BIT = (1 << 2),
         TEXTURE_USAGE_COLOR_ATTACHMENT_BIT = (1 << 3),
         TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT = (1 << 4),
-        TEXTURE_USAGE_INPUT_ATTACHMENT_BIT = (1 << 5),
-        TEXTURE_USAGE_STORAGE_BIT = (1 << 6),
+        TEXTURE_USAGE_STENCIL_ATTACHMENT_BIT = (1 << 5),
+        TEXTURE_USAGE_INPUT_ATTACHMENT_BIT = (1 << 6),
+        TEXTURE_USAGE_STORAGE_BIT = (1 << 7),
     };
 
     enum BufferUsageBits {
@@ -383,7 +384,7 @@ class RenderingDevice : public Resource {
             return SamplerDescription{
                 .minFilter = FILTER_LINEAR,
                 .magFilter = FILTER_LINEAR,
-                .addressMode = ADDRESS_MODE_CLAMP_TO_EDGE,
+                .addressMode = ADDRESS_MODE_REPEAT,
                 .mipmapMode = MIPMAP_MODE_LINEAR,
                 .lodBias = 0,
                 .maxAnisotropy = 16,
@@ -482,7 +483,8 @@ class RenderingDevice : public Resource {
 
     virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
     virtual void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) = 0;
-    virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID uniformSet) = 0;
+
+    virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID* uniformSet, uint32_t uniformSetCount) = 0;
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
     virtual void Submit(CommandBufferID commandBuffer) = 0;
 

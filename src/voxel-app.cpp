@@ -31,6 +31,13 @@ MessageCallback(GLenum source,
     assert(0);
 }
 
+TextureID VoxelApp::CreateSwapchainDepthAttachment() {
+    RD::TextureDescription desc = RD::TextureDescription::Initialize((uint32_t)windowSize.x, (uint32_t)windowSize.y);
+    desc.usageFlags = RD::TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT | RD::TEXTURE_USAGE_STENCIL_ATTACHMENT_BIT;
+    desc.format = RD::FORMAT_D24_UNORM_S8_UINT;
+    return device->CreateTexture(&desc, "Swapchain Depth Attachment");
+}
+
 VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}) {
     Debug::Initialize();
 
@@ -46,10 +53,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     globalUB = device->CreateBuffer(sizeof(FrameData), RD::BUFFER_USAGE_UNIFORM_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "GlobalUniformBuffer");
     globalUBPtr = device->MapBuffer(globalUB);
 
-    RD::TextureDescription desc = RD::TextureDescription::Initialize((uint32_t)windowSize.x, (uint32_t)windowSize.y);
-    desc.usageFlags = RD::TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT;
-    desc.format = RD::FORMAT_D24_UNORM_S8_UINT;
-    depthAttachment = device->CreateTexture(&desc, "Swapchain Depth Attachment");
+    depthAttachment = CreateSwapchainDepthAttachment();
 
     camera = new gfx::Camera();
     camera->SetPosition(glm::vec3{0.5f, 2.0f, 0.5f});
@@ -63,13 +67,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     target = glm::vec3(0.0f);
 
     auto begin = std::chrono::high_resolution_clock::now();
+    
     asyncLoader = std::make_shared<AsyncLoader>();
+    scene = std::make_shared<GLTFScene>();
 
-    asyncLoader->Initialize();
+    asyncLoader->Initialize(scene);
     asyncLoader->Start();
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
-    scene = std::make_shared<GLTFScene>();
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
     if (!scene->Initialize({meshPath}, asyncLoader, globalUB)) {
         LOGE("Failed to initialize scene");
@@ -93,6 +98,8 @@ void VoxelApp::Run() {
             device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             OnRender();
             device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_PRESENT_SRC);
+
+            std::static_pointer_cast<GLTFScene>(scene)->UpdateTextures(commandBuffer);
             // Draw UI
             device->EndCommandBuffer(commandBuffer);
             device->Submit(commandBuffer);
@@ -114,7 +121,7 @@ void VoxelApp::Run() {
 
 void VoxelApp::OnUpdate() {
 
-    ImGuiService::NewFrame();
+    //ImGuiService::NewFrame();
     if (!ImGuiService::IsFocused())
         UpdateControls();
 
@@ -170,12 +177,22 @@ void VoxelApp::OnRender() {
 
     device->SetViewport(commandBuffer, 0.0f, windowSize.y, windowSize.x, -windowSize.y);
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
-
+    
+    RD::TextureBarrier barrier{
+        .texture = depthAttachment,
+        .srcAccess = 0,
+        .dstAccess = RD::BARRIER_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        .newLayout = RD::TEXTURE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        .srcQueueFamily = QUEUE_FAMILY_IGNORED,
+        .dstQueueFamily = QUEUE_FAMILY_IGNORED,
+    };
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
+    
     device->BeginRenderPass(commandBuffer, &renderingInfo);
 
     scene->Render(commandBuffer);
 
-    OnRenderUI();
+    //OnRenderUI();
 
     device->EndRenderPass(commandBuffer);
 }
@@ -204,10 +221,7 @@ void VoxelApp::OnResize(float width, float height) {
         windowSize.y = height;
 
         device->Destroy(depthAttachment);
-        RD::TextureDescription desc = RD::TextureDescription::Initialize((uint32_t)windowSize.x, (uint32_t)windowSize.y);
-        desc.usageFlags = RD::TEXTURE_USAGE_DEPTH_ATTACHMENT_BIT;
-        desc.format = RD::FORMAT_D24_UNORM_S8_UINT;
-        depthAttachment = device->CreateTexture(&desc, "Swapchain Depth Attachment");
+        depthAttachment = CreateSwapchainDepthAttachment();
     }
 }
 

@@ -3,13 +3,15 @@
 
 #include "gltf-loader.h"
 #include "stb_image.h"
+#include "render-scene.h"
 
 #include <thread>
 using namespace std::chrono_literals;
 
-void AsyncLoader::Initialize() {
+void AsyncLoader::Initialize(std::shared_ptr<RenderScene> scene) {
     device = RD::GetInstance();
     execute = true;
+    this->scene = scene;
 
     submitQueueInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_TRANSFER);
     mainQueue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
@@ -58,7 +60,7 @@ void AsyncLoader::ProcessQueue(RD *device) {
 
         RD::TextureBarrier transferBarrier[] = {
             RD::TextureBarrier{request.textureId, 0, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED},
-            RD::TextureBarrier{request.textureId, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, 0, RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED},
+            RD::TextureBarrier{request.textureId, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, 0, RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, submitQueueInfo.queue, mainQueue},
         };
 
         device->ImmediateSubmit([&](CommandBufferID cb) {
@@ -69,6 +71,8 @@ void AsyncLoader::ProcessQueue(RD *device) {
             device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, &transferBarrier[1], 1);
         },
                                 &submitQueueInfo);
+
+        device->UpdateBindlessTexture(request.textureId);
         stbi_image_free(data);
     } else {
         std::this_thread::sleep_for(200ms);

@@ -19,6 +19,15 @@ class GLTFScene : public RenderScene {
     bool Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader, BufferID globalUB) override;
     void PrepareDraws() override;
     void Render(CommandBufferID commandBuffer) override;
+
+    void AddTexturesToUpdate(TextureID texture) {
+        std::lock_guard lock{textureUpdateMutex};
+        texturesToUpdate.push_back(texture);
+    }
+
+    // @TODO TEMP Fix this later
+    void UpdateTextures(CommandBufferID commandBuffer);
+
     void Shutdown() override;
 
     BufferID vertexBuffer;
@@ -46,4 +55,7 @@ class GLTFScene : public RenderScene {
     // @TODO shared among different scene
     PipelineID renderPipeline;
     UniformSetID globalSet, meshBindingSet;
+
+    std::mutex textureUpdateMutex;
+    std::vector<TextureID> texturesToUpdate;
 };

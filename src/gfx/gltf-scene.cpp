@@ -47,16 +47,17 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
         return TextureCache::LoadTexture(name, image.width, image.height, image.image.data(), image.component, true);
         };
     */
-    auto loadTexture = [&](uint32_t index) {
+    auto loadTexture = [&](uint32_t index) -> uint32_t {
         tinygltf::Texture &texture = model->textures[index];
         tinygltf::Image &image = model->images[texture.source];
         if (image.uri.length() > 0) {
             // @TODO implement better mechanism
             std::string texturePath = _meshBasePath + image.uri;
             uint32_t hash = DJB2Hash(texturePath);
+            LOG("Path: " + texturePath + " Hash: " + std::to_string(hash));
             auto found = textureMap.find(hash);
             if (found != textureMap.end()) {
-                return found->second;
+                return (uint32_t)found->second.id;
             } else {
                 int width, height, comp;
                 int res = stbi_info(texturePath.c_str(), &width, &height, &comp);
@@ -66,7 +67,7 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                 desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
                 if (res == 0) {
                     LOGE("Failed to get texture info from the file" + texturePath);
-                    return TextureID{~0u};
+                    return ~0u;
                 }
                 desc.format = RD::FORMAT_R8G8B8A8_UNORM;
                 desc.mipMaps = 1;
@@ -75,10 +76,10 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                 TextureID textureId = device->CreateTexture(&desc, image.uri);
                 textureMap[hash] = textureId;
                 asyncLoader->RequestTextureLoad(texturePath, textureId);
-                return textureId;
+                return (uint32_t)textureId.id;
             }
         }
-        return TextureID{~0u};
+        return ~0u;
     };
 
     if (pbr.baseColorTexture.index >= 0)
@@ -352,10 +353,31 @@ void GLTFScene::PrepareDraws() {
 
 void GLTFScene::Render(CommandBufferID commandBuffer) {
     device->BindPipeline(commandBuffer, renderPipeline);
-    device->BindUniformSet(commandBuffer, renderPipeline, globalSet);
-    device->BindUniformSet(commandBuffer, renderPipeline, meshBindingSet);
+
+    UniformSetID uniformSets[] = {globalSet, meshBindingSet};
+    device->BindUniformSet(commandBuffer, renderPipeline, uniformSets, (uint32_t)std::size(uniformSets));
     device->BindIndexBuffer(commandBuffer, indexBuffer);
     device->DrawIndexedIndirect(commandBuffer, drawCommandBuffer, 0, (uint32_t)meshGroup.drawCommands.size(), sizeof(RD::DrawElementsIndirectCommand));
+}
+
+void GLTFScene::UpdateTextures(CommandBufferID commandBuffer) {
+    // Transfer Queue Ownership
+    QueueID transferQueue = device->GetDeviceQueue(RD::QUEUE_TYPE_TRANSFER);
+    QueueID mainQueue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
+
+    std::lock_guard lock{textureUpdateMutex};
+    uint32_t textureUpdateCount = static_cast<uint32_t>(texturesToUpdate.size());
+    std::vector<RD::TextureBarrier> barriers(textureUpdateCount);
+    for (uint32_t i = 0; i < textureUpdateCount; ++i) {
+        barriers[i].texture = texturesToUpdate[i];
+        barriers[i].srcAccess = 0, 
+        barriers[i].dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
+        barriers[i].newLayout = RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[i].srcQueueFamily = transferQueue;
+        barriers[i].dstQueueFamily = mainQueue;
+        device->UpdateBindlessTexture(texturesToUpdate[i]);
+    }
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, barriers.data(), textureUpdateCount);
 }
 
 void GLTFScene::Shutdown() {

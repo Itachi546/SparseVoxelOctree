@@ -76,8 +76,9 @@ void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalS
     auto *device = RD::GetInstance();
     device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier, 2);
     device->BindPipeline(commandBuffer, pipeline);
-    device->BindUniformSet(commandBuffer, pipeline, globalSet);
-    device->BindUniformSet(commandBuffer, pipeline, resourceSet);
+
+    UniformSetID uniformSets[] = {globalSet, resourceSet};
+    device->BindUniformSet(commandBuffer, pipeline, uniformSets, 2);
     device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_COMPUTE, &dims, 0, sizeof(float) * 8);
     device->DispatchCompute(commandBuffer, (width / 8) + 1, (height / 8) + 1, 1);
     spp += 1.0f;

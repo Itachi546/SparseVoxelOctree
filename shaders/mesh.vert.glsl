@@ -42,7 +42,7 @@ void main() {
 
     vec3 position = vec3(vertex.px, vertex.py, vertex.pz);
     
-    vUV = vec2(vertex.tu, vertex.tv);
+    vUV = vec2(vertex.tu, 1.0f - vertex.tv);
     vNormal = vec3(vertex.nx, vertex.ny, vertex.nz);
     drawId = drawCommand.drawId;
     

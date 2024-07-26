@@ -1,4 +1,5 @@
 #version 460
+#extension GL_EXT_nonuniform_qualifier : enable
 
 layout(location = 0) out vec4 fragColor;
 
@@ -25,7 +26,24 @@ layout(binding = 3, set = 1) readonly buffer Materials {
     Material materials[];
 };
 
+#define INVALID_TEXTURE ~0u
+
+
+layout(binding = 0, set = 2) uniform sampler2D uTextures[];
+
+vec4 sampleTexture(uint textureId, vec2 uv) {
+    return texture(uTextures[nonuniformEXT(textureId)], uv);
+}
+
+
 void main() {
     vec3 n = normalize(vNormal);
-    fragColor = vec4(n, 1.0f);
+    Material material = materials[drawId];
+
+    vec3 diffuseColor;
+    if(material.albedoMap != INVALID_TEXTURE)
+        diffuseColor = sampleTexture(material.albedoMap, vUV).rgb;
+    else 
+        diffuseColor = vec3(1.0f);
+    fragColor = vec4(diffuseColor, 1.0f);
 }
