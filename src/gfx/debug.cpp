@@ -9,7 +9,7 @@ namespace Debug {
     PipelineID gLinePipeline;
     static uint32_t gLineBufferOffset = 0;
     static Line *gLineBufferPtr = nullptr;
-    static const int MAX_LINE_COUNT = 100'00'000;
+    static const int MAX_LINE_COUNT = 10'000;
     UniformSetID gUniformSet;
 
     void Initialize() {

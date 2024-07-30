@@ -84,15 +84,16 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
 
     if (pbr.baseColorTexture.index >= 0)
         component->albedoMap = loadTexture(pbr.baseColorTexture.index);
-
+    /*
     if (pbr.metallicRoughnessTexture.index >= 0)
         component->metallicRoughnessMap = loadTexture(pbr.metallicRoughnessTexture.index);
 
     if (material.emissiveTexture.index >= 0)
         component->emissiveMap = loadTexture(material.emissiveTexture.index);
+        */
 }
 
-bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, const glm::mat3 &transform) {
+bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, const glm::mat4 &transform) {
     for (auto &primitive : mesh.primitives) {
         // Parse position
         const tinygltf::Accessor &positionAccessor = model->accessors[primitive.attributes["POSITION"]];
@@ -352,12 +353,14 @@ void GLTFScene::PrepareDraws() {
 }
 
 void GLTFScene::Render(CommandBufferID commandBuffer) {
-    device->BindPipeline(commandBuffer, renderPipeline);
+    if (drawCommandBuffer && meshGroup.drawCommands.size() > 0) {
+        device->BindPipeline(commandBuffer, renderPipeline);
 
-    UniformSetID uniformSets[] = {globalSet, meshBindingSet};
-    device->BindUniformSet(commandBuffer, renderPipeline, uniformSets, (uint32_t)std::size(uniformSets));
-    device->BindIndexBuffer(commandBuffer, indexBuffer);
-    device->DrawIndexedIndirect(commandBuffer, drawCommandBuffer, 0, (uint32_t)meshGroup.drawCommands.size(), sizeof(RD::DrawElementsIndirectCommand));
+        UniformSetID uniformSets[] = {globalSet, meshBindingSet};
+        device->BindUniformSet(commandBuffer, renderPipeline, uniformSets, (uint32_t)std::size(uniformSets));
+        device->BindIndexBuffer(commandBuffer, indexBuffer);
+        device->DrawIndexedIndirect(commandBuffer, drawCommandBuffer, 0, (uint32_t)meshGroup.drawCommands.size(), sizeof(RD::DrawElementsIndirectCommand));
+    }
 }
 
 void GLTFScene::UpdateTextures(CommandBufferID commandBuffer) {
@@ -370,7 +373,7 @@ void GLTFScene::UpdateTextures(CommandBufferID commandBuffer) {
     std::vector<RD::TextureBarrier> barriers(textureUpdateCount);
     for (uint32_t i = 0; i < textureUpdateCount; ++i) {
         barriers[i].texture = texturesToUpdate[i];
-        barriers[i].srcAccess = 0, 
+        barriers[i].srcAccess = 0,
         barriers[i].dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
         barriers[i].newLayout = RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barriers[i].srcQueueFamily = transferQueue;
@@ -384,10 +387,12 @@ void GLTFScene::Shutdown() {
     device->Destroy(globalSet);
     device->Destroy(meshBindingSet);
     device->Destroy(renderPipeline);
-    device->Destroy(vertexBuffer);
-    device->Destroy(indexBuffer);
-    device->Destroy(transformBuffer);
-    device->Destroy(drawCommandBuffer);
+    if (meshGroup.drawCommands.size() > 0) {
+        device->Destroy(vertexBuffer);
+        device->Destroy(indexBuffer);
+        device->Destroy(transformBuffer);
+        device->Destroy(drawCommandBuffer);
+    }
     device->Destroy(materialBuffer);
     for (auto &[key, val] : textureMap)
         device->Destroy(val);

@@ -67,19 +67,19 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     target = glm::vec3(0.0f);
 
     auto begin = std::chrono::high_resolution_clock::now();
-    
+
     asyncLoader = std::make_shared<AsyncLoader>();
     scene = std::make_shared<GLTFScene>();
 
     asyncLoader->Initialize(scene);
     asyncLoader->Start();
 
-    // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
-    const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (!scene->Initialize({meshPath}, asyncLoader, globalUB)) {
+    const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
+    // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
+    if (scene->Initialize({meshPath}, asyncLoader, globalUB)) {
+        scene->PrepareDraws();
+    } else
         LOGE("Failed to initialize scene");
-    }
-    scene->PrepareDraws();
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
@@ -121,7 +121,7 @@ void VoxelApp::Run() {
 
 void VoxelApp::OnUpdate() {
 
-    //ImGuiService::NewFrame();
+    ImGuiService::NewFrame();
     if (!ImGuiService::IsFocused())
         UpdateControls();
 
@@ -145,6 +145,9 @@ void VoxelApp::OnUpdate() {
 void VoxelApp::OnRenderUI() {
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
+
+    float memoryUsage = (float)device->GetMemoryUsage() / (1024.0f * 1024.0f);
+    ImGui::Text("GPU Memory Usage: %.2fMB", memoryUsage);
     ImGuiService::Render(commandBuffer);
 }
 
@@ -177,7 +180,7 @@ void VoxelApp::OnRender() {
 
     device->SetViewport(commandBuffer, 0.0f, windowSize.y, windowSize.x, -windowSize.y);
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
-    
+
     RD::TextureBarrier barrier{
         .texture = depthAttachment,
         .srcAccess = 0,
@@ -187,12 +190,12 @@ void VoxelApp::OnRender() {
         .dstQueueFamily = QUEUE_FAMILY_IGNORED,
     };
     device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
-    
+
     device->BeginRenderPass(commandBuffer, &renderingInfo);
 
     scene->Render(commandBuffer);
 
-    //OnRenderUI();
+    OnRenderUI();
 
     device->EndRenderPass(commandBuffer);
 }

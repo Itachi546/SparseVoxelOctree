@@ -447,6 +447,8 @@ class RenderingDevice : public Resource {
 
     virtual void SetValidationMode(bool state) = 0;
 
+    virtual uint64_t GetMemoryUsage() = 0;
+
     virtual QueueID GetDeviceQueue(QueueType queueType) = 0;
     virtual FenceID GetRenderEndFence() = 0;
 

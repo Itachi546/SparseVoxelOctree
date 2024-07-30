@@ -1077,10 +1077,12 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description, 
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     allocationCreateInfo.flags = 0;
 
+
     // Create Image
     VmaAllocationInfo allocationInfo = {};
     VK_CHECK(vmaCreateImage(vmaAllocator, &createInfo, &allocationCreateInfo, &texture->image, &texture->allocation, &allocationInfo));
     SetDebugMarkerObjectName(VK_OBJECT_TYPE_IMAGE, (uint64_t)texture->image, name.c_str());
+    memoryUsage += texture->allocation->GetSize();
 
     VkImageViewCreateInfo imageViewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1141,6 +1143,8 @@ BufferID VulkanRenderingDevice::CreateBuffer(uint32_t size, uint32_t usageFlags,
     buffer->buffer = vkBuffer;
     buffer->allocation = allocation;
     buffer->size = size;
+
+    memoryUsage += allocation->GetSize();
     return BufferID(bufferID);
 }
 

@@ -57,6 +57,10 @@ class VulkanRenderingDevice : public RenderingDevice {
     void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) override;
     void CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region);
 
+    uint64_t GetMemoryUsage() override {
+        return memoryUsage;
+    }
+
     void BeginFrame() override;
     void BeginCommandBuffer(CommandBufferID commandBuffer) override;
     void EndCommandBuffer(CommandBufferID commandBuffer) override;
@@ -93,7 +97,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) override;
 
     void CopyToSwapchain(CommandBufferID commandBuffer, TextureID texture) override;
-    
+
     // Single Threaded, can only be called from main thread after ownership transfer
     void UpdateBindlessTexture(TextureID texture) override {
         bindlessTextureToUpdate.push_back(texture);
@@ -232,6 +236,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     static const uint32_t MAX_BINDLESS_RESOURCES = 16536;
     static const uint32_t BINDLESS_TEXTUERE_BINDING = 0;
     static const uint32_t BINDLESS_TEXTURE_SET = 2;
+
+    uint64_t memoryUsage = 0;
 
     std::vector<TextureID> bindlessTextureToUpdate;
 
