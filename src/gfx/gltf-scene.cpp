@@ -129,8 +129,8 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
 
         std::vector<Vertex> &vertices = meshGroup->vertices;
         std::vector<uint32_t> &indices = meshGroup->indices;
-        uint32_t vertexOffset = (uint32_t)(vertices.size() * sizeof(Vertex));
-        uint32_t indexOffset = (uint32_t)(indices.size() * sizeof(uint32_t));
+        uint32_t vertexOffset = (uint32_t)vertices.size();
+        uint32_t indexOffset = (uint32_t)indices.size();
 
         for (uint32_t i = 0; i < numPosition; ++i) {
             Vertex vertex;
@@ -169,8 +169,8 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
         RD::DrawElementsIndirectCommand drawCommand = {};
         drawCommand.count = indexCount;
         drawCommand.instanceCount = 1;
-        drawCommand.firstIndex = indexOffset / sizeof(uint32_t);
-        drawCommand.baseVertex = vertexOffset / sizeof(Vertex);
+        drawCommand.firstIndex = indexOffset;
+        drawCommand.baseVertex = vertexOffset;
         drawCommand.baseInstance = 0;
         drawCommand.drawId = (uint32_t)meshGroup->drawCommands.size();
         meshGroup->drawCommands.push_back(std::move(drawCommand));
@@ -185,7 +185,7 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
     return true;
 }
 
-void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup) {
+void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup, const glm::mat4& parentTransform) {
     tinygltf::Node &node = model->nodes[nodeIndex];
 
     // Create entity and write the transforms
@@ -199,7 +199,7 @@ void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGr
     if (node.scale.size() > 0)
         scale = glm::scale(glm::mat4(1.0f), glm::vec3((float)node.scale[0], (float)node.scale[1], (float)node.scale[2]));
 
-    glm::mat4 transform = translation * rotation * scale;
+    glm::mat4 transform = parentTransform * translation * rotation * scale;
     // Update MeshData
     if (node.mesh >= 0) {
         tinygltf::Mesh &mesh = model->meshes[node.mesh];
@@ -207,14 +207,14 @@ void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGr
     }
 
     for (auto child : node.children)
-        ParseNodeHierarchy(model, child, meshGroup);
+        ParseNodeHierarchy(model, child, meshGroup, parentTransform);
 }
 
 void GLTFScene::ParseScene(tinygltf::Model *model,
                            tinygltf::Scene *scene,
                            MeshGroup *meshGroup) {
     for (auto node : scene->nodes)
-        ParseNodeHierarchy(model, node, meshGroup);
+        ParseNodeHierarchy(model, node, meshGroup, glm::mat4(1.0f));
 }
 
 bool GLTFScene::LoadFile(const std::string &filename, MeshGroup *meshGroup) {

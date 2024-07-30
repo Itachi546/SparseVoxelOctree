@@ -44,7 +44,7 @@ class GLTFScene : public RenderScene {
 
     bool LoadFile(const std::string &filename, MeshGroup *meshGroup);
     void ParseScene(tinygltf::Model *model, tinygltf::Scene *scene, MeshGroup *meshGroup);
-    void ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup);
+    void ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup, const glm::mat4& parentTransform);
     bool ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGroup *meshGroup, const glm::mat4 &transform);
     void ParseMaterial(tinygltf::Model *model, MaterialInfo *component, uint32_t matIndex);
 

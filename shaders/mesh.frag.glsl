@@ -28,22 +28,22 @@ layout(binding = 3, set = 1) readonly buffer Materials {
 
 #define INVALID_TEXTURE ~0u
 
-
 layout(binding = 0, set = 2) uniform sampler2D uTextures[];
 
 vec4 sampleTexture(uint textureId, vec2 uv) {
     return texture(uTextures[nonuniformEXT(textureId)], uv);
 }
 
-
 void main() {
     vec3 n = normalize(vNormal);
     Material material = materials[drawId];
 
-    vec3 diffuseColor;
-    if(material.albedoMap != INVALID_TEXTURE)
-        diffuseColor = sampleTexture(material.albedoMap, vUV).rgb;
-    else 
-        diffuseColor = vec3(1.0f);
-    fragColor = vec4(diffuseColor, 1.0f);
+    vec4 diffuseColor;
+    if (material.albedoMap != INVALID_TEXTURE)
+        diffuseColor = sampleTexture(material.albedoMap, vUV);
+    else
+        diffuseColor = vec4(1.0f);
+    if (diffuseColor.a < 0.5)
+        discard;
+    fragColor = vec4(diffuseColor.rgb, 1.0f);
 }
