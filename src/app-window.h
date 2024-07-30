@@ -2,7 +2,7 @@
 
 #include "gfx/opengl.h"
 #include <GLFW/glfw3.h>
-#ifdef _WIN32
+#ifdef PLATFORM_WINDOWS 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #endif
@@ -58,7 +58,6 @@ struct AppWindow {
                 app.OnResize(static_cast<float>(sx), static_cast<float>(sy));
             });
 
-        RD::WindowPlatformData platformData;
         platformData.windowPtr = glfwGetWin32Window(glfwWindowPtr);
 #if VULKAN_ENABLED
         RD::GetInstance() = new VulkanRenderingDevice();
@@ -69,8 +68,8 @@ struct AppWindow {
 #else
         device->SetValidationMode(false);
 #endif
-        device->Initialize();
-        device->CreateSurface(&platformData);
+        device->Initialize(&platformData);
+        device->CreateSurface();
         device->CreateSwapchain(true);
     }
 
@@ -80,6 +79,7 @@ struct AppWindow {
         glfwTerminate();
     }
 
+    RD::WindowPlatformData platformData;
     GLFWwindow *glfwWindowPtr;
     glm::vec2 windowSize;
     bool minimized = false;

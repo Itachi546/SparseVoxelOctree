@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "octree-renderer.h"
 
-#include "gfx/imgui-service.h"
+#include "ui/imgui-service.h"
 
 OctreeRenderer::OctreeRenderer() {
     raycaster = new OctreeRaycaster();

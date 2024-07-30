@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/resource.h"
 #include "core/bitfield.h"
 
 #include <functional>
@@ -39,7 +38,7 @@ DEFINE_ID(Buffer)
 DEFINE_ID(Queue)
 DEFINE_ID(Fence)
 
-class RenderingDevice : public Resource {
+class RenderingDevice {
   public:
     enum class DeviceType {
         DEVICE_TYPE_OTHER = 0x0,
@@ -446,7 +445,7 @@ class RenderingDevice : public Resource {
         void *windowPtr;
     };
 
-    virtual void Initialize() = 0;
+    virtual void Initialize(void *platformData) = 0;
 
     virtual void SetValidationMode(bool state) = 0;
 
@@ -455,7 +454,7 @@ class RenderingDevice : public Resource {
     virtual QueueID GetDeviceQueue(QueueType queueType) = 0;
     virtual FenceID GetRenderEndFence() = 0;
 
-    virtual void CreateSurface(void *platformData) = 0;
+    virtual void CreateSurface() = 0;
     virtual void CreateSwapchain(bool vsync = true) = 0;
     virtual PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
                                               uint32_t shaderCount,

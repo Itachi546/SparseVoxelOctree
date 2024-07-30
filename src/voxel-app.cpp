@@ -5,7 +5,7 @@
 #include "math-utils.h"
 #include "gfx/debug.h"
 #include "gfx/camera.h"
-#include "gfx/imgui-service.h"
+#include "ui/imgui-service.h"
 #include "gfx/gpu-timer.h"
 #include "gfx/gltf-scene.h"
 #include "gfx/async-loader.h"

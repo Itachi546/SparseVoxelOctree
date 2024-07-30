@@ -6,7 +6,7 @@
 #include "voxel-data.h"
 #include "gfx/camera.h"
 #include "math-utils.h"
-#include "gfx/imgui-service.h"
+#include "ui/imgui-service.h"
 
 #include <glm/gtx/component_wise.hpp>
 

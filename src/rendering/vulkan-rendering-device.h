@@ -16,7 +16,7 @@
 class VulkanRenderingDevice : public RenderingDevice {
 
   public:
-    void Initialize() override;
+    void Initialize(void *platformData) override;
 
     void Shutdown() override;
 
@@ -28,7 +28,7 @@ class VulkanRenderingDevice : public RenderingDevice {
         return renderEndFence;
     }
 
-    void CreateSurface(void *platformData) override;
+    void CreateSurface() override;
     void CreateSwapchain(bool vsync = true) override;
     ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name) override;
     PipelineID CreateGraphicsPipeline(const ShaderID *shaders,
@@ -240,6 +240,7 @@ class VulkanRenderingDevice : public RenderingDevice {
     static const uint32_t BINDLESS_TEXTURE_SET = 2;
 
     uint64_t memoryUsage = 0;
+    void *_platformData;
 
     std::vector<TextureID> bindlessTextureToUpdate;
 

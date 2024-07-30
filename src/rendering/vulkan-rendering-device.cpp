@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "vulkan-rendering-device.h"
+#include "ui/win32-ui.h"
 
 #define VMA_IMPLEMENTATION
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
@@ -217,10 +218,12 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
 
     ASSERT(_queueFamilyIndices[MAIN_QUEUE] != ~0u, "Graphics Queue is not supported...");
 
-#if _WIN32
+#ifdef PLATFORM_WINDOWS
     static PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkCheckPresentationSupport = (PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)VK_LOAD_FUNCTION(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
     if (!vkCheckPresentationSupport(physicalDevice, _queueFamilyIndices[MAIN_QUEUE])) {
         LOGE("Selected Device/Queue doesn't support presentation");
+        HWND hwnd = (HWND) static_cast<WindowPlatformData *>(_platformData)->windowPtr;
+        UI::ShowDialogBox(hwnd, "Presentation is not supported", "Error::Unsupported Feature");
         exit(-1);
     }
 #endif
@@ -246,6 +249,10 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
         });
     } else {
         ASSERT(0, "Transfer Queue is not supported");
+#ifdef PLATFORM_WINDOWS
+        HWND hwnd = (HWND) static_cast<WindowPlatformData *>(_platformData)->windowPtr;
+        UI::ShowDialogBox(hwnd, "Transfer Queue is not supported", "Error::Unsupported Feature");
+#endif
         exit(0);
     }
 
@@ -268,6 +275,10 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     bool bindlessSupported = indexingFeatures.descriptorBindingPartiallyBound && indexingFeatures.runtimeDescriptorArray;
     if (!bindlessSupported) {
         LOGE("Bindless resources is not supported ...");
+#ifdef PLATFORM_WINDOWS
+        HWND hwnd = (HWND) static_cast<WindowPlatformData *>(_platformData)->windowPtr;
+        UI::ShowDialogBox(hwnd, "Bindless texture is not supported", "Error::Unsupported Feature");
+#endif
         exit(0);
     }
 
@@ -572,10 +583,10 @@ void VulkanRenderingDevice::InitializeAllocator() {
     VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator));
 }
 
-void VulkanRenderingDevice::Initialize() {
-    VK_CHECK(volkInitialize());
+void VulkanRenderingDevice::Initialize(void *platformData) {
+    _platformData = platformData;
 
-    this->id = Resource::GetId();
+    VK_CHECK(volkInitialize());
 
     if (enableValidation) {
         FindValidationLayers(enabledInstanceLayers);
@@ -717,9 +728,9 @@ void VulkanRenderingDevice::Initialize() {
     renderEndFence = CreateFence("RenderEnd Fence", true);
 }
 
-void VulkanRenderingDevice::CreateSurface(void *platformData) {
-#ifdef _WIN32
-    HWND hwnd = (HWND) static_cast<WindowPlatformData *>(platformData)->windowPtr;
+void VulkanRenderingDevice::CreateSurface() {
+#ifdef PLATFORM_WINDOWS
+    HWND hwnd = (HWND) static_cast<WindowPlatformData *>(_platformData)->windowPtr;
     VkWin32SurfaceCreateInfoKHR createInfo = {
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = GetModuleHandle(0),

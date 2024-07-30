@@ -26,9 +26,12 @@
 #include <filesystem>
 
 #ifdef _WIN32
+#define PLATFORM_WINDOWS
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#else
+#error "Unsupported platform"
 #endif
 
 #ifdef _DEBUG
