@@ -31,6 +31,7 @@
 #include <Windows.h>
 #endif
 
+#ifdef _DEBUG
 #define ASSERT(condition, message) (assert(condition &&message))
 #define LOGE(err)                                   \
     {                                               \
@@ -47,7 +48,12 @@
     {                                                 \
         std::cout << "WARNING::" << msg << std::endl; \
     }
-
+#else
+#define ASSERT(condition, message)
+#define LOGE(err)
+#define LOG(msg)
+#define LOGW(msg)
+#endif
 template <typename T>
 inline bool HasFlag(T val, T flag) {
     return (val & flag) == flag;

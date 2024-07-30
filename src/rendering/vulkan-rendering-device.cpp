@@ -101,8 +101,9 @@ void VulkanRenderingDevice::FindValidationLayers(std::vector<const char *> &enab
             }
         }
 
-        if (!available)
+        if (!available) {
             LOGE("Failed to find instance layer: " + std::string(requested));
+        }
     }
 }
 
@@ -131,8 +132,9 @@ void VulkanRenderingDevice::InitializeInstanceExtensions(std::vector<const char 
                 break;
             }
         }
-        if (!available)
+        if (!available) {
             LOGE("Failed to find instance extension: " + std::string(requestedExt));
+        }
     }
 }
 
@@ -178,8 +180,9 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
                 break;
             }
         }
-        if (!available)
+        if (!available) {
             LOGE("Failed to find device extension: " + std::string(requestedExt));
+        }
     }
 
     uint32_t queueCount = 0;
@@ -1869,6 +1872,7 @@ void VulkanRenderingDevice::Shutdown() {
     vkDestroySwapchainKHR(device, swapchain->swapchain, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDevice(device, nullptr);
-    vkDestroyDebugUtilsMessengerEXT(instance, messanger, nullptr);
+    if (messanger != VK_NULL_HANDLE)
+        vkDestroyDebugUtilsMessengerEXT(instance, messanger, nullptr);
     vkDestroyInstance(instance, nullptr);
 }

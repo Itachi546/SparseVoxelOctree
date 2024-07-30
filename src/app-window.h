@@ -64,7 +64,11 @@ struct AppWindow {
         RD::GetInstance() = new VulkanRenderingDevice();
 #endif
         RenderingDevice *device = RenderingDevice::GetInstance();
+#ifdef _DEBUG
         device->SetValidationMode(true);
+#else
+        device->SetValidationMode(false);
+#endif
         device->Initialize();
         device->CreateSurface(&platformData);
         device->CreateSwapchain(true);
