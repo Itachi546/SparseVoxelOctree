@@ -39,11 +39,19 @@ void main() {
     Material material = materials[drawId];
 
     vec4 diffuseColor;
-    if (material.albedoMap != INVALID_TEXTURE)
+    if (material.albedoMap != INVALID_TEXTURE) {
         diffuseColor = sampleTexture(material.albedoMap, vUV);
-    else
+        diffuseColor.rgb = pow(diffuseColor.rgb, vec3(2.2f));
+    } else
         diffuseColor = vec4(1.0f);
     if (diffuseColor.a < 0.5)
         discard;
-    fragColor = vec4(diffuseColor.rgb, 1.0f);
+
+    vec3 ld = normalize(vec3(0.1f, 1.0f, 0.5f));
+
+    vec3 col = vec3(0.0f);
+    col += max(dot(n, ld), 0.1f) * diffuseColor.rgb;
+    col /= (1.0f + col);
+    col = pow(col, vec3(0.4545));
+    fragColor = vec4(col, diffuseColor.a);
 }

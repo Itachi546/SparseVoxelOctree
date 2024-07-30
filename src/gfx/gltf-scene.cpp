@@ -16,9 +16,6 @@ static uint8_t *getBufferPtr(tinygltf::Model *model, const tinygltf::Accessor &a
 }
 
 void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, uint32_t matIndex) {
-    if (matIndex == -1)
-        return;
-
     tinygltf::Material &material = model->materials[matIndex];
     // component->alphaCutoff = (float)material.alphaCutoff;
     /*
@@ -39,14 +36,6 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
     component->emissive = glm::vec4((float)emissiveColor[0], (float)emissiveColor[1], (float)emissiveColor[2], 1.0f);
 
     // Parse Material texture
-    /*
-    auto loadTexture = [&](uint32_t index) {
-        tinygltf::Texture& texture = model->textures[index];
-        tinygltf::Image& image = model->images[texture.source];
-        const std::string& name = image.uri.length() == 0 ? image.name : image.uri;
-        return TextureCache::LoadTexture(name, image.width, image.height, image.image.data(), image.component, true);
-        };
-    */
     auto loadTexture = [&](uint32_t index) -> uint32_t {
         tinygltf::Texture &texture = model->textures[index];
         tinygltf::Image &image = model->images[texture.source];
@@ -176,9 +165,12 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
         meshGroup->drawCommands.push_back(std::move(drawCommand));
 
         MaterialInfo material = {};
-        std::string materialName = model->materials[primitive.material].name;
-        meshGroup->names.push_back(materialName);
-        ParseMaterial(model, &material, primitive.material);
+        material.Initialize();
+        if (primitive.material >= 0) {
+            std::string materialName = model->materials[primitive.material].name;
+            meshGroup->names.push_back(materialName);
+            ParseMaterial(model, &material, primitive.material);
+        }
         meshGroup->materials.push_back(std::move(material));
     }
 
