@@ -342,6 +342,9 @@ class RenderingDevice : public Resource {
         TextureLayout newLayout;
         QueueID srcQueueFamily;
         QueueID dstQueueFamily;
+
+        uint32_t baseMipLevel, baseArrayLayer;
+        uint32_t levelCount, layerCount;
     };
 
     enum MemoryAllocationType {
@@ -486,7 +489,7 @@ class RenderingDevice : public Resource {
     virtual void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) = 0;
     virtual void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) = 0;
 
-    virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID* uniformSet, uint32_t uniformSetCount) = 0;
+    virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) = 0;
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
     virtual void Submit(CommandBufferID commandBuffer) = 0;
 
@@ -515,6 +518,7 @@ class RenderingDevice : public Resource {
     virtual void Present() = 0;
 
     virtual void UpdateBindlessTexture(TextureID texture) = 0;
+    virtual void GenerateMipmap(CommandBufferID commandBuffer, TextureID texture) = 0;
 
     virtual void Destroy(PipelineID pipeline) = 0;
     virtual void Destroy(ShaderID shaderModule) = 0;

@@ -1077,7 +1077,6 @@ TextureID VulkanRenderingDevice::CreateTexture(TextureDescription *description, 
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     allocationCreateInfo.flags = 0;
 
-
     // Create Image
     VmaAllocationInfo allocationInfo = {};
     VK_CHECK(vmaCreateImage(vmaAllocator, &createInfo, &allocationCreateInfo, &texture->image, &texture->allocation, &allocationInfo));
@@ -1173,7 +1172,7 @@ void VulkanRenderingDevice::CopyBufferToTexture(CommandBufferID commandBuffer, B
     copyRegion.imageSubresource.aspectMask = texture->imageAspect;
     copyRegion.imageSubresource.baseArrayLayer = 0;
     copyRegion.imageSubresource.layerCount = texture->arrayLevels;
-    copyRegion.imageSubresource.mipLevel = texture->mipLevels - 1;
+    copyRegion.imageSubresource.mipLevel = 0;
 
     copyRegion.imageOffset = {0, 0, 0};
     copyRegion.imageExtent = {texture->width, texture->height, texture->depth};
@@ -1506,9 +1505,9 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
                                                                VkImageLayout newLayout,
                                                                uint32_t srcQueueFamily,
                                                                uint32_t dstQueueFamily,
-                                                               uint32_t mipLevel,
-                                                               uint32_t arrLayer,
-                                                               uint32_t mipCount,
+                                                               uint32_t baseMipLevel,
+                                                               uint32_t baseArrayLayer,
+                                                               uint32_t levelCount,
                                                                uint32_t layerCount) {
     return {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1521,9 +1520,9 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
         .image = image,
         .subresourceRange = {
             .aspectMask = aspect,
-            .baseMipLevel = mipLevel,
-            .levelCount = mipCount,
-            .baseArrayLayer = arrLayer,
+            .baseMipLevel = baseMipLevel,
+            .levelCount = levelCount,
+            .baseArrayLayer = baseArrayLayer,
             .layerCount = layerCount,
         },
     };
@@ -1549,7 +1548,10 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
                                                        VkAccessFlags(textureBarrier.dstAccess),
                                                        vkTexture->currentLayout, newLayout,
                                                        srcQueueFamily,
-                                                       dstQueueFamily));
+                                                       dstQueueFamily,
+                                                       textureBarrier.baseMipLevel,
+                                                       textureBarrier.baseArrayLayer,
+                                                       textureBarrier.levelCount, textureBarrier.layerCount));
         vkTexture->currentLayout = newLayout;
     }
 
@@ -1674,7 +1676,6 @@ void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)>
 }
 
 void VulkanRenderingDevice::Present() {
-
     VkSemaphore waitSemaphores[] = {renderEndSemaphore};
     VkPresentInfoKHR presentInfo = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -1728,6 +1729,80 @@ void VulkanRenderingDevice::Destroy(CommandPoolID commandPool) {
     VkCommandPool *vkcmdPool = _commandPools.Access(commandPool.id);
     vkDestroyCommandPool(device, *vkcmdPool, nullptr);
     _commandPools.Release(commandPool.id);
+}
+
+void VulkanRenderingDevice::GenerateMipmap(CommandBufferID commandBuffer, TextureID texture) {
+    VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
+    VulkanTexture *tex = _textures.Access(texture.id);
+
+    // Mip 0 is already in transfer_src optimal, but rest of the mip is undefined
+    // so we transition it to transfer dst so that we can copy
+    VkImageMemoryBarrier transferBarriers[2];
+    transferBarriers[0] = CreateImageBarrier(
+        tex->image,
+        tex->imageAspect,
+        0,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        ~0u, ~0u, 1, 0, tex->mipLevels - 1, 1);
+
+    // After each copy we need to transition layout from transfer_dst to transfer src
+    transferBarriers[1] = CreateImageBarrier(
+        tex->image,
+        tex->imageAspect,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_ACCESS_TRANSFER_READ_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        ~0u, ~0u, 0, 0, 1, 1);
+
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 2, transferBarriers);
+
+    VkImageBlit imageBlit;
+    imageBlit.srcSubresource.aspectMask = tex->imageAspect;
+    imageBlit.srcSubresource.baseArrayLayer = 0;
+    imageBlit.srcSubresource.layerCount = 1;
+
+    imageBlit.dstSubresource.aspectMask = tex->imageAspect;
+    imageBlit.dstSubresource.baseArrayLayer = 0;
+    imageBlit.dstSubresource.layerCount = 1;
+
+    imageBlit.srcOffsets[0] = {0, 0, 0};
+    imageBlit.dstOffsets[0] = {0, 0, 0};
+
+    int width = static_cast<int>(tex->width);
+    int height = static_cast<int>(tex->height);
+
+    for (uint32_t i = 1; i < tex->mipLevels; ++i) {
+        imageBlit.srcSubresource.mipLevel = i - 1;
+        imageBlit.dstSubresource.mipLevel = i;
+        imageBlit.srcOffsets[1] = {width, height, 1};
+        imageBlit.dstOffsets[1] = {width >> 1, height >> 1, 1};
+
+        vkCmdBlitImage(cb, tex->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, tex->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_LINEAR);
+
+        width = width >> 1;
+        height = height >> 1;
+
+        transferBarriers[1].subresourceRange.baseMipLevel = i;
+        vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &transferBarriers[1]);
+    }
+
+    tex->currentLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    TextureBarrier shaderReadBarrier{
+        .texture = texture,
+        .srcAccess = RD::BARRIER_ACCESS_TRANSFER_READ_BIT,
+        .dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT,
+        .newLayout = RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .srcQueueFamily = QUEUE_FAMILY_IGNORED,
+        .dstQueueFamily = QUEUE_FAMILY_IGNORED,
+        .baseMipLevel = 0,
+        .baseArrayLayer = 0,
+        .levelCount = tex->mipLevels,
+        .layerCount = 1,
+    };
+    PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &shaderReadBarrier, 1);
 }
 
 void VulkanRenderingDevice::Destroy(PipelineID pipeline) {

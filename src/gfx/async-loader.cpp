@@ -59,8 +59,30 @@ void AsyncLoader::ProcessQueue(RD *device) {
         copyRegion.bufferOffset = 0;
 
         RD::TextureBarrier transferBarrier[] = {
-            RD::TextureBarrier{request.textureId, 0, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL, QUEUE_FAMILY_IGNORED, QUEUE_FAMILY_IGNORED},
-            RD::TextureBarrier{request.textureId, RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT, 0, RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, submitQueueInfo.queue, mainQueue},
+            RD::TextureBarrier{
+                .texture = request.textureId,
+                .srcAccess = 0,
+                .dstAccess = RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT,
+                .newLayout = RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamily = QUEUE_FAMILY_IGNORED,
+                .dstQueueFamily = QUEUE_FAMILY_IGNORED,
+                .baseMipLevel = 0,
+                .baseArrayLayer = 0,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
+            RD::TextureBarrier{
+                .texture = request.textureId,
+                .srcAccess = RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccess = 0,
+                .newLayout = RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamily = submitQueueInfo.queue,
+                .dstQueueFamily = mainQueue,
+                .baseMipLevel = 0,
+                .baseArrayLayer = 0,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
         };
 
         device->ImmediateSubmit([&](CommandBufferID cb) {
@@ -68,11 +90,11 @@ void AsyncLoader::ProcessQueue(RD *device) {
 
             device->CopyBufferToTexture(cb, stagingBuffer, request.textureId, &copyRegion);
 
-            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, &transferBarrier[1], 1);
+            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &transferBarrier[1], 1);
         },
                                 &submitQueueInfo);
 
-        device->UpdateBindlessTexture(request.textureId);
+        scene->AddTexturesToUpdate(request.textureId);
         stbi_image_free(data);
     } else {
         std::this_thread::sleep_for(200ms);

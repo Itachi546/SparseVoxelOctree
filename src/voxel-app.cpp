@@ -74,8 +74,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     asyncLoader->Initialize(scene);
     asyncLoader->Start();
 
-    const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
-    // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
+    // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
+    const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
     if (scene->Initialize({meshPath}, asyncLoader, globalUB)) {
         scene->PrepareDraws();
     } else
@@ -188,6 +188,10 @@ void VoxelApp::OnRender() {
         .newLayout = RD::TEXTURE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         .srcQueueFamily = QUEUE_FAMILY_IGNORED,
         .dstQueueFamily = QUEUE_FAMILY_IGNORED,
+        .baseMipLevel = 0,
+        .baseArrayLayer = 0,
+        .levelCount = ~0u,
+        .layerCount = ~0u,
     };
     device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
 

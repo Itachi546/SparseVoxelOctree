@@ -64,13 +64,13 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
 
                 RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
                 RD::TextureDescription desc = RD::TextureDescription::Initialize(width, height);
-                desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
+                desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
                 if (res == 0) {
                     LOGE("Failed to get texture info from the file" + texturePath);
                     return ~0u;
                 }
                 desc.format = RD::FORMAT_R8G8B8A8_UNORM;
-                desc.mipMaps = 1;
+                desc.mipMaps = static_cast<uint32_t>(std::floor(std::log2(std::max({width, height})))) + 1;
                 desc.samplerDescription = &samplerDesc;
 
                 TextureID textureId = device->CreateTexture(&desc, image.uri);
@@ -185,7 +185,7 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
     return true;
 }
 
-void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup, const glm::mat4& parentTransform) {
+void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGroup *meshGroup, const glm::mat4 &parentTransform) {
     tinygltf::Node &node = model->nodes[nodeIndex];
 
     // Create entity and write the transforms
@@ -374,13 +374,23 @@ void GLTFScene::UpdateTextures(CommandBufferID commandBuffer) {
     for (uint32_t i = 0; i < textureUpdateCount; ++i) {
         barriers[i].texture = texturesToUpdate[i];
         barriers[i].srcAccess = 0,
-        barriers[i].dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
-        barriers[i].newLayout = RD::TEXTURE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[i].dstAccess = RD::BARRIER_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[i].newLayout = RD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barriers[i].srcQueueFamily = transferQueue;
         barriers[i].dstQueueFamily = mainQueue;
-        device->UpdateBindlessTexture(texturesToUpdate[i]);
+        barriers[i].baseMipLevel = 0;
+        barriers[i].baseArrayLayer = 0;
+        barriers[i].layerCount = 1;
+        barriers[i].levelCount = 1;
     }
-    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, barriers.data(), textureUpdateCount);
+
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, barriers.data(), textureUpdateCount);
+    for (auto &texture : texturesToUpdate) {
+        device->GenerateMipmap(commandBuffer, texture);
+        device->UpdateBindlessTexture(texture);
+    }
+
+    texturesToUpdate.clear();
 }
 
 void GLTFScene::Shutdown() {

@@ -103,6 +103,8 @@ class VulkanRenderingDevice : public RenderingDevice {
         bindlessTextureToUpdate.push_back(texture);
     }
 
+    void GenerateMipmap(CommandBufferID commandBuffer, TextureID texture) override;
+
     void Destroy(PipelineID pipeline) override;
     void Destroy(CommandPoolID commandPool) override;
     void Destroy(ShaderID shaderModule) override;
@@ -261,9 +263,9 @@ class VulkanRenderingDevice : public RenderingDevice {
                                             VkImageLayout newLayout,
                                             uint32_t srcQueueFamilyIndex,
                                             uint32_t dstQueueFamilyIndex,
-                                            uint32_t mipLevel = 0,
-                                            uint32_t arrLayer = 0,
-                                            uint32_t mipCount = ~0u,
+                                            uint32_t baseMipLevel = 0,
+                                            uint32_t baseArrayLayer = 0,
+                                            uint32_t levelCount = ~0u,
                                             uint32_t layerCount = ~0u);
 
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
