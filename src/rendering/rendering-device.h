@@ -38,6 +38,10 @@ DEFINE_ID(Buffer)
 DEFINE_ID(Queue)
 DEFINE_ID(Fence)
 
+constexpr const uint64_t INVALID_ID = UINT64_MAX;
+constexpr const uint32_t INVALID_TEXTURE_ID = UINT32_MAX;
+constexpr const uint32_t INVALID_QUEUE_ID = UINT32_MAX;
+
 class RenderingDevice {
   public:
     enum class DeviceType {
@@ -82,7 +86,7 @@ class RenderingDevice {
         uint32_t binding;
         ID resourceID;
         uint64_t offset = 0;
-        uint64_t size = ~0ull;
+        uint64_t range = UINT64_MAX;
     };
 
     struct PushConstant {
@@ -90,7 +94,7 @@ class RenderingDevice {
         uint32_t size;
     };
 
-    struct SubmitQueueInfo {
+    struct ImmediateSubmitInfo {
         QueueID queue;
         CommandPoolID commandPool;
         CommandBufferID commandBuffer;
@@ -333,7 +337,7 @@ class RenderingDevice {
         uint64_t bufferOffset;
     };
 
-#define QUEUE_FAMILY_IGNORED QueueID(~0u)
+#define QUEUE_FAMILY_IGNORED QueueID(UINT32_MAX)
 
     struct TextureBarrier {
         TextureID texture;
@@ -453,7 +457,6 @@ class RenderingDevice {
     virtual uint64_t GetMemoryUsage() = 0;
 
     virtual QueueID GetDeviceQueue(QueueType queueType) = 0;
-    virtual FenceID GetRenderEndFence() = 0;
 
     virtual void CreateSurface() = 0;
     virtual void CreateSwapchain(bool vsync = true) = 0;
@@ -472,9 +475,12 @@ class RenderingDevice {
     virtual ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInBytes, ShaderDescription *desc, const std::string &name = "shader") = 0;
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;
     virtual CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "commandPool") = 0;
+    virtual void ResetCommandPool(CommandPoolID commandPool) = 0;
     virtual UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) = 0;
+
     virtual FenceID CreateFence(const std::string &name = "fence", bool signalled = false) = 0;
     virtual void WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout) = 0;
+    virtual void ResetFences(FenceID *fences, uint32_t fenceCount) = 0;
 
     virtual BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) = 0;
     virtual uint8_t *MapBuffer(BufferID buffer) = 0;
@@ -491,9 +497,9 @@ class RenderingDevice {
 
     virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) = 0;
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
-    virtual void Submit(CommandBufferID commandBuffer) = 0;
+    virtual void Submit(CommandBufferID commandBuffer, FenceID Fence) = 0;
 
-    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, SubmitQueueInfo *queueInfo) = 0;
+    virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, ImmediateSubmitInfo *queueInfo) = 0;
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
                                  PipelineStageBits srcStage,
                                  PipelineStageBits dstStage,

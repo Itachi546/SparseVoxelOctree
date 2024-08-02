@@ -24,10 +24,6 @@ class VulkanRenderingDevice : public RenderingDevice {
         return static_cast<uint32_t>(gpus.size());
     }
 
-    FenceID GetRenderEndFence() override {
-        return renderEndFence;
-    }
-
     void CreateSurface() override;
     void CreateSwapchain(bool vsync = true) override;
     ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInByte, ShaderDescription *desc, const std::string &name) override;
@@ -44,12 +40,16 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name);
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name) override;
+
     CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "CommandPool") override;
+    void ResetCommandPool(CommandPoolID commandPool) override;
+
     TextureID CreateTexture(TextureDescription *description, const std::string &name) override;
     UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) override;
-    FenceID CreateFence(const std::string &name = "fence", bool signalled = false) override;
 
+    FenceID CreateFence(const std::string &name = "fence", bool signalled = false) override;
     void WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout);
+    void ResetFences(FenceID *fences, uint32_t fenceCount) override;
 
     BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) override;
     uint8_t *MapBuffer(BufferID buffer) override;
@@ -77,8 +77,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
     void DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride);
 
-    void Submit(CommandBufferID commandBuffer) override;
-    void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, SubmitQueueInfo *queueInfo) override;
+    void Submit(CommandBufferID commandBuffer, FenceID fence) override;
+    void ImmediateSubmit(std::function<void(CommandBufferID commandBufferfence)> &&function, ImmediateSubmitInfo *queueInfo) override;
 
     void Present() override;
 
@@ -224,11 +224,6 @@ class VulkanRenderingDevice : public RenderingDevice {
     ResourcePool<VkFence> _fences;
     std::vector<VkCommandBuffer> _commandBuffers;
 
-    CommandBufferID uploadCommandBuffer;
-    CommandPoolID uploadCommandPool;
-    FenceID uploadFence;
-    FenceID renderEndFence;
-
     VkDescriptorPool _descriptorPool;
     VkDescriptorPool _bindlessDescriptorPool;
     VkDescriptorSetLayout _bindlessDescriptorSetLayout;
@@ -266,8 +261,8 @@ class VulkanRenderingDevice : public RenderingDevice {
                                             uint32_t dstQueueFamilyIndex,
                                             uint32_t baseMipLevel = 0,
                                             uint32_t baseArrayLayer = 0,
-                                            uint32_t levelCount = ~0u,
-                                            uint32_t layerCount = ~0u);
+                                            uint32_t levelCount = UINT32_MAX,
+                                            uint32_t layerCount = UINT32_MAX);
 
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
     void ResizeSwapchain();

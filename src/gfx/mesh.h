@@ -33,10 +33,10 @@ struct MaterialInfo {
         ao = 1.0f;
         transparency = 1.0f;
 
-        albedoMap = ~0u;
-        emissiveMap = ~0u;
-        metallicRoughnessMap = ~0u;
-        padding_ = ~0u;
+        albedoMap = INVALID_TEXTURE_ID;
+        emissiveMap = INVALID_TEXTURE_ID;
+        metallicRoughnessMap = INVALID_TEXTURE_ID;
+        padding_ = INVALID_TEXTURE_ID;
     }
 };
 

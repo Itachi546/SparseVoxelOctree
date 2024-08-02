@@ -94,6 +94,10 @@ void AsyncLoader::ProcessQueue(RD *device) {
         },
                                 &submitQueueInfo);
 
+        device->WaitForFence(&submitQueueInfo.fence, 1, UINT64_MAX);
+        device->ResetFences(&submitQueueInfo.fence, 1);
+        device->ResetCommandPool(submitQueueInfo.commandPool);
+
         scene->AddTexturesToUpdate(request.textureId);
         stbi_image_free(data);
     } else {

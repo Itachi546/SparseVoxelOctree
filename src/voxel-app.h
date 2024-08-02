@@ -5,6 +5,7 @@
 #include <chrono>
 #include <vector>
 
+class Voxelizer;
 class AsyncLoader;
 struct RenderScene;
 namespace gfx {
@@ -71,9 +72,13 @@ struct VoxelApp : AppWindow<VoxelApp> {
     CommandPoolID commandPool;
     CommandBufferID commandBuffer;
     TextureID depthAttachment;
+    FenceID renderFence;
 
     std::shared_ptr<AsyncLoader> asyncLoader;
     std::shared_ptr<RenderScene> scene;
+
+    // @TODO TEmp
+    std::shared_ptr<Voxelizer> voxelizer;
 
     BufferID globalUB;
     uint8_t *globalUBPtr;

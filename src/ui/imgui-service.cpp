@@ -43,10 +43,22 @@ namespace ImGuiService {
 
         ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
 
+        RD::ImmediateSubmitInfo submitInfo;
+        submitInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
+        submitInfo.commandPool = device->CreateCommandPool(submitInfo.queue, "TempCommandPool");
+        submitInfo.commandBuffer = device->CreateCommandBuffer(submitInfo.commandPool, "TempCommandBuffer");
+        submitInfo.fence = device->CreateFence("TempFence");
+
         device->ImmediateSubmit([&device](CommandBufferID commandBuffer) {
             VkCommandBuffer cb = device->_commandBuffers[commandBuffer.id];
             ImGui_ImplVulkan_CreateFontsTexture(cb);
-        }, nullptr);
+        },
+                                &submitInfo);
+
+        device->WaitForFence(&submitInfo.fence, 1, UINT64_MAX);
+        device->Destroy(submitInfo.fence);
+        device->Destroy(submitInfo.commandPool);
+
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 

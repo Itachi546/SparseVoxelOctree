@@ -4,19 +4,24 @@
 
 #include <memory>
 
-class Scene;
+struct RenderScene;
 
 class Voxelizer {
 
-    void Initialize(std::shared_ptr<Scene> scene);
+  public:
+    void Initialize(std::shared_ptr<RenderScene> scene, BufferID globalUB);
 
-    void Voxelize();
+    void Voxelize(CommandBufferID commandBuffer);
 
     void Shutdown();
 
   private:
-    std::shared_ptr<Scene> scene;
-    PipelineID pipeline;
+    std::shared_ptr<RenderScene> scene;
+    PipelineID prepassPipeline;
+    UniformSetID globalSet, prepassSet;
+
     RD *device;
-    BufferID voxelListBuffer;
+    // BufferID voxelFragmentListBuffer;
+    BufferID voxelCountBuffer;
+    uint64_t *countBufferPtr;
 };

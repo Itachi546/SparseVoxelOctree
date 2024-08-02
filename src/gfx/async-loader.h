@@ -39,7 +39,7 @@ class AsyncLoader {
 
     BufferID stagingBuffer;
     uint8_t *stagingBufferPtr;
-    RD::SubmitQueueInfo submitQueueInfo;
+    RD::ImmediateSubmitInfo submitQueueInfo;
     RD *device;
     void ProcessQueue(RD *device);
 

@@ -11,6 +11,9 @@
 #include "gfx/async-loader.h"
 #include "rendering/rendering-utils.h"
 
+// @TODO Temp
+#include "sparse-octree/voxelizer.h"
+
 #include <glm/gtx/component_wise.hpp>
 
 using namespace std::chrono_literals;
@@ -46,6 +49,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     QueueID graphicsQueue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
     commandPool = device->CreateCommandPool(graphicsQueue, "RenderCommandPool");
     commandBuffer = device->CreateCommandBuffer(commandPool, "RenderCommandBuffer");
+    renderFence = device->CreateFence("Render Fence");
 
     Input::Singleton()->Initialize();
     ImGuiService::Initialize(glfwWindowPtr, commandBuffer);
@@ -84,6 +88,9 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
     LOG("Total time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
+
+    voxelizer = std::make_shared<Voxelizer>();
+    voxelizer->Initialize(scene, globalUB);
 }
 
 void VoxelApp::Run() {
@@ -102,8 +109,11 @@ void VoxelApp::Run() {
             std::static_pointer_cast<GLTFScene>(scene)->UpdateTextures(commandBuffer);
             // Draw UI
             device->EndCommandBuffer(commandBuffer);
-            device->Submit(commandBuffer);
+            device->Submit(commandBuffer, renderFence);
             device->Present();
+
+            device->WaitForFence(&renderFence, 1, UINT64_MAX);
+            device->ResetFences(&renderFence, 1);
         } else
             std::this_thread::sleep_for(1ms);
 
@@ -157,7 +167,7 @@ void VoxelApp::OnRender() {
         .clearColor = {0.5f, 0.5f, 0.5f, 1.0f},
         .clearDepth = 0,
         .clearStencil = 0,
-        .attachment = TextureID{~0u},
+        .attachment = TextureID{INVALID_TEXTURE_ID},
     };
 
     RD::AttachmentInfo depthStencilAttachmentInfo = {
@@ -189,8 +199,8 @@ void VoxelApp::OnRender() {
         .dstQueueFamily = QUEUE_FAMILY_IGNORED,
         .baseMipLevel = 0,
         .baseArrayLayer = 0,
-        .levelCount = ~0u,
-        .layerCount = ~0u,
+        .levelCount = UINT32_MAX,
+        .layerCount = UINT32_MAX,
     };
     device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
 
@@ -261,13 +271,12 @@ void VoxelApp::UpdateControls() {
 
 VoxelApp::~VoxelApp() {
     asyncLoader->Shutdown();
-
-    FenceID renderEndFence = device->GetRenderEndFence();
-    device->WaitForFence(&renderEndFence, 1, UINT64_MAX);
+    voxelizer->Shutdown();
     scene->Shutdown();
     device->Destroy(depthAttachment);
     device->Destroy(commandPool);
     device->Destroy(globalUB);
+    device->Destroy(renderFence);
     Debug::Shutdown();
     ImGuiService::Shutdown();
 }

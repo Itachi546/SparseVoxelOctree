@@ -86,7 +86,7 @@ uint32_t Octree::FindRegion(const glm::vec3 &center, float size, const glm::vec3
     }
 
     assert(0);
-    return ~0u;
+    return UINT32_MAX;
 }
 
 void Octree::ListVoxels(std::vector<glm::vec4> &voxels) {

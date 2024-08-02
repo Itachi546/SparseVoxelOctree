@@ -35,11 +35,11 @@ class GLTFScene : public RenderScene {
     BufferID transformBuffer;
     BufferID materialBuffer;
     BufferID drawCommandBuffer;
+    MeshGroup meshGroup;
 
     virtual ~GLTFScene() {}
 
   private:
-    MeshGroup meshGroup;
     std::unordered_map<uint32_t, TextureID> textureMap;
 
     bool LoadFile(const std::string &filename, MeshGroup *meshGroup);

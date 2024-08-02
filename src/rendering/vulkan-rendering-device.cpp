@@ -194,7 +194,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, queueFamilyProperties.data());
 
-    _queueFamilyIndices[MAIN_QUEUE] = _queueFamilyIndices[TRANSFER_QUEUE] = _queueFamilyIndices[COMPUTE_QUEUE] = ~0u;
+    _queueFamilyIndices[MAIN_QUEUE] = _queueFamilyIndices[TRANSFER_QUEUE] = _queueFamilyIndices[COMPUTE_QUEUE] = INVALID_QUEUE_ID;
     for (uint32_t i = 0; i < queueCount; ++i) {
         VkQueueFamilyProperties &queueFamily = queueFamilyProperties[i];
         if (queueFamilyProperties[i].queueCount == 0)
@@ -217,7 +217,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
         }
     }
 
-    ASSERT(_queueFamilyIndices[MAIN_QUEUE] != ~0u, "Graphics Queue is not supported...");
+    ASSERT(_queueFamilyIndices[MAIN_QUEUE] != INVALID_QUEUE_ID, "Graphics Queue is not supported...");
 
 #ifdef PLATFORM_WINDOWS
     static PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkCheckPresentationSupport = (PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)VK_LOAD_FUNCTION(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
@@ -291,6 +291,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     deviceFeatures2.features.samplerAnisotropy = true;
     deviceFeatures2.features.geometryShader = true;
     deviceFeatures2.features.wideLines = true;
+    deviceFeatures2.features.shaderInt64 = true;
 
     deviceFeatures11.shaderDrawParameters = true;
 
@@ -302,6 +303,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     deviceFeatures12.descriptorBindingVariableDescriptorCount = true;
     deviceFeatures12.runtimeDescriptorArray = true;
     deviceFeatures12.shaderSampledImageArrayNonUniformIndexing = true;
+    deviceFeatures12.shaderBufferInt64Atomics = true;
 
     deviceFeatures13.dynamicRendering = true;
     deviceFeatures13.synchronization2 = true;
@@ -372,6 +374,13 @@ void VulkanRenderingDevice::WaitForFence(FenceID *fence, uint32_t fenceCount, ui
     for (uint32_t i = 0; i < fenceCount; ++i)
         fences[i] = *_fences.Access(fence[i].id);
     vkWaitForFences(device, fenceCount, fences.data(), true, timeout);
+}
+
+void VulkanRenderingDevice::ResetFences(FenceID *fences, uint32_t fenceCount) {
+    std::vector<VkFence> vkFences(fenceCount);
+    for (uint32_t i = 0; i < fenceCount; ++i)
+        vkFences[i] = *_fences.Access(fences[i].id);
+    vkResetFences(device, fenceCount, vkFences.data());
 }
 
 VkSemaphore VulkanRenderingDevice::CreateVulkanSemaphore(const std::string &name) {
@@ -721,12 +730,6 @@ void VulkanRenderingDevice::Initialize(void *platformData) {
         .descriptorSetCount = 1,
         .pSetLayouts = &_bindlessDescriptorSetLayout};
     VK_CHECK(vkAllocateDescriptorSets(device, &bindlessDescriptorSetAllocateInfo, &_bindlessDescriptorSet));
-
-    // Upload Resource Creation
-    CommandPoolID commandPool = CreateCommandPool(QueueID{MAIN_QUEUE}, "Upload CommandPool");
-    uploadCommandBuffer = CreateCommandBuffer(commandPool, "Upload Command Buffer");
-    uploadFence = CreateFence("Upload Fence");
-    renderEndFence = CreateFence("RenderEnd Fence", true);
 }
 
 void VulkanRenderingDevice::CreateSurface() {
@@ -1014,6 +1017,11 @@ CommandPoolID VulkanRenderingDevice::CreateCommandPool(QueueID queue, const std:
     return CommandPoolID(commandPoolID);
 }
 
+void VulkanRenderingDevice::ResetCommandPool(CommandPoolID commandPool) {
+    VkCommandPool *cp = _commandPools.Access(commandPool.id);
+    vkResetCommandPool(device, *cp, 0);
+}
+
 CommandBufferID VulkanRenderingDevice::CreateCommandBuffer(CommandPoolID commandPool, const std::string &name) {
     const VkCommandPool *vkcmdPool = _commandPools.Access(commandPool.id);
     VkCommandBufferAllocateInfo allocateInfo = {
@@ -1229,7 +1237,7 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
             VkDescriptorBufferInfo &bufferInfo = bufferInfos.emplace_back(VkDescriptorBufferInfo{});
             bufferInfo.buffer = buffer->buffer;
             bufferInfo.offset = uniform->offset;
-            bufferInfo.range = uniform->size;
+            bufferInfo.range = uniform->range;
             writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             writeSets[i].pBufferInfo = &bufferInfo;
         } break;
@@ -1238,7 +1246,7 @@ UniformSetID VulkanRenderingDevice::CreateUniformSet(PipelineID pipeline, BoundU
             VkDescriptorBufferInfo &bufferInfo = bufferInfos.emplace_back(VkDescriptorBufferInfo{});
             bufferInfo.buffer = buffer->buffer;
             bufferInfo.offset = uniform->offset;
-            bufferInfo.range = uniform->size;
+            bufferInfo.range = uniform->range;
             writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             writeSets[i].pBufferInfo = &bufferInfo;
         } break;
@@ -1285,11 +1293,7 @@ void VulkanRenderingDevice::BeginFrame() {
     if (resized)
         ResizeSwapchain();
 
-    VkFence *fence = _fences.Access(renderEndFence);
-    vkWaitForFences(device, 1, fence, true, UINT64_MAX);
-    vkResetFences(device, 1, fence);
-
-    VK_CHECK(vkAcquireNextImageKHR(device, swapchain->swapchain, ~0ul, imageAcquireSemaphore, VK_NULL_HANDLE, &swapchain->currentImageIndex));
+    VK_CHECK(vkAcquireNextImageKHR(device, swapchain->swapchain, UINT64_MAX, imageAcquireSemaphore, VK_NULL_HANDLE, &swapchain->currentImageIndex));
 }
 
 void VulkanRenderingDevice::BeginCommandBuffer(CommandBufferID commandBuffer) {
@@ -1333,7 +1337,7 @@ void VulkanRenderingDevice::BeginRenderPass(CommandBufferID commandBuffer, Rende
         attachmentInfo.storeOp = VkAttachmentStoreOp(attachment.storeOp);
         attachmentInfo.clearValue.color = {attachment.clearColor[0], attachment.clearColor[1], attachment.clearColor[2], attachment.clearColor[3]};
 
-        if (attachment.attachment.id == ~0u) {
+        if (attachment.attachment.id == INVALID_TEXTURE_ID) {
             uint32_t currentImageIndex = swapchain->currentImageIndex;
             attachmentInfo.imageView = swapchain->imageViews[currentImageIndex];
         } else {
@@ -1430,7 +1434,7 @@ void VulkanRenderingDevice::PrepareSwapchain(CommandBufferID commandBuffer, Text
                          1, &presentBarrier);
 }
 
-void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer) {
+void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer, FenceID fence) {
 
     VkQueue queue = _queues[0];
 
@@ -1463,8 +1467,13 @@ void VulkanRenderingDevice::Submit(CommandBufferID commandBuffer) {
         .pSignalSemaphoreInfos = signalSemaphores,
     };
 
-    VkFence *signalFence = _fences.Access(renderEndFence.id);
-    VK_CHECK(vkQueueSubmit2(queue, 1, &submitInfo, *signalFence));
+    VkFence *vkFence;
+    if (fence.id != INVALID_ID) {
+        vkFence = _fences.Access(fence.id);
+    } else
+        vkFence = VK_NULL_HANDLE;
+
+    VK_CHECK(vkQueueSubmit2(queue, 1, &submitInfo, *vkFence));
 }
 
 void VulkanRenderingDevice::SetViewport(CommandBufferID commandBuffer, float offsetX, float offsetY, float width, float height) {
@@ -1643,20 +1652,10 @@ void VulkanRenderingDevice::CopyToSwapchain(CommandBufferID commandBuffer, Textu
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &swapchainBarrier);
 }
 
-void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)> &&function, SubmitQueueInfo *queueInfo) {
-    size_t queueType = MAIN_QUEUE;
-    CommandBufferID cb = uploadCommandBuffer;
-    CommandPoolID cp = uploadCommandPool;
-    FenceID fence = uploadFence;
+void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)> &&function, ImmediateSubmitInfo *queueInfo) {
+    ASSERT(queueInfo->fence.id != INVALID_ID, "Fence must be a valid fence for immediate submit");
 
-    if (queueInfo) {
-        queueType = queueInfo->queue.id;
-        cb = queueInfo->commandBuffer;
-        cp = queueInfo->commandPool;
-        fence = queueInfo->fence;
-    }
-
-    VkCommandBuffer cmd = _commandBuffers[cb.id];
+    VkCommandBuffer cmd = _commandBuffers[queueInfo->commandBuffer.id];
     VkCommandBufferBeginInfo cmdBeginInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -1664,7 +1663,7 @@ void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)>
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    function(cb);
+    function(queueInfo->commandBuffer);
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -1681,13 +1680,8 @@ void VulkanRenderingDevice::ImmediateSubmit(std::function<void(CommandBufferID)>
         .pSignalSemaphores = nullptr,
     };
 
-    VkFence *vkFence = _fences.Access(fence.id);
-    VK_CHECK(vkQueueSubmit(_queues[queueType], 1, &submitInfo, *vkFence));
-
-    // @TODO this is not where it belongs
-    vkWaitForFences(device, 1, vkFence, true, UINT64_MAX);
-    vkResetFences(device, 1, vkFence);
-    vkResetCommandPool(device, *_commandPools.Access(cp.id), 0);
+    VkFence *vkFence = _fences.Access(queueInfo->fence.id);
+    VK_CHECK(vkQueueSubmit(_queues[queueInfo->queue.id], 1, &submitInfo, *vkFence));
 }
 
 void VulkanRenderingDevice::Present() {
@@ -1760,7 +1754,7 @@ void VulkanRenderingDevice::GenerateMipmap(CommandBufferID commandBuffer, Textur
         VK_ACCESS_TRANSFER_WRITE_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        ~0u, ~0u, 1, 0, tex->mipLevels - 1, 1);
+        UINT32_MAX, UINT32_MAX, 1, 0, tex->mipLevels - 1, 1);
 
     // After each copy we need to transition layout from transfer_dst to transfer src
     transferBarriers[1] = CreateImageBarrier(
@@ -1770,7 +1764,7 @@ void VulkanRenderingDevice::GenerateMipmap(CommandBufferID commandBuffer, Textur
         VK_ACCESS_TRANSFER_READ_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        ~0u, ~0u, 0, 0, 1, 1);
+        UINT32_MAX, UINT32_MAX, 0, 0, 1, 1);
 
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 2, transferBarriers);
 
@@ -1859,9 +1853,6 @@ void VulkanRenderingDevice::Destroy(FenceID fence) {
 }
 
 void VulkanRenderingDevice::Shutdown() {
-    Destroy(CommandPoolID{0ull});
-    Destroy(uploadFence);
-    Destroy(renderEndFence);
     // Release resource pool
     _shaders.Shutdown();
     _commandPools.Shutdown();

@@ -39,3 +39,4 @@ build/
 *.ini
 
 assets/models/
+assets/SPIRV/

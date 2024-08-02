@@ -58,7 +58,7 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                 desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT | RD::TEXTURE_USAGE_TRANSFER_SRC_BIT;
                 if (res == 0) {
                     LOGE("Failed to get texture info from the file" + texturePath);
-                    return ~0u;
+                    return INVALID_TEXTURE_ID;
                 }
                 if (colorTexture)
                     desc.format = RD::FORMAT_R8G8B8A8_SRGB;
@@ -74,7 +74,7 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                 return (uint32_t)textureId.id;
             }
         }
-        return ~0u;
+        return INVALID_TEXTURE_ID;
     };
 
     if (pbr.baseColorTexture.index >= 0)
@@ -328,6 +328,11 @@ void GLTFScene::PrepareDraws() {
     };
 
     // Move to transfer queue
+    RD::ImmediateSubmitInfo submitInfo;
+    submitInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
+    submitInfo.commandPool = device->CreateCommandPool(submitInfo.queue, "TempCommandPool");
+    submitInfo.commandBuffer = device->CreateCommandBuffer(submitInfo.commandPool, "TempCommandBuffer");
+    submitInfo.fence = device->CreateFence("TempFence");
     for (auto &request : uploadRequests) {
         std::memcpy(stagingBufferPtr, request.data, request.size);
 
@@ -336,9 +341,13 @@ void GLTFScene::PrepareDraws() {
                 0, 0, request.size};
             device->CopyBuffer(commandBuffer, stagingBuffer, request.bufferId, &copyRegion);
         },
-                                nullptr);
+                                &submitInfo);
+        device->WaitForFence(&submitInfo.fence, 1, UINT64_MAX);
+        device->ResetFences(&submitInfo.fence, 1);
+        device->ResetCommandPool(submitInfo.commandPool);
     }
-
+    device->Destroy(submitInfo.fence);
+    device->Destroy(submitInfo.commandPool);
     device->Destroy(stagingBuffer);
 
     RD::BoundUniform boundedUniform[] = {
