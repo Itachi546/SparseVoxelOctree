@@ -76,7 +76,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (scene->Initialize({meshPath, "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"}, asyncLoader, globalUB)) {
+    if (scene->Initialize({meshPath /*,"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"*/}, asyncLoader, globalUB)) {
         scene->PrepareDraws();
     } else
         LOGE("Failed to initialize scene");
@@ -120,7 +120,6 @@ void VoxelApp::Run() {
 }
 
 void VoxelApp::OnUpdate() {
-
     ImGuiService::NewFrame();
     if (!ImGuiService::IsFocused())
         UpdateControls();

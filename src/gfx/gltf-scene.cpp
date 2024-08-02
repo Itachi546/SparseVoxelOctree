@@ -10,6 +10,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtx/euler_angles.hpp>
+
 static uint8_t *getBufferPtr(tinygltf::Model *model, const tinygltf::Accessor &accessor) {
     tinygltf::BufferView &bufferView = model->bufferViews[accessor.bufferView];
     return model->buffers[bufferView.buffer].data.data() + accessor.byteOffset + bufferView.byteOffset;
@@ -36,8 +37,9 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
     component->emissive = glm::vec4((float)emissiveColor[0], (float)emissiveColor[1], (float)emissiveColor[2], 1.0f);
 
     // Parse Material texture
-    auto loadTexture = [&](uint32_t index) -> uint32_t {
+    auto LoadTexture = [&](uint32_t index, bool colorTexture = false) -> uint32_t {
         tinygltf::Texture &texture = model->textures[index];
+
         tinygltf::Image &image = model->images[texture.source];
         if (image.uri.length() > 0) {
             // @TODO implement better mechanism
@@ -58,7 +60,11 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
                     LOGE("Failed to get texture info from the file" + texturePath);
                     return ~0u;
                 }
-                desc.format = RD::FORMAT_R8G8B8A8_UNORM;
+                if (colorTexture)
+                    desc.format = RD::FORMAT_R8G8B8A8_SRGB;
+                else
+                    desc.format = RD::FORMAT_R8G8B8A8_UNORM;
+
                 desc.mipMaps = static_cast<uint32_t>(std::floor(std::log2(std::max({width, height})))) + 1;
                 desc.samplerDescription = &samplerDesc;
 
@@ -72,7 +78,7 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
     };
 
     if (pbr.baseColorTexture.index >= 0)
-        component->albedoMap = loadTexture(pbr.baseColorTexture.index);
+        component->albedoMap = LoadTexture(pbr.baseColorTexture.index, true);
     /*
     if (pbr.metallicRoughnessTexture.index >= 0)
         component->metallicRoughnessMap = loadTexture(pbr.metallicRoughnessTexture.index);

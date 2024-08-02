@@ -41,7 +41,6 @@ void main() {
     vec4 diffuseColor;
     if (material.albedoMap != INVALID_TEXTURE) {
         diffuseColor = sampleTexture(material.albedoMap, vUV);
-        diffuseColor.rgb = pow(diffuseColor.rgb, vec3(2.2f));
     } else
         diffuseColor = vec4(1.0f);
     if (diffuseColor.a < 0.5)
