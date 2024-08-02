@@ -20,15 +20,15 @@ struct MeshDrawCommand {
     uint drawId;
 };
 
-layout(binding = 0, set = 1) readonly buffer Vertices {
+layout(binding = 1, set = 0) readonly buffer Vertices {
     VertexData vertices[];
 };
 
-layout(binding = 1, set = 1) readonly buffer DrawCommands {
+layout(binding = 2, set = 0) readonly buffer DrawCommands {
     MeshDrawCommand drawCommands[];
 };
 
-layout(binding = 2, set = 1) readonly buffer Transforms {
+layout(binding = 3, set = 0) readonly buffer Transforms {
     mat4 transforms[];
 };
 

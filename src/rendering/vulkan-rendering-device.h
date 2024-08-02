@@ -231,8 +231,8 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     static const uint32_t MAX_SET_COUNT = 4;
     static const uint32_t MAX_BINDLESS_RESOURCES = 16536;
-    static const uint32_t BINDLESS_TEXTUERE_BINDING = 0;
-    static const uint32_t BINDLESS_TEXTURE_SET = 2;
+    static const uint32_t BINDLESS_TEXTURE_BINDING = 10;
+    static const uint32_t BINDLESS_TEXTURE_SET = 1;
 
     uint64_t memoryUsage = 0;
     void *_platformData;

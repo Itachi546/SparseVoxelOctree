@@ -239,19 +239,19 @@ bool GLTFScene::LoadFile(const std::string &filename, MeshGroup *meshGroup) {
     return true;
 }
 
-bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader, BufferID globalUB) {
+bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader) {
     device = RD::GetInstance();
     asyncLoader = loader;
 
     RD::UniformBinding vsBindings[] = {
         {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 1},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 2},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 1},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 2},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 3},
     };
 
     RD::UniformBinding fsBindings[] = {
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 3},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 4},
     };
 
     ShaderID shaders[2] = {
@@ -281,15 +281,6 @@ bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::share
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
 
-    RD::BoundUniform globalBinding{
-        .bindingType = RD::BINDING_TYPE_UNIFORM_BUFFER,
-        .binding = 0,
-        .resourceID = globalUB,
-        .offset = 0,
-    };
-
-    globalSet = device->CreateUniformSet(renderPipeline, &globalBinding, 1, 0, "GlobalUniformSet");
-
     for (int i = 0; i < filenames.size(); ++i) {
         _meshBasePath = std::filesystem::path(filenames[i]).remove_filename().string();
         if (!LoadFile(filenames[i].c_str(), &meshGroup))
@@ -298,7 +289,7 @@ bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::share
     return true;
 }
 
-void GLTFScene::PrepareDraws() {
+void GLTFScene::PrepareDraws(BufferID globalUB) {
     uint32_t vertexSize = static_cast<uint32_t>(meshGroup.vertices.size() * sizeof(Vertex));
     vertexBuffer = device->CreateBuffer(vertexSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "VertexBuffer");
 
@@ -351,20 +342,20 @@ void GLTFScene::PrepareDraws() {
     device->Destroy(stagingBuffer);
 
     RD::BoundUniform boundedUniform[] = {
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, vertexBuffer},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, drawCommandBuffer},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 2, transformBuffer},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 3, materialBuffer},
+        {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, globalUB},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, vertexBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 2, drawCommandBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 3, transformBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 4, materialBuffer},
     };
-    meshBindingSet = device->CreateUniformSet(renderPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 1, "MeshBindingSet");
+    bindingSet = device->CreateUniformSet(renderPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "MeshBindingSet");
 }
 
 void GLTFScene::Render(CommandBufferID commandBuffer) {
     if (drawCommandBuffer && meshGroup.drawCommands.size() > 0) {
         device->BindPipeline(commandBuffer, renderPipeline);
+        device->BindUniformSet(commandBuffer, renderPipeline, &bindingSet, 1);
 
-        UniformSetID uniformSets[] = {globalSet, meshBindingSet};
-        device->BindUniformSet(commandBuffer, renderPipeline, uniformSets, (uint32_t)std::size(uniformSets));
         device->BindIndexBuffer(commandBuffer, indexBuffer);
         device->DrawIndexedIndirect(commandBuffer, drawCommandBuffer, 0, (uint32_t)meshGroup.drawCommands.size(), sizeof(RD::DrawElementsIndirectCommand));
     }
@@ -401,8 +392,7 @@ void GLTFScene::UpdateTextures(CommandBufferID commandBuffer) {
 }
 
 void GLTFScene::Shutdown() {
-    device->Destroy(globalSet);
-    device->Destroy(meshBindingSet);
+    device->Destroy(bindingSet);
     device->Destroy(renderPipeline);
     if (meshGroup.drawCommands.size() > 0) {
         device->Destroy(vertexBuffer);

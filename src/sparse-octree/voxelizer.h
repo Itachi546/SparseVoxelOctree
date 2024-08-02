@@ -9,16 +9,16 @@ struct RenderScene;
 class Voxelizer {
 
   public:
-    void Initialize(std::shared_ptr<RenderScene> scene, BufferID globalUB);
+    void Initialize(std::shared_ptr<RenderScene> scene);
 
-    void Voxelize(CommandBufferID commandBuffer);
+    void Voxelize(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
     void Shutdown();
 
   private:
     std::shared_ptr<RenderScene> scene;
     PipelineID prepassPipeline;
-    UniformSetID globalSet, prepassSet;
+    UniformSetID prepassSet;
 
     RD *device;
     // BufferID voxelFragmentListBuffer;

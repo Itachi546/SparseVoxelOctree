@@ -699,7 +699,7 @@ void VulkanRenderingDevice::Initialize(void *platformData) {
 
     // Bindless Descriptor Layout
     VkDescriptorSetLayoutBinding _bindlessSetLayouts[] = {
-        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_RESOURCES, VK_SHADER_STAGE_ALL, nullptr},
+        {BINDLESS_TEXTURE_BINDING, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_RESOURCES, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     VkDescriptorSetLayoutCreateInfo bindlessLayoutInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -1708,7 +1708,7 @@ void VulkanRenderingDevice::Present() {
             writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writeSet.pNext = nullptr;
             writeSet.dstSet = _bindlessDescriptorSet;
-            writeSet.dstBinding = BINDLESS_TEXTUERE_BINDING,
+            writeSet.dstBinding = BINDLESS_TEXTURE_BINDING,
             writeSet.dstArrayElement = (uint32_t)bindlessTextureToUpdate[i].id;
             writeSet.descriptorCount = 1;
             writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

@@ -16,8 +16,8 @@ class AsyncLoader;
 
 class GLTFScene : public RenderScene {
   public:
-    bool Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader, BufferID globalUB) override;
-    void PrepareDraws() override;
+    bool Initialize(const std::vector<std::string> &filenames, std::shared_ptr<AsyncLoader> loader) override;
+    void PrepareDraws(BufferID globalUB) override;
     void Render(CommandBufferID commandBuffer) override;
 
     void AddTexturesToUpdate(TextureID texture) {
@@ -54,7 +54,7 @@ class GLTFScene : public RenderScene {
 
     // @TODO shared among different scene
     PipelineID renderPipeline;
-    UniformSetID globalSet, meshBindingSet;
+    UniformSetID bindingSet;
 
     std::mutex textureUpdateMutex;
     std::vector<TextureID> texturesToUpdate;

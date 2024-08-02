@@ -80,8 +80,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (scene->Initialize({meshPath /*,"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"*/}, asyncLoader, globalUB)) {
-        scene->PrepareDraws();
+    if (scene->Initialize({meshPath /*,"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"*/}, asyncLoader)) {
+        scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
 
@@ -90,7 +90,9 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     LOG("Total time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
 
     voxelizer = std::make_shared<Voxelizer>();
-    voxelizer->Initialize(scene, globalUB);
+
+    voxelizer->Initialize(scene);
+    voxelizer->Voxelize(commandPool, commandBuffer);
 }
 
 void VoxelApp::Run() {

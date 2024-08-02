@@ -23,13 +23,13 @@ struct Material {
     uint padding_;
 };
 
-layout(binding = 3, set = 1) readonly buffer Materials {
+layout(binding = 4, set = 0) readonly buffer Materials {
     Material materials[];
 };
 
 #define INVALID_TEXTURE ~0u
 
-layout(binding = 0, set = 2) uniform sampler2D uTextures[];
+layout(binding = 10, set = 1) uniform sampler2D uTextures[];
 
 vec4 sampleTexture(uint textureId, vec2 uv) {
     return texture(uTextures[nonuniformEXT(textureId)], uv);
