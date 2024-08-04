@@ -24,4 +24,9 @@ class Voxelizer {
     // BufferID voxelFragmentListBuffer;
     BufferID voxelCountBuffer;
     uint64_t *countBufferPtr;
+
+    // @TEMP
+    TextureID texture;
+
+    const uint32_t VOXEL_GRID_SIZE = 32;
 };

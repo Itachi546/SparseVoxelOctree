@@ -17,21 +17,21 @@ void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene) {
     *countBufferPtr = 0;
 
     RD::UniformBinding vsBindings[] = {
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 0},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 1},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 2},
-    };
-
-    RD::UniformBinding fsBindings[] = {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 3},
     };
 
-    uint32_t pushConstantSize = static_cast<uint32_t>(sizeof(glm::mat4));
-    RD::PushConstant pushConstant{.offset = 0, .size = pushConstantSize};
+    RD::UniformBinding fsBindings[] = {
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 4},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 5},
+        {RD::BINDING_TYPE_IMAGE, 0, 6},
+    };
 
-    ShaderID shaders[2] = {
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), &pushConstant, 1),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
+    ShaderID shaders[3] = {
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.geom.spv", nullptr, 0, nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
     };
 
     RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
@@ -53,13 +53,22 @@ void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene) {
 
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
+    device->Destroy(shaders[2]);
+
+    RD::TextureDescription description = RD::TextureDescription::Initialize(VOXEL_GRID_SIZE, VOXEL_GRID_SIZE, VOXEL_GRID_SIZE);
+    description.format = RD::FORMAT_R8_UNORM;
+    description.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
+    description.textureType = RD::TEXTURE_TYPE_3D;
+    texture = device->CreateTexture(&description, "VoxelTexture");
 
     std::shared_ptr<GLTFScene> gltfScene = std::static_pointer_cast<GLTFScene>(scene);
     RD::BoundUniform boundedUniform[] = {
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 0, gltfScene->vertexBuffer},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, gltfScene->drawCommandBuffer},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 2, gltfScene->transformBuffer},
-        {RD::BINDING_TYPE_STORAGE_BUFFER, 3, voxelCountBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 1, gltfScene->vertexBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 2, gltfScene->drawCommandBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 3, gltfScene->transformBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 4, gltfScene->materialBuffer},
+        {RD::BINDING_TYPE_STORAGE_BUFFER, 5, voxelCountBuffer},
+        {RD::BINDING_TYPE_IMAGE, 6, texture},
     };
     prepassSet = device->CreateUniformSet(prepassPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "Prepass Mesh Binding");
 }
@@ -74,8 +83,8 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
     };
 
     RD::RenderingInfo renderingInfo = {
-        .width = 512,
-        .height = 512,
+        .width = VOXEL_GRID_SIZE,
+        .height = VOXEL_GRID_SIZE,
         .layerCount = 1,
         .colorAttachmentCount = 0,
         .pColorAttachments = nullptr,
@@ -85,13 +94,26 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
 
     glm::mat4 VP = glm::mat4(1.0f);
     device->ImmediateSubmit([&](CommandBufferID commandBuffer) {
+        RD::TextureBarrier barrier{
+            .texture = texture,
+            .srcAccess = 0,
+            .dstAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT,
+            .newLayout = RD::TEXTURE_LAYOUT_GENERAL,
+            .srcQueueFamily = QUEUE_FAMILY_IGNORED,
+            .dstQueueFamily = QUEUE_FAMILY_IGNORED,
+            .baseMipLevel = 0,
+            .baseArrayLayer = 0,
+            .levelCount = 1,
+            .layerCount = 1,
+        };
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1);
+
         device->BeginRenderPass(commandBuffer, &renderingInfo);
         device->SetViewport(commandBuffer, 0, 0, static_cast<float>(renderingInfo.width), static_cast<float>(renderingInfo.height));
         device->SetScissor(commandBuffer, 0, 0, renderingInfo.width, renderingInfo.height);
 
         device->BindPipeline(commandBuffer, prepassPipeline);
         device->BindUniformSet(commandBuffer, prepassPipeline, bindings, static_cast<uint32_t>(std::size(bindings)));
-        device->BindPushConstants(commandBuffer, prepassPipeline, RD::SHADER_STAGE_VERTEX, &VP[0][0], 0, (uint32_t)sizeof(glm::mat4));
 
         std::shared_ptr<GLTFScene> gltfScene = std::static_pointer_cast<GLTFScene>(scene);
         device->BindIndexBuffer(commandBuffer, gltfScene->indexBuffer);
@@ -111,6 +133,7 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
 }
 
 void Voxelizer::Shutdown() {
+    device->Destroy(texture);
     device->Destroy(prepassSet);
     device->Destroy(prepassPipeline);
     device->Destroy(voxelCountBuffer);

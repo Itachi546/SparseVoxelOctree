@@ -80,7 +80,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (scene->Initialize({meshPath /*,"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"*/}, asyncLoader)) {
+    if (scene->Initialize({/*meshPath /*,*/ "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"}, asyncLoader)) {
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
@@ -163,6 +163,21 @@ void VoxelApp::OnRenderUI() {
 }
 
 void VoxelApp::OnRender() {
+
+    RD::TextureBarrier barrier{
+        .texture = depthAttachment,
+        .srcAccess = 0,
+        .dstAccess = RD::BARRIER_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        .newLayout = RD::TEXTURE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        .srcQueueFamily = QUEUE_FAMILY_IGNORED,
+        .dstQueueFamily = QUEUE_FAMILY_IGNORED,
+        .baseMipLevel = 0,
+        .baseArrayLayer = 0,
+        .levelCount = UINT32_MAX,
+        .layerCount = UINT32_MAX,
+    };
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
+
     RD::AttachmentInfo colorAttachmentInfos = {
         .loadOp = RD::LOAD_OP_CLEAR,
         .storeOp = RD::STORE_OP_STORE,
@@ -189,24 +204,10 @@ void VoxelApp::OnRender() {
         .pDepthStencilAttachment = &depthStencilAttachmentInfo,
     };
 
+    device->BeginRenderPass(commandBuffer, &renderingInfo);
+
     device->SetViewport(commandBuffer, 0.0f, windowSize.y, windowSize.x, -windowSize.y);
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
-
-    RD::TextureBarrier barrier{
-        .texture = depthAttachment,
-        .srcAccess = 0,
-        .dstAccess = RD::BARRIER_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        .newLayout = RD::TEXTURE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        .srcQueueFamily = QUEUE_FAMILY_IGNORED,
-        .dstQueueFamily = QUEUE_FAMILY_IGNORED,
-        .baseMipLevel = 0,
-        .baseArrayLayer = 0,
-        .levelCount = UINT32_MAX,
-        .layerCount = UINT32_MAX,
-    };
-    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
-
-    device->BeginRenderPass(commandBuffer, &renderingInfo);
 
     scene->Render(commandBuffer);
 

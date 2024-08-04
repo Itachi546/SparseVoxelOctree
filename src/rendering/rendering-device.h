@@ -148,8 +148,7 @@ class RenderingDevice {
     };
 
     enum Format {
-        FORMAT_R10G10B10A2_UNORM = 0,
-        FORMAT_B8G8R8A8_UNORM,
+        FORMAT_B8G8R8A8_UNORM = 0,
         FORMAT_R8G8B8A8_UNORM,
         FORMAT_R8G8B8A8_SRGB,
         FORMAT_R8G8B8_UNORM,
@@ -420,7 +419,7 @@ class RenderingDevice {
                 .format = FORMAT_R8G8B8A8_UNORM,
                 .width = width,
                 .height = height,
-                .depth = 1,
+                .depth = depth,
                 .arrayLayers = 1,
                 .mipMaps = 1,
                 .textureType = TEXTURE_TYPE_2D,

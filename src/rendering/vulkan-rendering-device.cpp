@@ -57,7 +57,6 @@ static VkShaderStageFlagBits RD_STAGE_TO_VK_SHADER_STAGE_BITS[RD::SHADER_STAGE_M
 };
 
 static VkFormat RD_FORMAT_TO_VK_FORMAT[RD::FORMAT_MAX] = {
-    VK_FORMAT_A2B10G10R10_UNORM_PACK32,
     VK_FORMAT_B8G8R8A8_UNORM,
     VK_FORMAT_R8G8B8A8_UNORM,
     VK_FORMAT_R8G8B8A8_SRGB,
@@ -285,6 +284,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
 
     LOG("Bindless support found ...");
 
+    deviceFeatures2.features.fragmentStoresAndAtomics = true;
     deviceFeatures2.features.multiDrawIndirect = true;
     deviceFeatures2.features.pipelineStatisticsQuery = true;
     deviceFeatures2.features.shaderInt16 = true;
