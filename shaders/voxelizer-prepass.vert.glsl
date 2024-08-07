@@ -6,8 +6,6 @@
 #include "meshdata.glsl"
 
 layout(location = 0) out vec3 vWorldPos;
-layout(location = 1) out vec2 vUV;
-layout(location = 2) out flat uint vDrawID;
 
 void main() {
     MeshDrawCommand drawCommand = drawCommands[gl_DrawID];
@@ -21,6 +19,4 @@ void main() {
     gl_Position = worldPos;
 
     vWorldPos = worldPos.xyz;
-    vUV = vec2(vertex.tu, vertex.tv);
-    vDrawID = drawCommand.drawId;
 }

@@ -17,16 +17,27 @@ class Voxelizer {
 
   private:
     std::shared_ptr<RenderScene> scene;
-    PipelineID prepassPipeline;
-    UniformSetID prepassSet;
+    PipelineID prepassPipeline, mainPipeline;
+    UniformSetID prepassSet, mainSet;
 
     RD *device;
-    // BufferID voxelFragmentListBuffer;
+
+    BufferID voxelFragmentListBuffer;
     BufferID voxelCountBuffer;
     uint64_t *countBufferPtr;
+    uint32_t voxelCount = 0;
 
     // @TEMP
     TextureID texture;
 
-    const uint32_t VOXEL_GRID_SIZE = 32;
+    const uint32_t VOXEL_GRID_SIZE = 128;
+
+    void InitializePrepassResources();
+    void InitializeMainResources();
+
+    void DrawVoxelScene(CommandBufferID cb, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount);
+
+    void ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceID waitFence);
+
+    void ExecuteMainPass(CommandPoolID cp, CommandBufferID cb, FenceID waitFence);
 };

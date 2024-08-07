@@ -70,7 +70,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-    auto begin = std::chrono::high_resolution_clock::now();
+    auto begin0 = std::chrono::high_resolution_clock::now();
 
     asyncLoader = std::make_shared<AsyncLoader>();
     scene = std::make_shared<GLTFScene>();
@@ -80,19 +80,21 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (scene->Initialize({/*meshPath /*,*/ "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"}, asyncLoader)) {
+    if (scene->Initialize({meshPath /*,"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"*/}, asyncLoader)) {
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-    LOG("Total time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
-
     voxelizer = std::make_shared<Voxelizer>();
-
+    auto begin1 = std::chrono::high_resolution_clock::now();
     voxelizer->Initialize(scene);
     voxelizer->Voxelize(commandPool, commandBuffer);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin1).count();
+    LOG("Time taken Voxelization: " + std::to_string(float(duration) / 1000.0f) + "s");
+
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin0).count();
+    LOG("Total Time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
 }
 
 void VoxelApp::Run() {

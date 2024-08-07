@@ -55,6 +55,7 @@ struct AppWindow {
             glfwWindowPtr,
             [](GLFWwindow *window, int sx, int sy) {
                 auto &app = *reinterpret_cast<App *>(glfwGetWindowUserPointer(window));
+                std::cout << sx << " " << sy << std::endl;
                 app.OnResize(static_cast<float>(sx), static_cast<float>(sy));
             });
 
@@ -71,6 +72,12 @@ struct AppWindow {
         device->Initialize(&platformData);
         device->CreateSurface();
         device->CreateSwapchain(true);
+
+        int width, height;
+        glfwGetFramebufferSize(glfwWindowPtr, &width, &height);
+        this->windowSize.x = static_cast<float>(width);
+        this->windowSize.y = static_cast<float>(height);
+        std::cout << width << " " << height << std::endl;
     }
 
     virtual ~AppWindow() {

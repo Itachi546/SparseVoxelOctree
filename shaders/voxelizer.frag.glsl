@@ -5,21 +5,21 @@
 #define ENABLE_BINDLESS_SET
 #include "material.glsl"
 
-layout(location = 0) in vec3 gWorldPos;
+layout(location = 0) in vec3 gVoxelWorldPos;
 layout(location = 1) in vec2 gUV;
-layout(location = 2) in flat uint gDrawId;
-layout(location = 3) in vec3 gVoxelWorldPos;
+layout(location = 2) in flat uint gDrawID;
 
-layout(binding = 5, set = 0) writeonly buffer VoxelFragmentBuffer {
-    uint voxelFragmentList;
+layout(binding = 5, set = 0) writeonly buffer VoxelFragmentCountBuffer {
+    uint voxelCount;
 };
 
-layout(r8, binding = 6, set = 0) uniform writeonly image3D uVoxelTexture;
+layout(binding = 6, set = 0) writeonly buffer VoxelFragmentBuffer {
+    uint voxelFragment[];
+};
 
 void main() {
-    atomicAdd(voxelFragmentList, 1);
+    uint index = atomicAdd(voxelCount, 1);
 
-    // WorldPos range from the -VOXEL_SIZE to VOXEL_SIZE 
-    ivec3 voxelCoord = ivec3(gVoxelWorldPos);
-    imageStore(uVoxelTexture, voxelCoord, vec4(0.5f));
+    ivec3 vp = ivec3(gVoxelWorldPos);
+    voxelFragment[index] = (vp.x << 20) | (vp.y << 10) | vp.z;
 }

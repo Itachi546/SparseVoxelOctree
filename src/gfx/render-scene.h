@@ -5,6 +5,7 @@
 #include <string>
 
 #include "rendering/rendering-device.h"
+#include "mesh.h"
 
 class AsyncLoader;
 
@@ -23,4 +24,11 @@ struct RenderScene {
     virtual void Shutdown() = 0;
 
     virtual ~RenderScene() {}
+
+    BufferID vertexBuffer;
+    BufferID indexBuffer;
+    BufferID transformBuffer;
+    BufferID materialBuffer;
+    BufferID drawCommandBuffer;
+    MeshGroup meshGroup;
 };

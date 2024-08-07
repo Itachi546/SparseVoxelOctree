@@ -70,7 +70,6 @@ namespace ImGuiService {
 
     void Render(CommandBufferID commandBuffer) {
         ImGui::Render();
-        return;
         VulkanRenderingDevice *device = static_cast<VulkanRenderingDevice *>(RD::GetInstance());
         VkCommandBuffer cb = device->_commandBuffers[commandBuffer.id];
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cb);
