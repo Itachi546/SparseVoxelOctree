@@ -31,7 +31,7 @@ void main() {
     for (int i = 0; i < 3; ++i) {
         // Convert to clipspace position and project it along dominant axis
         vec3 voxelSpacePos = ToVoxelSpace(vWorldPos[i]);
-        gVoxelWorldPos = (voxelSpacePos * 0.5 + 0.5) * VOXEL_SIZE;
+        gVoxelWorldPos = clamp(voxelSpacePos * 0.5 + 0.5, vec3(0), vec3(1)) * VOXEL_SIZE;
 
         vec3 projectedPosition = ProjectAlongDominantAxis(voxelSpacePos, dominantAxis);
         

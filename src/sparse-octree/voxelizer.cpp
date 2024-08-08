@@ -9,11 +9,12 @@ void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene) {
     this->scene = scene;
     device = RD::GetInstance();
 
-    voxelCountBuffer = device->CreateBuffer(static_cast<uint32_t>(sizeof(uint64_t)),
+    voxelCountBuffer = device->CreateBuffer(static_cast<uint32_t>(sizeof(uint32_t) * 2),
                                             RD::BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                             RD::MEMORY_ALLOCATION_TYPE_CPU,
                                             "Voxel Count Buffer");
-    countBufferPtr = (uint64_t *)device->MapBuffer(voxelCountBuffer);
+    countBufferPtr = (uint32_t *)device->MapBuffer(voxelCountBuffer);
+    std::memset(countBufferPtr, 0, sizeof(uint32_t) * 2);
 
     InitializePrepassResources();
     InitializeMainResources();
@@ -144,8 +145,6 @@ void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipelin
 }
 
 void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceID waitFence) {
-    *countBufferPtr = 0;
-
     RD::ImmediateSubmitInfo submitInfo = {
         .queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS),
         .commandPool = cp,
@@ -176,12 +175,11 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
     device->WaitForFence(&waitFence, 1, UINT64_MAX);
     device->ResetFences(&waitFence, 1);
 
-    voxelCount = static_cast<uint32_t>(*countBufferPtr);
-    LOG("Total voxels: " + std::to_string(*countBufferPtr));
+    voxelCount = countBufferPtr[0];
+    LOG("Total voxels: " + std::to_string(voxelCount));
 }
 
 void Voxelizer::ExecuteMainPass(CommandPoolID cp, CommandBufferID cb, FenceID waitFence) {
-    *countBufferPtr = 0;
     RD::ImmediateSubmitInfo submitInfo = {
         .queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS),
         .commandPool = cp,
@@ -195,7 +193,7 @@ void Voxelizer::ExecuteMainPass(CommandPoolID cp, CommandBufferID cb, FenceID wa
                             &submitInfo);
 
     device->WaitForFence(&waitFence, 1, UINT64_MAX);
-    LOG("Voxelization Write Pass Finished ..." + std::to_string(*countBufferPtr));
+    LOG("Voxelization Write Pass Finished ..." + std::to_string(countBufferPtr[1]));
 }
 
 void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {

@@ -24,7 +24,7 @@ class Voxelizer {
 
     BufferID voxelFragmentListBuffer;
     BufferID voxelCountBuffer;
-    uint64_t *countBufferPtr;
+    uint32_t *countBufferPtr;
     uint32_t voxelCount = 0;
 
     // @TEMP

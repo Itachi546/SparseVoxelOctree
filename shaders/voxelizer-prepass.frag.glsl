@@ -7,14 +7,14 @@ layout(binding = 10, set = 1) uniform sampler2D uTextures[];
 
 layout(location = 0) in vec3 gVoxelWorldPos;
 
-layout(binding = 4, set = 0) writeonly buffer VoxelFragmentBuffer {
-    uint voxelCount;
+layout(binding = 4, set = 0) writeonly buffer VoxelFragmentCountBuffer {
+    uint voxelCount[];
 };
 
 layout(r8, binding = 5, set = 0) uniform writeonly image3D uVoxelTexture;
 
 void main() {
-    atomicAdd(voxelCount, 1);
+    atomicAdd(voxelCount[0], 1);
     ivec3 voxelCoord = ivec3(gVoxelWorldPos);
     imageStore(uVoxelTexture, voxelCoord, vec4(0.5f));
 }
