@@ -17,6 +17,7 @@ set(ENKITS_BUILD_C_INTERFACE OFF)
 set(ENKITS_BUILD_EXAMPLES OFF)
 add_subdirectory(external/enkiTS)
 
+find_package(Vulkan)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)

@@ -468,8 +468,9 @@ class RenderingDevice {
                                               const BlendState *attachmentBlendStates,
                                               uint32_t colorAttachmentCount,
                                               Format depthAttachmentFormat,
+                                              bool enableBindless,
                                               const std::string &name) = 0;
-    virtual PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name) = 0;
+    virtual PipelineID CreateComputePipeline(const ShaderID shader, bool enableBindless, const std::string &name) = 0;
     virtual TextureID CreateTexture(TextureDescription *description, const std::string &name) = 0;
     virtual ShaderID CreateShader(const uint32_t *byteCode, uint32_t codeSizeInBytes, ShaderDescription *desc, const std::string &name = "shader") = 0;
     virtual CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name = "commandBuffer") = 0;

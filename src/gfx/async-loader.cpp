@@ -2,7 +2,7 @@
 #include "async-loader.h"
 
 #include "gltf-loader.h"
-#include "stb_image.h"
+#include "tinygltf/stb_image.h"
 #include "render-scene.h"
 
 #include <thread>

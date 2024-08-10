@@ -17,7 +17,7 @@ void main() {
 
     mat4 worldTransform = transforms[drawCommand.drawId];
 
-    vec4 worldPos = worldTransform * vec4(position * 5.0f, 1.0f);
+    vec4 worldPos = worldTransform * vec4(position, 1.0f);
     gl_Position = worldPos;
 
     vWorldPos = worldPos.xyz;

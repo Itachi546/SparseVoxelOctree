@@ -821,6 +821,7 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
                                                          const BlendState *attachmentBlendStates,
                                                          uint32_t colorAttachmentCount,
                                                          Format depthAttachmentFormat,
+                                                         bool enableBindless,
                                                          const std::string &name) {
     VkGraphicsPipelineCreateInfo createInfo = {VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
 
@@ -894,7 +895,7 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
 
     std::vector<VkPipelineColorBlendAttachmentState> blendStates(colorAttachmentCount);
     for (uint32_t i = 0; i < colorAttachmentCount; ++i) {
-        blendStates[i].blendEnable = false;
+        blendStates[i].blendEnable = attachmentBlendStates[i].enable;
         blendStates[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     }
     VkPipelineColorBlendStateCreateInfo colorBlendState = {VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
@@ -933,23 +934,29 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
         if (setBinding.size() > 0)
             setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
     }
-    // Temporarily push back the bindlessSetLayout to create pipeline layout
-    setLayouts.push_back(_bindlessDescriptorSetLayout);
-    VkPipelineLayout layout = CreatePipelineLayout(setLayouts, pushConstants);
-    // Remove bindlessDescriptorSetLayout as it is already destroyed
-    setLayouts.pop_back();
 
+    if (enableBindless) {
+        // Temporarily push back the bindlessSetLayout to create pipeline layout
+        setLayouts.push_back(_bindlessDescriptorSetLayout);
+    }
+    VkPipelineLayout layout = CreatePipelineLayout(setLayouts, pushConstants);
     createInfo.layout = layout;
+
+    // Remove bindlessDescriptorSetLayout as it is already destroyed
+    if (enableBindless)
+        setLayouts.pop_back();
 
     VK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
 
     pipeline->bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     pipeline->layout = layout;
+    pipeline->bindlessEnabled = enableBindless;
+
     SetDebugMarkerObjectName(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline->pipeline, name.c_str());
     return PipelineID{pipelineID};
 }
 
-PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, const std::string &name) {
+PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, bool enableBindless, const std::string &name) {
     VulkanShader *vkShader = _shaders.Access(shader.id);
     assert(vkShader->stage == VK_SHADER_STAGE_COMPUTE_BIT);
 
@@ -995,6 +1002,7 @@ PipelineID VulkanRenderingDevice::CreateComputePipeline(const ShaderID shader, c
     VK_CHECK(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline->pipeline));
     pipeline->layout = layout;
     pipeline->bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+    pipeline->bindlessEnabled = enableBindless;
 
     SetDebugMarkerObjectName(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline->pipeline, name.c_str());
 
@@ -1499,7 +1507,9 @@ void VulkanRenderingDevice::BindPipeline(CommandBufferID commandBuffer, Pipeline
 
     VkCommandBuffer cb = _commandBuffers[commandBuffer.id];
     vkCmdBindPipeline(cb, vkPipeline->bindPoint, vkPipeline->pipeline);
-    vkCmdBindDescriptorSets(cb, vkPipeline->bindPoint, vkPipeline->layout, BINDLESS_TEXTURE_SET, 1, &_bindlessDescriptorSet, 0, nullptr);
+
+    if (vkPipeline->bindlessEnabled)
+        vkCmdBindDescriptorSets(cb, vkPipeline->bindPoint, vkPipeline->layout, BINDLESS_TEXTURE_SET, 1, &_bindlessDescriptorSet, 0, nullptr);
 }
 
 void VulkanRenderingDevice::BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) {
@@ -1562,8 +1572,8 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
         TextureBarrier &textureBarrier = textureBarriers[i];
         VkImageLayout newLayout = VkImageLayout(textureBarrier.newLayout);
         VulkanTexture *vkTexture = _textures.Access(textureBarrier.texture.id);
-        if (newLayout == vkTexture->currentLayout)
-            continue;
+        // if (newLayout == vkTexture->currentLayout)
+        // continue;
 
         uint32_t srcQueueFamily = textureBarrier.srcQueueFamily.id == VK_QUEUE_FAMILY_IGNORED ? VK_QUEUE_FAMILY_IGNORED : _queueFamilyIndices[textureBarrier.srcQueueFamily.id];
         uint32_t dstQueueFamily = textureBarrier.dstQueueFamily.id == VK_QUEUE_FAMILY_IGNORED ? VK_QUEUE_FAMILY_IGNORED : _queueFamilyIndices[textureBarrier.dstQueueFamily.id];

@@ -80,7 +80,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf";
-    if (scene->Initialize({meshPath /*,"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"*/}, asyncLoader)) {
+    if (scene->Initialize({/*meshPath /*,*/ "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb"}, asyncLoader)) {
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
@@ -89,6 +89,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     auto begin1 = std::chrono::high_resolution_clock::now();
     voxelizer->Initialize(scene);
     voxelizer->Voxelize(commandPool, commandBuffer);
+
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin1).count();
     LOG("Time taken Voxelization: " + std::to_string(float(duration) / 1000.0f) + "s");
@@ -161,6 +162,7 @@ void VoxelApp::OnRenderUI() {
 
     float memoryUsage = (float)device->GetMemoryUsage() / (1024.0f * 1024.0f);
     ImGui::Text("GPU Memory Usage: %.2fMB", memoryUsage);
+    ImGui::Combo("Scene Mode", &sceneMode, "Rasterizer\0Raycast\0\0");
     ImGuiService::Render(commandBuffer);
 }
 
@@ -211,7 +213,11 @@ void VoxelApp::OnRender() {
     device->SetViewport(commandBuffer, 0.0f, windowSize.y, windowSize.x, -windowSize.y);
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
 
-    scene->Render(commandBuffer);
+    if (sceneMode == 0) {
+        scene->Render(commandBuffer);
+    } else {
+        voxelizer->RayMarch(commandBuffer, camera);
+    }
 
     OnRenderUI();
 

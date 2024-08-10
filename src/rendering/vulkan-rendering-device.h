@@ -36,9 +36,10 @@ class VulkanRenderingDevice : public RenderingDevice {
                                       const BlendState *attachmentBlendStates,
                                       uint32_t colorAttachmentCount,
                                       Format depthAttachmentFormat,
+                                      bool enableBindless,
                                       const std::string &name) override;
 
-    PipelineID CreateComputePipeline(const ShaderID shader, const std::string &name);
+    PipelineID CreateComputePipeline(const ShaderID shader, bool enableBindless, const std::string &name);
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name) override;
 
     CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "CommandPool") override;
@@ -160,6 +161,7 @@ class VulkanRenderingDevice : public RenderingDevice {
         VkPipelineLayout layout;
         std::vector<VkDescriptorSetLayout> setLayout;
         VkPipelineBindPoint bindPoint;
+        bool bindlessEnabled;
     };
 
     struct VulkanSwapchain {

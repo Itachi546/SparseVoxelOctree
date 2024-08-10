@@ -3,6 +3,7 @@
 
 #include "gfx/render-scene.h"
 #include "gfx/gltf-scene.h"
+#include "gfx/camera.h"
 #include "rendering/rendering-utils.h"
 
 void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene) {
@@ -18,6 +19,7 @@ void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene) {
 
     InitializePrepassResources();
     InitializeMainResources();
+    InitializeRayMarchResources();
 }
 
 void Voxelizer::InitializePrepassResources() {
@@ -55,6 +57,7 @@ void Voxelizer::InitializePrepassResources() {
                                                      nullptr,
                                                      0,
                                                      RD::FORMAT_UNDEFINED,
+                                                     false,
                                                      "Voxelizer Prepass");
 
     device->Destroy(shaders[0]);
@@ -76,6 +79,19 @@ void Voxelizer::InitializePrepassResources() {
         {RD::BINDING_TYPE_IMAGE, 5, texture},
     };
     prepassSet = device->CreateUniformSet(prepassPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "Prepass Binding");
+
+    RD::UniformBinding csBindings = {
+        .bindingType = RD::BINDING_TYPE_IMAGE,
+        .set = 0,
+        .binding = 0,
+    };
+
+    ShaderID cs = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/clear3d-texture.comp.spv", &csBindings, 1, nullptr, 0);
+    clearTexturePipeline = device->CreateComputePipeline(cs, false, "Clear3DTexture Pipeline");
+    device->Destroy(cs);
+
+    RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture, 0, 0};
+    clearTextureSet = device->CreateUniformSet(clearTexturePipeline, &textureBinding, 1, 0, "ClearTextureBinding");
 }
 
 void Voxelizer::InitializeMainResources() {
@@ -113,11 +129,52 @@ void Voxelizer::InitializeMainResources() {
                                                   nullptr,
                                                   0,
                                                   RD::FORMAT_UNDEFINED,
+                                                  true,
                                                   "Voxelizer Main Pass");
 
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
     device->Destroy(shaders[2]);
+}
+
+void Voxelizer::InitializeRayMarchResources() {
+    // Create prepass pipeline
+    RD::UniformBinding fsBindings[] = {
+        {RD::BINDING_TYPE_IMAGE, 0, 0},
+    };
+
+    RD::PushConstant pushConstants = {0, sizeof(RayMarchPushConstant)};
+
+    ShaderID shaders[2] = {
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast-grid.vert.spv", nullptr, 0, nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast-grid.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), &pushConstants, 1),
+    };
+
+    RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
+    RD::DepthState depthState = RD::DepthState::Create();
+    depthState.enableDepthWrite = false;
+    depthState.enableDepthTest = false;
+
+    RD::Format colorAttachmentFormat = RD::FORMAT_B8G8R8A8_UNORM;
+    RD::BlendState blendState = RD::BlendState::Create();
+
+    raymarchPipeline = device->CreateGraphicsPipeline(shaders,
+                                                      (uint32_t)std::size(shaders),
+                                                      RD::TOPOLOGY_TRIANGLE_LIST,
+                                                      &rasterizationState,
+                                                      &depthState,
+                                                      &colorAttachmentFormat,
+                                                      &blendState,
+                                                      1,
+                                                      RD::FORMAT_D24_UNORM_S8_UINT,
+                                                      false,
+                                                      "RayMarch Pass");
+
+    device->Destroy(shaders[0]);
+    device->Destroy(shaders[1]);
+
+    RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture, 0, 0};
+    raymarchSet = device->CreateUniformSet(raymarchPipeline, &textureBinding, 1, 0, "Raymarch Set");
 }
 
 void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) {
@@ -166,7 +223,17 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
             .layerCount = 1,
         };
 
-        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1);
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, &barrier, 1);
+
+        // @TEMP Clear the voxel texture
+        device->BindPipeline(commandBuffer, clearTexturePipeline);
+        device->BindUniformSet(commandBuffer, clearTexturePipeline, &clearTextureSet, 1);
+
+        uint32_t workGroupSize = RenderingUtils::GetWorkGroupSize(VOXEL_GRID_SIZE, 8);
+        device->DispatchCompute(commandBuffer, workGroupSize, workGroupSize, workGroupSize);
+
+        barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1);
 
         DrawVoxelScene(commandBuffer, prepassPipeline, &prepassSet, 1);
     },
@@ -223,7 +290,26 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
     device->ResetCommandPool(cp);
 }
 
+void Voxelizer::RayMarch(CommandBufferID commandBuffer, const gfx::Camera *camera) {
+
+    raymarchConstants.uInvP = camera->GetInvProjectionMatrix();
+    raymarchConstants.uInvV = camera->GetInvViewMatrix();
+    raymarchConstants.uCamPos = glm::vec4(camera->GetPosition(), 0.0f);
+
+    device->BindPipeline(commandBuffer, raymarchPipeline);
+    device->BindUniformSet(commandBuffer, raymarchPipeline, &raymarchSet, 1);
+    device->BindPushConstants(commandBuffer, raymarchPipeline, RD::SHADER_STAGE_FRAGMENT, &raymarchConstants, 0, sizeof(RayMarchPushConstant));
+
+    device->Draw(commandBuffer, 6, 1, 0, 0);
+}
+
 void Voxelizer::Shutdown() {
+    device->Destroy(clearTexturePipeline);
+    device->Destroy(clearTextureSet);
+
+    device->Destroy(raymarchPipeline);
+    device->Destroy(raymarchSet);
+
     device->Destroy(mainPipeline);
     device->Destroy(mainSet);
     device->Destroy(texture);

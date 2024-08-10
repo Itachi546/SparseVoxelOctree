@@ -41,6 +41,7 @@ namespace Debug {
                                                        &bs,
                                                        1,
                                                        RD::FORMAT_D24_UNORM_S8_UINT,
+                                                       false,
                                                        "Debug Draw Pipeline");
 
         RD::BoundUniform boundUniform = {RD::BINDING_TYPE_STORAGE_BUFFER, 0, gLineBuffer};

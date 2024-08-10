@@ -14,5 +14,7 @@ namespace RenderingUtils {
         return (uint32_t)std::floor(std::log2(std::max({width, height, depth}))) + 1;
     }
 
-    void GenerateMipmap(CommandBufferID commandBuffer, TextureID texture);
+    inline uint32_t GetWorkGroupSize(uint32_t size, uint32_t localSize) {
+        return (size + localSize - 1) / localSize;
+    }
 }; // namespace RenderingUtils

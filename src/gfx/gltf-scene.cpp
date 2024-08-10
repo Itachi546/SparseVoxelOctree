@@ -4,7 +4,7 @@
 
 #include "gltf-loader.h"
 #include "tinygltf/tinygltf.h"
-#include "stb_image.h"
+#include "tinygltf/stb_image.h"
 #include "async-loader.h"
 #include "rendering/rendering-utils.h"
 
@@ -276,6 +276,7 @@ bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::share
                                                     &blendState,
                                                     1,
                                                     RD::FORMAT_D24_UNORM_S8_UINT,
+                                                    true,
                                                     "MeshDrawPipeline");
 
     device->Destroy(shaders[0]);
@@ -301,6 +302,10 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
 
     uint32_t transformSize = static_cast<uint32_t>(meshGroup.transforms.size() * sizeof(glm::mat4));
     transformBuffer = device->CreateBuffer(transformSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "TransformBuffer");
+    // @TEMP
+    for (auto &transform : meshGroup.transforms) {
+        transform = transform * glm::scale(glm::mat4(1.0f), glm::vec3(30.0f));
+    }
 
     uint32_t materialSize = static_cast<uint32_t>(meshGroup.materials.size() * sizeof(MaterialInfo));
     materialBuffer = device->CreateBuffer(materialSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "Material Buffer");

@@ -28,7 +28,7 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
     };
 
     ShaderID shaderID = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/raycast.comp.spv", bindings, static_cast<uint32_t>(std::size(bindings)), &pushConstant, 1);
-    pipeline = device->CreateComputePipeline(shaderID, "Raycast Compute Pipeline");
+    pipeline = device->CreateComputePipeline(shaderID, false, "Raycast Compute Pipeline");
     device->Destroy(shaderID);
 
     uint32_t nodeDataSize = static_cast<uint32_t>(octree->nodePools.size() * sizeof(uint32_t));
