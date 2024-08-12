@@ -37,7 +37,7 @@ class Voxelizer {
 
     // @TEMP
     TextureID texture;
-
+    bool enableConservativeRasterization = true;
     const uint32_t VOXEL_GRID_SIZE = 128;
 
     void InitializePrepassResources();

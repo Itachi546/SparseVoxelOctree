@@ -304,7 +304,7 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
     transformBuffer = device->CreateBuffer(transformSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "TransformBuffer");
     // @TEMP
     for (auto &transform : meshGroup.transforms) {
-        transform = transform * glm::scale(glm::mat4(1.0f), glm::vec3(30.0f));
+        transform = transform * glm::scale(glm::mat4(1.0f), glm::vec3(5.0f));
     }
 
     uint32_t materialSize = static_cast<uint32_t>(meshGroup.materials.size() * sizeof(MaterialInfo));

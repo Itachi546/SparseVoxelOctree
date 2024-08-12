@@ -25,8 +25,7 @@ vec3 GenerateCameraRay(vec2 uv, mat4 invP, mat4 invV) {
 float SampleVoxel(vec3 p) {
 #if 1
     ivec3 textureCoord = ivec3(WorldToTextureSpace(p));
-    if (textureCoord.x >= 0 && textureCoord.y >= 0 && textureCoord.z >= 0 &&
-        textureCoord.x < VOXEL_GRID_SIZE && textureCoord.y < VOXEL_GRID_SIZE && textureCoord.z < VOXEL_GRID_SIZE) {
+    if (IsInsideCube(textureCoord)) {
         float val = imageLoad(uTexture, textureCoord).r;
         return val;
     }
@@ -57,7 +56,7 @@ void main() {
         t += nearestAxis * tStep * stepDir;
 
         float val = SampleVoxel(p);
-        if (val > 0.5f) {
+        if (val > 0.1f) {
             vec3 id = p;
             p = p + 1.0 - offset;
             vec3 intersection = (p - r0) * tStep;

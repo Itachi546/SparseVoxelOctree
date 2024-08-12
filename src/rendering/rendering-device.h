@@ -174,6 +174,7 @@ class RenderingDevice {
         CullMode cullMode;
         PolygonMode polygonMode;
         FrontFace frontFace;
+        bool enableConservative;
 
         static RasterizationState Create() {
             return RasterizationState{
@@ -181,6 +182,7 @@ class RenderingDevice {
                 .cullMode = CULL_MODE_BACK,
                 .polygonMode = POLYGON_MODE_FILL,
                 .frontFace = FRONT_FACE_CLOCKWISE,
+                .enableConservative = false,
             };
         }
     };

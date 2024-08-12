@@ -5,8 +5,6 @@
 
 #include "meshdata.glsl"
 
-layout(location = 0) out vec3 vWorldPos;
-
 void main() {
     MeshDrawCommand drawCommand = drawCommands[gl_DrawID];
     VertexData vertex = vertices[gl_VertexIndex];
@@ -17,6 +15,4 @@ void main() {
 
     vec4 worldPos = worldTransform * vec4(position, 1.0f);
     gl_Position = worldPos;
-
-    vWorldPos = worldPos.xyz;
 }

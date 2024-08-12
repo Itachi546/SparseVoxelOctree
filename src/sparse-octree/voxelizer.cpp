@@ -32,6 +32,7 @@ void Voxelizer::InitializePrepassResources() {
     std::shared_ptr<GLTFScene> gltfScene = std::static_pointer_cast<GLTFScene>(scene);
 
     RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
+    rasterizationState.enableConservative = enableConservativeRasterization;
     rasterizationState.cullMode = RD::CULL_MODE_NONE;
     RD::DepthState depthState = RD::DepthState::Create();
     depthState.enableDepthWrite = false;
@@ -65,10 +66,14 @@ void Voxelizer::InitializePrepassResources() {
     device->Destroy(shaders[2]);
 
     // @TODO Temp
+    RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
+    samplerDesc.addressMode = RD::ADDRESS_MODE_CLAMP_TO_EDGE;
+
     RD::TextureDescription description = RD::TextureDescription::Initialize(VOXEL_GRID_SIZE, VOXEL_GRID_SIZE, VOXEL_GRID_SIZE);
     description.format = RD::FORMAT_R8_UNORM;
     description.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
     description.textureType = RD::TEXTURE_TYPE_3D;
+    description.samplerDescription = &samplerDesc;
     texture = device->CreateTexture(&description, "VoxelTexture");
 
     RD::BoundUniform boundedUniform[] = {
@@ -116,6 +121,7 @@ void Voxelizer::InitializeMainResources() {
 
     RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
     rasterizationState.cullMode = RD::CULL_MODE_NONE;
+    rasterizationState.enableConservative = enableConservativeRasterization;
     RD::DepthState depthState = RD::DepthState::Create();
     depthState.enableDepthWrite = false;
     depthState.enableDepthTest = false;
@@ -236,6 +242,12 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
         device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1);
 
         DrawVoxelScene(commandBuffer, prepassPipeline, &prepassSet, 1);
+
+        // Transfer image access to shader read
+        barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
+        barrier.dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
+
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &barrier, 1);
     },
                             &submitInfo);
 

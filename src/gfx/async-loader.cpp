@@ -49,7 +49,9 @@ void AsyncLoader::ProcessQueue(RD *device) {
         int width, height, _unused;
         uint8_t *data = stbi_load(request.path.c_str(), &width, &height, &_unused, STBI_rgb_alpha);
 
+        RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
         RD::TextureDescription desc = RD::TextureDescription::Initialize(width, height);
+        desc.samplerDescription = &samplerDesc;
         desc.format = RD::FORMAT_R8G8B8A8_UNORM;
         desc.usageFlags = RD::TEXTURE_USAGE_SAMPLED_BIT | RD::TEXTURE_USAGE_TRANSFER_DST_BIT;
         LOG("Loading texture: " + request.path);

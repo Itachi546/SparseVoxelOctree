@@ -165,6 +165,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
 
     std::vector<const char *> requestedExts{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME,
     };
 
     uint32_t availableExtCount = 0;
@@ -272,6 +273,7 @@ VkDevice VulkanRenderingDevice::CreateDevice(VkPhysicalDevice physicalDevice, st
     VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT, nullptr};
     VkPhysicalDeviceFeatures2 supportedFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &indexingFeatures};
     vkGetPhysicalDeviceFeatures2(physicalDevice, &supportedFeatures);
+
     bool bindlessSupported = indexingFeatures.descriptorBindingPartiallyBound && indexingFeatures.runtimeDescriptorArray;
     if (!bindlessSupported) {
         LOGE("Bindless resources is not supported ...");
@@ -569,7 +571,9 @@ VkDescriptorPool VulkanRenderingDevice::CreateDescriptorPool(VkDescriptorPoolSiz
 void VulkanRenderingDevice::InitializeDevice(uint32_t deviceIndex) {
 
     physicalDevice = physicalDevices[deviceIndex];
-    VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+
+    conservativeRasterProps.sType = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONSERVATIVE_RASTERIZATION_PROPERTIES_EXT};
+    VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &conservativeRasterProps};
     vkGetPhysicalDeviceProperties2(physicalDevice, &properties);
     LOG("Selected Device: " + std::string(properties.properties.deviceName));
 
@@ -878,6 +882,13 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
     rasterizationState.polygonMode = (VkPolygonMode)rs->polygonMode;
     createInfo.pRasterizationState = &rasterizationState;
     rasterizationState.depthClampEnable = ds->enableDepthClamp;
+
+    VkPipelineRasterizationConservativeStateCreateInfoEXT conservativeRasterState = {VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT};
+    if (rs->enableConservative) {
+        conservativeRasterState.conservativeRasterizationMode = VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
+        conservativeRasterState.extraPrimitiveOverestimationSize = 0.0f;
+        rasterizationState.pNext = &conservativeRasterState;
+    }
 
     VkPipelineMultisampleStateCreateInfo multisampleState = {VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;

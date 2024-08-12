@@ -128,6 +128,8 @@ class VulkanRenderingDevice : public RenderingDevice {
     VkDebugUtilsMessengerEXT messanger;
     uint32_t vulkanAPIVersion = VK_API_VERSION_1_3;
     std::vector<VkPhysicalDevice> physicalDevices;
+
+    VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservativeRasterProps{};
     VkPhysicalDeviceFeatures2 deviceFeatures2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
     VkPhysicalDeviceVulkan11Features deviceFeatures11 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
     VkPhysicalDeviceVulkan12Features deviceFeatures12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
