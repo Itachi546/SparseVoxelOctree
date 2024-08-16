@@ -13,6 +13,7 @@
 
 // @TODO Temp
 #include "sparse-octree/voxelizer.h"
+#include "sparse-octree/octree-builder.h"
 
 #include <glm/gtx/component_wise.hpp>
 
@@ -88,11 +89,14 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     } else
         LOGE("Failed to initialize scene");
 
-    voxelizer = std::make_shared<Voxelizer>();
+    OctreeBuilder octreeBuilder;
+    octreeBuilder.Initialize();
+    // voxelizer = std::make_shared<Voxelizer>();
     auto begin1 = std::chrono::high_resolution_clock::now();
-    voxelizer->Initialize(scene);
-    voxelizer->Voxelize(commandPool, commandBuffer);
-
+    octreeBuilder.Initialize();
+    octreeBuilder.Build();
+    // voxelizer->Initialize(scene);
+    // voxelizer->Voxelize(commandPool, commandBuffer);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin1).count();
     LOG("Time taken Voxelization: " + std::to_string(float(duration) / 1000.0f) + "s");
@@ -219,7 +223,7 @@ void VoxelApp::OnRender() {
     if (sceneMode == 0) {
         scene->Render(commandBuffer);
     } else {
-        voxelizer->RayMarch(commandBuffer, camera);
+        // voxelizer->RayMarch(commandBuffer, camera);
     }
 
     OnRenderUI();
@@ -285,7 +289,7 @@ void VoxelApp::UpdateControls() {
 
 VoxelApp::~VoxelApp() {
     asyncLoader->Shutdown();
-    voxelizer->Shutdown();
+    // voxelizer->Shutdown();
     scene->Shutdown();
     device->Destroy(depthAttachment);
     device->Destroy(commandPool);
