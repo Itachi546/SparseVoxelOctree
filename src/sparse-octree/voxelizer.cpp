@@ -6,8 +6,10 @@
 #include "gfx/camera.h"
 #include "rendering/rendering-utils.h"
 
-void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene) {
+void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene, uint32_t size) {
+    this->size = size;
     this->scene = scene;
+
     device = RD::GetInstance();
 
     voxelCountBuffer = device->CreateBuffer(static_cast<uint32_t>(sizeof(uint32_t) * 2),
@@ -69,7 +71,7 @@ void Voxelizer::InitializePrepassResources() {
     RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
     samplerDesc.addressMode = RD::ADDRESS_MODE_CLAMP_TO_EDGE;
 
-    RD::TextureDescription description = RD::TextureDescription::Initialize(VOXEL_GRID_SIZE, VOXEL_GRID_SIZE, VOXEL_GRID_SIZE);
+    RD::TextureDescription description = RD::TextureDescription::Initialize(size, size, size);
     description.format = RD::FORMAT_R8_UNORM;
     description.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
     description.textureType = RD::TEXTURE_TYPE_3D;
@@ -185,8 +187,8 @@ void Voxelizer::InitializeRayMarchResources() {
 
 void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) {
     RD::RenderingInfo renderingInfo = {
-        .width = VOXEL_GRID_SIZE,
-        .height = VOXEL_GRID_SIZE,
+        .width = size,
+        .height = size,
         .layerCount = 1,
         .colorAttachmentCount = 0,
         .pColorAttachments = nullptr,
@@ -235,7 +237,7 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
         device->BindPipeline(commandBuffer, clearTexturePipeline);
         device->BindUniformSet(commandBuffer, clearTexturePipeline, &clearTextureSet, 1);
 
-        uint32_t workGroupSize = RenderingUtils::GetWorkGroupSize(VOXEL_GRID_SIZE, 8);
+        uint32_t workGroupSize = RenderingUtils::GetWorkGroupSize(size, 8);
         device->DispatchCompute(commandBuffer, workGroupSize, workGroupSize, workGroupSize);
 
         barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;

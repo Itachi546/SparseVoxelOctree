@@ -15,7 +15,7 @@ namespace gfx {
 class Voxelizer {
 
   public:
-    void Initialize(std::shared_ptr<RenderScene> scene);
+    void Initialize(std::shared_ptr<RenderScene> scene, uint32_t size);
 
     void Voxelize(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
@@ -34,11 +34,11 @@ class Voxelizer {
     BufferID voxelCountBuffer;
     uint32_t *countBufferPtr;
     uint32_t voxelCount = 0;
+    uint32_t size;
 
     // @TEMP
     TextureID texture;
     bool enableConservativeRasterization = true;
-    const uint32_t VOXEL_GRID_SIZE = 128;
 
     void InitializePrepassResources();
     void InitializeMainResources();

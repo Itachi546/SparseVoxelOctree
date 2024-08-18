@@ -10,6 +10,7 @@
 #include "gfx/gltf-scene.h"
 #include "gfx/async-loader.h"
 #include "rendering/rendering-utils.h"
+#include "sparse-octree/octree-builder.h"
 
 #include <glm/gtx/component_wise.hpp>
 
@@ -82,6 +83,10 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
+
+    octreeBuilder = std::make_unique<OctreeBuilder>();
+    octreeBuilder->Initialize(scene);
+    octreeBuilder->Build(commandPool, commandBuffer);
 }
 
 void VoxelApp::Run() {
@@ -202,6 +207,8 @@ void VoxelApp::OnRender() {
     glm::mat4 VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
     if (sceneMode == 0) {
         scene->Render(commandBuffer);
+    } else {
+        octreeBuilder->Debug(commandBuffer, camera);
     }
 
     Debug::Render(commandBuffer, VP);
@@ -268,6 +275,7 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
+    octreeBuilder->Shutdown();
     asyncLoader->Shutdown();
     scene->Shutdown();
     device->Destroy(depthAttachment);

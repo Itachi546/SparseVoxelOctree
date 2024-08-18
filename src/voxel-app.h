@@ -7,6 +7,7 @@
 
 class AsyncLoader;
 struct RenderScene;
+class OctreeBuilder;
 
 namespace gfx {
     class Camera;
@@ -76,6 +77,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     std::shared_ptr<AsyncLoader> asyncLoader;
     std::shared_ptr<RenderScene> scene;
+    std::unique_ptr<OctreeBuilder> octreeBuilder;
 
     BufferID globalUB;
     uint8_t *globalUBPtr;
