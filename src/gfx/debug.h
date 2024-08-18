@@ -19,7 +19,7 @@ namespace Debug {
 
     void AddRect(const glm::vec3 &min, const glm::vec3 &max, uint32_t color = 0xffffffff);
 
-    void Render(CommandBufferID commandBuffer, UniformSetID globalSet);
+    void Render(CommandBufferID commandBuffer, glm::mat4 VP);
 
     void Shutdown();
 } // namespace Debug

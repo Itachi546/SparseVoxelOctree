@@ -19,12 +19,11 @@ class GLTFScene : public RenderScene {
     void PrepareDraws(BufferID globalUB) override;
     void Render(CommandBufferID commandBuffer) override;
 
-    void AddTexturesToUpdate(TextureID texture) {
+    void AddTexturesToUpdate(TextureID texture) override {
         std::lock_guard lock{textureUpdateMutex};
         texturesToUpdate.push_back(texture);
     }
 
-    // @TODO TEMP Fix this later
     void UpdateTextures(CommandBufferID commandBuffer);
 
     void Shutdown() override;

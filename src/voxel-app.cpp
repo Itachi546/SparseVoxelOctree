@@ -11,10 +11,6 @@
 #include "gfx/async-loader.h"
 #include "rendering/rendering-utils.h"
 
-// @TODO Temp
-#include "sparse-octree/voxelizer.h"
-#include "sparse-octree/octree-builder.h"
-
 #include <glm/gtx/component_wise.hpp>
 
 using namespace std::chrono_literals;
@@ -71,8 +67,6 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-    auto begin0 = std::chrono::high_resolution_clock::now();
-
     asyncLoader = std::make_shared<AsyncLoader>();
     scene = std::make_shared<GLTFScene>();
 
@@ -88,21 +82,6 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
-
-    OctreeBuilder octreeBuilder;
-    octreeBuilder.Initialize();
-    // voxelizer = std::make_shared<Voxelizer>();
-    auto begin1 = std::chrono::high_resolution_clock::now();
-    octreeBuilder.Initialize();
-    octreeBuilder.Build();
-    // voxelizer->Initialize(scene);
-    // voxelizer->Voxelize(commandPool, commandBuffer);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin1).count();
-    LOG("Time taken Voxelization: " + std::to_string(float(duration) / 1000.0f) + "s");
-
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin0).count();
-    LOG("Total Time taken: " + std::to_string(float(duration) / 1000.0f) + "s");
 }
 
 void VoxelApp::Run() {
@@ -220,11 +199,12 @@ void VoxelApp::OnRender() {
     device->SetViewport(commandBuffer, 0.0f, windowSize.y, windowSize.x, -windowSize.y);
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
 
+    glm::mat4 VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
     if (sceneMode == 0) {
         scene->Render(commandBuffer);
-    } else {
-        // voxelizer->RayMarch(commandBuffer, camera);
     }
+
+    Debug::Render(commandBuffer, VP);
 
     OnRenderUI();
 
@@ -289,7 +269,6 @@ void VoxelApp::UpdateControls() {
 
 VoxelApp::~VoxelApp() {
     asyncLoader->Shutdown();
-    // voxelizer->Shutdown();
     scene->Shutdown();
     device->Destroy(depthAttachment);
     device->Destroy(commandPool);

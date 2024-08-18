@@ -9,7 +9,7 @@ namespace Debug {
     PipelineID gLinePipeline;
     static uint32_t gLineBufferOffset = 0;
     static Line *gLineBufferPtr = nullptr;
-    static const int MAX_LINE_COUNT = 10'000;
+    static const int MAX_LINE_COUNT = 1'000'000;
     UniformSetID gUniformSet;
 
     void Initialize() {
@@ -18,14 +18,14 @@ namespace Debug {
         gLineBuffer = device->CreateBuffer(bufferSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "Debug Draw SSBO");
 
         RD::UniformBinding bindings[2] = {
-            {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
-            {RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0}};
-        // RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(Debug::NewFrame();glm::mat4))};
+            {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 0}};
+
+        RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(glm::mat4))};
         ShaderID shaders[2] = {};
-        shaders[0] = RenderingUtils::CreateShaderModuleFromFile("Assets/SPIRV/debug.vert.spv", bindings, 2, nullptr, 0);
+        shaders[0] = RenderingUtils::CreateShaderModuleFromFile("Assets/SPIRV/debug.vert.spv", bindings, 1, &pushConstant, 1);
         shaders[1] = RenderingUtils::CreateShaderModuleFromFile("Assets/SPIRV/debug.frag.spv", nullptr, 0, nullptr, 0);
 
-        RD::Format colorAttachmentFormats[] = {RD::FORMAT_R8G8B8A8_UNORM};
+        RD::Format colorAttachmentFormats[] = {RD::FORMAT_B8G8R8A8_UNORM};
         RD::BlendState bs = RD::BlendState::Create();
         RD::RasterizationState rs = RD::RasterizationState::Create();
         rs.lineWidth = 2.0f;
@@ -45,7 +45,7 @@ namespace Debug {
                                                        "Debug Draw Pipeline");
 
         RD::BoundUniform boundUniform = {RD::BINDING_TYPE_STORAGE_BUFFER, 0, gLineBuffer};
-        gUniformSet = device->CreateUniformSet(gLinePipeline, &boundUniform, 1, 1, "Debug Uniform Set");
+        gUniformSet = device->CreateUniformSet(gLinePipeline, &boundUniform, 1, 0, "Debug Uniform Set");
 
         device->Destroy(shaders[0]);
         device->Destroy(shaders[1]);
@@ -141,7 +141,7 @@ namespace Debug {
         gLineBufferOffset = 0;
     }
 
-    void Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
+    void Render(CommandBufferID commandBuffer, glm::mat4 VP) {
         if (gLineBufferOffset == 0)
             return;
 
@@ -150,14 +150,15 @@ namespace Debug {
         RenderingDevice *device = RD::GetInstance();
         device->BindPipeline(commandBuffer, gLinePipeline);
         device->BindUniformSet(commandBuffer, gLinePipeline, &gUniformSet, 1);
+        device->BindPushConstants(commandBuffer, gLinePipeline, RD::SHADER_STAGE_VERTEX, &VP[0][0], 0, static_cast<uint32_t>(sizeof(glm::mat4)));
         device->Draw(commandBuffer, numLines * 2, 1, 0, 0);
     }
 
     void Shutdown() {
         RenderingDevice *device = RD::GetInstance();
+        device->Destroy(gUniformSet);
         device->Destroy(gLineBuffer);
         device->Destroy(gLinePipeline);
-        device->Destroy(gUniformSet);
     }
 
 } // namespace Debug

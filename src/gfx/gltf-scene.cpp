@@ -110,7 +110,7 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
         if (tangentAttributes != primitive.attributes.end()) {
             const tinygltf::Accessor &tangentAccessor = model->accessors[normalAttributes->second];
             assert(numPosition == tangentAccessor.count);
-            tangents = (float *)getBufferPtr(model, tangentAccessor);
+            // tangents = (float *)getBufferPtr(model, tangentAccessor);
         }
 
         // Parse UV
@@ -323,7 +323,7 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
         {meshGroup.materials.data(), materialBuffer, materialSize},
     };
 
-    // Move to transfer queue
+    //@TODO Move to transfer queue
     RD::ImmediateSubmitInfo submitInfo;
     submitInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
     submitInfo.commandPool = device->CreateCommandPool(submitInfo.queue, "TempCommandPool");

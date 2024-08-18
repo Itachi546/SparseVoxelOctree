@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.8)
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
 
+if(MSVC)
+    add_compile_options(/W4 /WX)
+endif()
+
 # set(CMAKE_TOOLCHAIN_FILE "C:/Packages/vcpkg/scripts/buildsystems/vcpkg.cmake")
 set(CMAKE_PREFIX_PATH "C:/Packages/vcpkg/installed/x64-windows/share")
 project(vox-engine VERSION 0.1.0 LANGUAGES C CXX)
@@ -48,6 +52,6 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
         NOMINMAX
     ) 
 
-if(MSVC)    
+if(MSVC)   
     set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif(MSVC)

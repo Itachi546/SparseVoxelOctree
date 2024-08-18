@@ -39,7 +39,7 @@ class VulkanRenderingDevice : public RenderingDevice {
                                       bool enableBindless,
                                       const std::string &name) override;
 
-    PipelineID CreateComputePipeline(const ShaderID shader, bool enableBindless, const std::string &name);
+    PipelineID CreateComputePipeline(const ShaderID shader, bool enableBindless, const std::string &name) override;
     CommandBufferID CreateCommandBuffer(CommandPoolID commandPool, const std::string &name) override;
 
     CommandPoolID CreateCommandPool(QueueID queue, const std::string &name = "CommandPool") override;
@@ -49,14 +49,14 @@ class VulkanRenderingDevice : public RenderingDevice {
     UniformSetID CreateUniformSet(PipelineID pipeline, BoundUniform *uniforms, uint32_t uniformCount, uint32_t set, const std::string &name) override;
 
     FenceID CreateFence(const std::string &name = "fence", bool signalled = false) override;
-    void WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout);
+    void WaitForFence(FenceID *fence, uint32_t fenceCount, uint64_t timeout) override;
     void ResetFences(FenceID *fences, uint32_t fenceCount) override;
 
     BufferID CreateBuffer(uint32_t size, uint32_t usageFlags, MemoryAllocationType allocationType, const std::string &name) override;
     uint8_t *MapBuffer(BufferID buffer) override;
 
     void CopyBuffer(CommandBufferID commandBuffer, BufferID src, BufferID dst, BufferCopyRegion *region) override;
-    void CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region);
+    void CopyBufferToTexture(CommandBufferID commandBuffer, BufferID src, TextureID dst, BufferImageCopyRegion *region) override;
 
     uint64_t GetMemoryUsage() override {
         return memoryUsage;
@@ -76,7 +76,7 @@ class VulkanRenderingDevice : public RenderingDevice {
 
     void DrawElementInstanced(CommandBufferID commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t firstInstance = 0) override;
     void Draw(CommandBufferID commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
-    void DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride);
+    void DrawIndexedIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride) override;
 
     void Submit(CommandBufferID commandBuffer, FenceID fence) override;
     void ImmediateSubmit(std::function<void(CommandBufferID commandBufferfence)> &&function, ImmediateSubmitInfo *queueInfo) override;

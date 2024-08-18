@@ -1,7 +1,6 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : enable
-#include "globaldata.glsl"
 
 struct InstanceData {
     float x, y, z, w;
@@ -19,6 +18,10 @@ layout(binding = 0, set = 1) readonly buffer Vertices {
 
 layout(binding = 1, set = 1) readonly buffer Instances {
     InstanceData instanceData[];
+};
+
+layout(push_constant) uniform PushConstant {
+    mat4 VP;
 };
 
 layout(location = 0) out vec3 vNormal;
