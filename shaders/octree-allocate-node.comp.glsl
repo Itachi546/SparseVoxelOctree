@@ -9,16 +9,13 @@ layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
 layout(binding = 0, set = 0) buffer OctreeBuildInfo {
     uint allocationBegin;
     uint allocationCount;
-
-    uint totalAllocation;
-    uint _padding;
 };
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id > allocationCount)
         return;
-
+    /*
     uint currentNode = allocationBegin + id;
     if ((octree[currentNode] & 0x80000000) != 0) {
         uint childPtr = totalAllocation - currentNode;
@@ -32,4 +29,5 @@ void main() {
         allocationBegin = newAllocationBegin;
         allocationCount = totalAllocation - newAllocationBegin;
     }
+    */
 }

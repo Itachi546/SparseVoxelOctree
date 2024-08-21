@@ -23,6 +23,9 @@ class Voxelizer {
 
     void Shutdown();
 
+    uint32_t voxelCount = 0;
+    BufferID voxelFragmentListBuffer;
+
   private:
     std::shared_ptr<RenderScene> scene;
     PipelineID prepassPipeline, mainPipeline, clearTexturePipeline, raymarchPipeline;
@@ -30,10 +33,8 @@ class Voxelizer {
 
     RD *device;
 
-    BufferID voxelFragmentListBuffer;
     BufferID voxelCountBuffer;
     uint32_t *countBufferPtr;
-    uint32_t voxelCount = 0;
     uint32_t size;
 
     // @TEMP

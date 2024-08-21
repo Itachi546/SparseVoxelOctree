@@ -12,8 +12,6 @@ layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
 layout(binding = 0, set = 0) buffer OctreeBuildInfo {
     uint allocationBegin;
     uint allocationCount;
-    uint totalAllocation;
-    uint _padding;
 };
 
 void main() {
