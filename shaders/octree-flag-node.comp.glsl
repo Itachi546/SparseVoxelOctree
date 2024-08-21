@@ -2,12 +2,12 @@
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0, set = 0) readonly buffer VoxelFragmentBuffer {
-    uint voxelFragments[];
+layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
+    uint octree[];
 };
 
-layout(binding = 1, set = 1) buffer SparseOctreeBuffer {
-    uint octree[];
+layout(binding = 1, set = 0) readonly buffer VoxelFragmentBuffer {
+    uint voxelFragments[];
 };
 
 layout(push_constant) uniform PushConstants {
@@ -21,7 +21,7 @@ vec3 getPositionFromUint(uint p) {
     position.x = (p >> 20) & 0x3ff;
     position.y = (p >> 10) & 0x3ff;
     position.z = p & 0x3ff;
-    return position;
+    return position + uVoxelDims * 0.5f;
 }
 
 void main() {
@@ -29,14 +29,29 @@ void main() {
     if (threadId >= uVoxelCount)
         return;
 
-    uint voxelPosition = voxelFragments[threadId];
+    vec3 position = getPositionFromUint(voxelFragments[threadId]);
 
-    vec3 halfDims = vec3(uVoxelDims * 0.5f);
+    uint childIndex = 0;
+    uint node = octree[0];
 
-    uint childPtr = 0;
-    uint rootNode = octree[0];
-
+    vec3 center = vec3(0.0f);
+    bool bFlag = true;
+    float halfDims = uVoxelDims * 0.5f;
     // Traverse upto given current level
     for (int i = 0; i < uLevel; ++i) {
+        halfDims *= 0.5f;
+        if ((node & 0x80000000) == 0) {
+            bFlag = false;
+            break;
+        }
+
+        childIndex += node & 0x7FFFFFFF;
+        ivec3 region = ivec3(greaterThan(position, center));
+        childIndex += region.z * 4 + region.y * 2 + region.x;
+        center += (region * 2.0 - 1.0) * halfDims;
+        node = octree[childIndex];
     }
+
+    if (bFlag)
+        octree[childIndex] |= 0x80000000;
 }

@@ -233,7 +233,6 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
 
         device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, &barrier, 1);
 
-        // @TEMP Clear the voxel texture
         device->BindPipeline(commandBuffer, clearTexturePipeline);
         device->BindUniformSet(commandBuffer, clearTexturePipeline, &clearTextureSet, 1);
 
