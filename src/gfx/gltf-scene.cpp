@@ -387,7 +387,7 @@ void GLTFScene::UpdateTextures(CommandBufferID commandBuffer) {
         barriers[i].levelCount = 1;
     }
 
-    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, barriers.data(), textureUpdateCount);
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, barriers.data(), textureUpdateCount, nullptr, 0);
     for (auto &texture : texturesToUpdate) {
         device->GenerateMipmap(commandBuffer, texture);
         device->UpdateBindlessTexture(texture);

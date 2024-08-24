@@ -88,11 +88,11 @@ void AsyncLoader::ProcessQueue(RD *device) {
         };
 
         device->ImmediateSubmit([&](CommandBufferID cb) {
-            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, &transferBarrier[0], 1);
+            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_TRANSFER_BIT, &transferBarrier[0], 1, nullptr, 0);
 
             device->CopyBufferToTexture(cb, stagingBuffer, request.textureId, &copyRegion);
 
-            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &transferBarrier[1], 1);
+            device->PipelineBarrier(cb, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &transferBarrier[1], 1, nullptr, 0);
         },
                                 &submitQueueInfo);
 

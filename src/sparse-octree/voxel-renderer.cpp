@@ -10,7 +10,6 @@
 
 void VoxelRenderer::Initialize(std::vector<glm::vec4> &voxels) {
     device = RD::GetInstance();
-
     RD::UniformBinding bindings[] = {
         RD::UniformBinding{RD::BINDING_TYPE_UNIFORM_BUFFER, 0, 0},
         RD::UniformBinding{RD::BINDING_TYPE_STORAGE_BUFFER, 1, 0},
@@ -104,12 +103,14 @@ void VoxelRenderer::Initialize(std::vector<glm::vec4> &voxels) {
 }
 
 void VoxelRenderer::Render(CommandBufferID commandBuffer, glm::mat4 VP) {
-    device->BindPipeline(commandBuffer, pipeline);
-    device->BindUniformSet(commandBuffer, pipeline, &uniformSet, 1);
-    device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_VERTEX, &VP[0][0], 0, static_cast<uint32_t>(sizeof(glm::mat4)));
+    if (numVoxels > 0) {
+        device->BindPipeline(commandBuffer, pipeline);
+        device->BindUniformSet(commandBuffer, pipeline, &uniformSet, 1);
+        device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_VERTEX, &VP[0][0], 0, static_cast<uint32_t>(sizeof(glm::mat4)));
 
-    device->BindIndexBuffer(commandBuffer, indexBuffer);
-    device->DrawElementInstanced(commandBuffer, numVertices, numVoxels);
+        device->BindIndexBuffer(commandBuffer, indexBuffer);
+        device->DrawElementInstanced(commandBuffer, numVertices, numVoxels);
+    }
 }
 
 void VoxelRenderer::Shutdown() {

@@ -21,7 +21,7 @@ vec3 getPositionFromUint(uint p) {
     position.x = (p >> 20) & 0x3ff;
     position.y = (p >> 10) & 0x3ff;
     position.z = p & 0x3ff;
-    return position + uVoxelDims * 0.5f;
+    return position - uVoxelDims * 0.5f;
 }
 
 void main() {
@@ -36,6 +36,7 @@ void main() {
 
     vec3 center = vec3(0.0f);
     bool bFlag = true;
+
     float halfDims = uVoxelDims * 0.5f;
     // Traverse upto given current level
     for (int i = 0; i < uLevel; ++i) {
@@ -47,7 +48,7 @@ void main() {
 
         childIndex += node & 0x7FFFFFFF;
         ivec3 region = ivec3(greaterThan(position, center));
-        childIndex += region.z * 4 + region.y * 2 + region.x;
+        childIndex += region.x * 4 + region.y * 2 + region.z;
         center += (region * 2.0 - 1.0) * halfDims;
         node = octree[childIndex];
     }

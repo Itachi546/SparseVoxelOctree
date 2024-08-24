@@ -9,12 +9,14 @@ layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
 // AllocationBegin and AllocationCount keep track of the previously
 // allocated node and update it's child pointer when allocating new
 // nodes
-layout(binding = 0, set = 0) buffer OctreeBuildInfo {
+layout(binding = 1, set = 0) buffer OctreeBuildInfo {
     uint allocationBegin;
     uint allocationCount;
 };
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
+    if (id >= allocationCount)
+        return;
     octree[allocationBegin + id] = 0;
 }

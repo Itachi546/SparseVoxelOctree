@@ -5,7 +5,7 @@
 
 class CpuOctreeBuilder {
   public:
-    void Initialize();
+    void Initialize(uint32_t dims, uint32_t level);
 
     void ListVoxels(std::vector<glm::vec4> &voxels);
 
@@ -13,12 +13,12 @@ class CpuOctreeBuilder {
 
     void Build();
 
-    const uint32_t kDims = 64;
-    const uint32_t kLevels = 7;
-
-  private:
-    std::vector<uint32_t> voxelFragmentList;
     std::vector<uint32_t> octree;
+  private:
+    uint32_t kLevels = 7;
+    uint32_t kDims = 64;
+
+    std::vector<uint32_t> voxelFragmentList;
 
     void InitializeFragmentList();
 

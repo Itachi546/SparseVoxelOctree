@@ -74,7 +74,7 @@ void OctreeRaycaster::Initialize(uint32_t outputWidth, uint32_t outputHeight, Pa
 void OctreeRaycaster::Render(CommandBufferID commandBuffer, UniformSetID globalSet) {
     glm::vec4 dims[2] = {glm::vec4{minBound, spp}, glm::vec4{maxBound, spp}};
     auto *device = RD::GetInstance();
-    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier, 2);
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, outputImageBarrier, 2, nullptr, 0);
     device->BindPipeline(commandBuffer, pipeline);
 
     UniformSetID uniformSets[] = {globalSet, resourceSet};

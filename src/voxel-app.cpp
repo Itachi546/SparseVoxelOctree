@@ -171,7 +171,7 @@ void VoxelApp::OnRender() {
         .levelCount = UINT32_MAX,
         .layerCount = UINT32_MAX,
     };
-    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1);
+    device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, &barrier, 1, nullptr, 0);
 
     RD::AttachmentInfo colorAttachmentInfos = {
         .loadOp = RD::LOAD_OP_CLEAR,

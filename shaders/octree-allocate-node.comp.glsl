@@ -6,28 +6,21 @@ layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
     uint octree[];
 };
 
-layout(binding = 0, set = 0) buffer OctreeBuildInfo {
+layout(binding = 1, set = 0) buffer OctreeBuildInfo {
     uint allocationBegin;
     uint allocationCount;
+    uint allocationThisFrame;
 };
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (id > allocationCount)
         return;
-    /*
+
     uint currentNode = allocationBegin + id;
     if ((octree[currentNode] & 0x80000000) != 0) {
-        uint childPtr = totalAllocation - currentNode;
+        uint offset = atomicAdd(allocationThisFrame, 8);
+        uint childPtr = allocationCount + offset - id;
         octree[currentNode] |= childPtr;
-        atomicAdd(totalAllocation, 8);
     }
-    memoryBarrierShared();
-
-    if (id == 0) {
-        uint newAllocationBegin = allocationBegin + allocationCount;
-        allocationBegin = newAllocationBegin;
-        allocationCount = totalAllocation - newAllocationBegin;
-    }
-    */
 }

@@ -3,7 +3,9 @@
 #include "cpu-octree-builder.h"
 #include "gfx/debug.h"
 
-void CpuOctreeBuilder::Initialize() {
+void CpuOctreeBuilder::Initialize(uint32_t dims, uint32_t levels) {
+    kDims = dims;
+    kLevels = levels;
 }
 
 void CpuOctreeBuilder::Build() {
@@ -63,7 +65,7 @@ void CpuOctreeBuilder::FlagNode(uint32_t level) {
             childIndex += node & 0x7FFFFFFF;
 
             glm::ivec3 region = glm::greaterThan(position, center);
-            childIndex += region.z * 4 + region.y * 2 + region.x;
+            childIndex += region.x * 3 + region.y * 2 + region.z;
 
             center += (glm::vec3(region) * 2.0f - 1.0f) * nodeSize;
             node = octree[childIndex];
@@ -107,11 +109,11 @@ glm::vec3 REGIONS[8] = {
 
 void CpuOctreeBuilder::_ListVoxel(uint32_t nodeIndex, const glm::vec3 &position, float halfSize, uint32_t level, std::vector<glm::vec4> &voxels) {
     uint32_t node = octree[nodeIndex];
-    if (level == kLevels - 1) {
-        voxels.push_back({position, halfSize});
-        return;
-    }
     if ((node & 0x80000000)) {
+        if (level == kLevels - 1) {
+            voxels.push_back({position, halfSize});
+            return;
+        }
         uint32_t childIndex = nodeIndex + (node & 0x7fffffff);
         float childHSize = halfSize * 0.5f;
         for (uint32_t i = 0; i < 8; ++i) {

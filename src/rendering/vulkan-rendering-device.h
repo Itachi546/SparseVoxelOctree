@@ -84,16 +84,19 @@ class VulkanRenderingDevice : public RenderingDevice {
     void Present() override;
 
     void PipelineBarrier(CommandBufferID commandBuffer,
-                         PipelineStageBits srcStage,
-                         PipelineStageBits dstStage,
-                         TextureBarrier *barrier,
-                         uint32_t barrierCount) override;
+                         BitField<PipelineStageBits> srcStage,
+                         BitField<PipelineStageBits> dstStage,
+                         TextureBarrier *textureBarriers,
+                         uint32_t textureBarrierCount,
+                         BufferBarrier *bufferBarriers,
+                         uint32_t bufferBarrierCount) override;
 
     void BindIndexBuffer(CommandBufferID commandBuffer, BufferID buffer) override;
     void BindPipeline(CommandBufferID commandBuffer, PipelineID pipeline) override;
     void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) override;
     void BindPushConstants(CommandBufferID commandBuffer, PipelineID pipeline, ShaderStage shaderStage, void *data, uint32_t offset, uint32_t size) override;
     void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ = 1) override;
+    void DispatchComputeIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset);
 
     void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) override;
 
@@ -267,6 +270,13 @@ class VulkanRenderingDevice : public RenderingDevice {
                                             uint32_t baseArrayLayer = 0,
                                             uint32_t levelCount = UINT32_MAX,
                                             uint32_t layerCount = UINT32_MAX);
+    VkBufferMemoryBarrier CreateBufferBarrier(VkBuffer buffer,
+                                              VkAccessFlags srcAccessMask,
+                                              VkAccessFlags dstAccessMask,
+                                              uint32_t srcQueueFamily,
+                                              uint32_t dstQueueFamily,
+                                              uint64_t offset = 0,
+                                              uint64_t size = VK_WHOLE_SIZE);
 
     void SetDebugMarkerObjectName(VkObjectType objectType, uint64_t handle, const char *objectName);
     void ResizeSwapchain();

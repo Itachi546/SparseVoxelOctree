@@ -6,6 +6,7 @@
 
 class Voxelizer;
 struct RenderScene;
+struct VoxelRenderer;
 
 namespace gfx {
     class Camera;
@@ -29,14 +30,16 @@ class OctreeBuilder {
     uint32_t kDims = 128;
     uint32_t kLevels = static_cast<uint32_t>(std::log2(128) + 1);
 
-    BufferID octreeBuffer, buildInfoBuffer;
-    PipelineID pipelineInitNode, pipelineTagNode, pipelineAllocateNode;
-    UniformSetID initNodeSet, tagNodeSet, allocateNodeSet;
+    BufferID octreeBuffer, buildInfoBuffer, dispatchIndirectBuffer;
+    PipelineID pipelineInitNode, pipelineTagNode, pipelineAllocateNode, pipelineUpdateParams;
+    UniformSetID initNodeSet, tagNodeSet, allocateNodeSet, updateParamsSet;
 
     RD *device = nullptr;
+    std::shared_ptr<VoxelRenderer> renderer;
 
   private:
     void InitializeNode(CommandBufferID commandBuffer);
-    void TagNode(CommandBufferID commandBuffer);
+    void TagNode(CommandBufferID commandBuffer, uint32_t level);
     void AllocateNode(CommandBufferID commandBuffer);
+    void UpdateParams(CommandBufferID commandBuffer);
 };

@@ -1542,6 +1542,11 @@ void VulkanRenderingDevice::DispatchCompute(CommandBufferID commandBuffer, uint3
     vkCmdDispatch(_commandBuffers[commandBuffer.id], workGroupX, workGroupY, workGroupZ);
 }
 
+void VulkanRenderingDevice::DispatchComputeIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset) {
+    VulkanBuffer *buffer = _buffers.Access(indirectBuffer.id);
+    vkCmdDispatchIndirect(_commandBuffers[commandBuffer.id], buffer->buffer, offset);
+}
+
 VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
                                                                VkImageAspectFlags aspect,
                                                                VkAccessFlags srcAccessMask,
@@ -1573,13 +1578,35 @@ VkImageMemoryBarrier VulkanRenderingDevice::CreateImageBarrier(VkImage image,
     };
 }
 
+VkBufferMemoryBarrier VulkanRenderingDevice::CreateBufferBarrier(VkBuffer buffer,
+                                                                 VkAccessFlags srcAccessMask,
+                                                                 VkAccessFlags dstAccessMask,
+                                                                 uint32_t srcQueueFamily,
+                                                                 uint32_t dstQueueFamily,
+                                                                 uint64_t offset,
+                                                                 uint64_t size) {
+    return {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = srcAccessMask,
+        .dstAccessMask = dstAccessMask,
+        .srcQueueFamilyIndex = srcQueueFamily,
+        .dstQueueFamilyIndex = dstQueueFamily,
+        .buffer = buffer,
+        .offset = offset,
+        .size = size,
+    };
+}
+
 void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
-                                            PipelineStageBits srcStage,
-                                            PipelineStageBits dstStage,
+                                            BitField<PipelineStageBits> srcStage,
+                                            BitField<PipelineStageBits> dstStage,
                                             TextureBarrier *textureBarriers,
-                                            uint32_t barrierCount) {
+                                            uint32_t textureBarrierCount,
+                                            BufferBarrier *bufferBarriers,
+                                            uint32_t bufferBarrierCount) {
     std::vector<VkImageMemoryBarrier> vkTextureBarriers;
-    for (uint32_t i = 0; i < barrierCount; ++i) {
+    for (uint32_t i = 0; i < textureBarrierCount; ++i) {
         TextureBarrier &textureBarrier = textureBarriers[i];
         VkImageLayout newLayout = VkImageLayout(textureBarrier.newLayout);
         VulkanTexture *vkTexture = _textures.Access(textureBarrier.texture.id);
@@ -1600,13 +1627,30 @@ void VulkanRenderingDevice::PipelineBarrier(CommandBufferID commandBuffer,
         vkTexture->currentLayout = newLayout;
     }
 
-    if (vkTextureBarriers.size() > 0) {
+    std::vector<VkBufferMemoryBarrier> vkBufferBarriers;
+    for (uint32_t i = 0; i < bufferBarrierCount; ++i) {
+        BufferBarrier &barrier = bufferBarriers[i];
+        VulkanBuffer *vkBuffer = _buffers.Access(barrier.buffer.id);
+        uint32_t srcQueueFamily = barrier.srcQueueFamily.id == VK_QUEUE_FAMILY_IGNORED ? VK_QUEUE_FAMILY_IGNORED : _queueFamilyIndices[barrier.srcQueueFamily.id];
+        uint32_t dstQueueFamily = barrier.dstQueueFamily.id == VK_QUEUE_FAMILY_IGNORED ? VK_QUEUE_FAMILY_IGNORED : _queueFamilyIndices[barrier.dstQueueFamily.id];
+        vkBufferBarriers.push_back(CreateBufferBarrier(
+            vkBuffer->buffer,
+            VkAccessFlags(barrier.srcAccess),
+            VkAccessFlags(barrier.dstAccess),
+            srcQueueFamily,
+            dstQueueFamily,
+            barrier.offset,
+            barrier.size));
+    }
+
+    if (vkTextureBarriers.size() > 0 || vkBufferBarriers.size() > 0) {
         vkCmdPipelineBarrier(_commandBuffers[commandBuffer.id],
                              VkPipelineStageFlags(srcStage),
                              VkPipelineStageFlags(dstStage),
                              VK_DEPENDENCY_BY_REGION_BIT,
                              0, nullptr,
-                             0, nullptr,
+                             static_cast<uint32_t>(vkBufferBarriers.size()),
+                             vkBufferBarriers.data(),
                              static_cast<uint32_t>(vkTextureBarriers.size()),
                              vkTextureBarriers.data());
     }
@@ -1832,7 +1876,7 @@ void VulkanRenderingDevice::GenerateMipmap(CommandBufferID commandBuffer, Textur
         .levelCount = tex->mipLevels,
         .layerCount = 1,
     };
-    PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &shaderReadBarrier, 1);
+    PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TRANSFER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &shaderReadBarrier, 1, nullptr, 0);
 }
 
 void VulkanRenderingDevice::Destroy(PipelineID pipeline) {

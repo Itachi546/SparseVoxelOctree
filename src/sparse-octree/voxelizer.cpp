@@ -231,7 +231,7 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
             .layerCount = 1,
         };
 
-        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, &barrier, 1);
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, &barrier, 1, nullptr, 0);
 
         device->BindPipeline(commandBuffer, clearTexturePipeline);
         device->BindUniformSet(commandBuffer, clearTexturePipeline, &clearTextureSet, 1);
@@ -240,7 +240,7 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
         device->DispatchCompute(commandBuffer, workGroupSize, workGroupSize, workGroupSize);
 
         barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
-        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1);
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1, nullptr, 0);
 
         DrawVoxelScene(commandBuffer, prepassPipeline, &prepassSet, 1);
 
@@ -248,7 +248,7 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
         barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
         barrier.dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
 
-        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &barrier, 1);
+        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &barrier, 1, nullptr, 0);
     },
                             &submitInfo);
 

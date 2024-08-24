@@ -352,6 +352,15 @@ class RenderingDevice {
         uint32_t levelCount, layerCount;
     };
 
+    struct BufferBarrier {
+        BufferID buffer;
+        BitField<BarrierAccessBits> srcAccess;
+        BitField<BarrierAccessBits> dstAccess;
+        QueueID srcQueueFamily;
+        QueueID dstQueueFamily;
+        uint64_t offset, size;
+    };
+
     enum MemoryAllocationType {
         MEMORY_ALLOCATION_TYPE_CPU,
         MEMORY_ALLOCATION_TYPE_GPU
@@ -499,14 +508,18 @@ class RenderingDevice {
 
     virtual void BindUniformSet(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) = 0;
     virtual void DispatchCompute(CommandBufferID commandBuffer, uint32_t workGroupX, uint32_t workGroupY, uint32_t workGroupZ) = 0;
+    virtual void DispatchComputeIndirect(CommandBufferID commandBuffer, BufferID indirectBuffer, uint32_t offset) = 0;
+
     virtual void Submit(CommandBufferID commandBuffer, FenceID Fence) = 0;
 
     virtual void ImmediateSubmit(std::function<void(CommandBufferID commandBuffer)> &&function, ImmediateSubmitInfo *queueInfo) = 0;
     virtual void PipelineBarrier(CommandBufferID commandBuffer,
-                                 PipelineStageBits srcStage,
-                                 PipelineStageBits dstStage,
-                                 TextureBarrier *barriers,
-                                 uint32_t barrierCount) = 0;
+                                 BitField<PipelineStageBits> srcStage,
+                                 BitField<PipelineStageBits> dstStage,
+                                 TextureBarrier *textureBarriers,
+                                 uint32_t textureBarrierCount,
+                                 BufferBarrier *bufferBarriers,
+                                 uint32_t bufferBarrierCount) = 0;
 
     virtual void PrepareSwapchain(CommandBufferID commandBuffer, TextureLayout layout) = 0;
 
