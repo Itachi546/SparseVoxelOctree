@@ -22,19 +22,13 @@ vec3 GenerateCameraRay(vec2 uv, mat4 invP, mat4 invV) {
     return normalize(worldPos.xyz);
 }
 
-float SampleVoxel(vec3 p) {
-#if 1
+vec4 SampleVoxel(vec3 p) {
     ivec3 textureCoord = ivec3(WorldToTextureSpace(p));
     if (IsInsideCube(textureCoord)) {
-        float val = imageLoad(uTexture, textureCoord).r;
+        vec4 val = imageLoad(uTexture, textureCoord);
         return val;
     }
-    return 0.0f;
-#else
-    if (length(p) < 5.0f)
-        return 1.0f;
-    return 0.0f;
-#endif
+    return vec4(0.0f);
 }
 
 float CalculateAO(vec3 p) {
@@ -46,7 +40,7 @@ float CalculateAO(vec3 p) {
             for (int k = -1; k <= 1; ++k) {
                 if (i == 0 && j == 0 && k == 0)
                     continue;
-                ao += SampleVoxel(ip + vec3(i, j, k));
+                ao += SampleVoxel(ip + vec3(i, j, k)).a;
                 totalSample++;
             }
         }
@@ -74,10 +68,10 @@ vec2 rand22(vec2 p) {
     return fract(sin(p) * 43758.5453123);
 }
 
-const vec3 lp = vec3(10.0f, 300.0f, 150.0f);
+const vec3 lp = vec3(0.0f, 200.0f, 0.0f);
 const float lr = 10.0f;
 
-const int MAX_ITERATION = 512;
+const int MAX_ITERATION = 1024;
 bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
     float halfSize = VOXEL_GRID_SIZE * 0.5f;
     vec2 tBox = BoxIntersection(r0, rd, vec3(halfSize));
@@ -98,8 +92,8 @@ bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
             p += nearestAxis * stepDir;
             t += nearestAxis * tStep * stepDir;
 
-            float val = SampleVoxel(p);
-            if (val > 0.1f) {
+            vec4 val = SampleVoxel(p);
+            if (val.a > 0.1f) {
                 vec3 id = p;
                 p = p + 1.0 - offset;
                 vec3 intersection = (p - r0) * tStep;
@@ -107,14 +101,15 @@ bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
                 p = r0 + d * rd;
                 out_p = p;
                 n = (p - id - 0.5) * 2.0;
-                vec3 n = pow(abs(n), vec3(5.0f)) * sign(n);
+                n = pow(abs(n), vec3(15.0f)) * sign(n);
                 n = normalize(n);
                 vec3 ld = normalize(lp - p);
-                col = max(dot(n, ld), 0.1f) * vec3(1.0f, 0.01f, 0.01f) * 5.;
+                col = max(dot(n, ld), 0.1f) * vec3(1.0f, 1.01f, 1.01f) * 5.;
 
                 vec3 h = normalize(-rd + ld);
                 vec3 spec = pow(max(dot(n, h), 0.0f), 16.0f) * vec3(1.);
                 col += spec;
+                col *= val.rgb;
 
                 // col = vec3(float(i) / float(MAX_ITERATION));
                 return true;
@@ -140,11 +135,11 @@ void main() {
     if (Raycast(r0, rd, p, n, col)) {
         vec3 lpR = lp;
         // lpR.xz += rand22(p.xz) * lr;
-        float ao = 1 - CalculateAO(p);
+        // float ao = 1 - CalculateAO(p);
         vec3 ld = normalize(lpR - p);
         if (Raycast(p + 0.01 * n, ld, _unused, _unused1, _unused2))
-            col *= 0.3f;
-        col *= pow(ao, 3.0f);
+            col *= 0.01f;
+        // col *= pow(ao, 3.0f);
     }
 
     col /= (1.0f + col);

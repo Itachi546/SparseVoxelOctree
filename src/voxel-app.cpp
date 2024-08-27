@@ -58,8 +58,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     depthAttachment = CreateSwapchainDepthAttachment();
 
     camera = new gfx::Camera();
-    camera->SetPosition(glm::vec3{0.5f, 2.0f, 0.5f});
-    camera->SetRotation(glm::vec3(0.0f, glm::radians(90.0f), 0.0f));
+    camera->SetPosition(glm::vec3{64.0f, 32.0f, 64.0f});
+    camera->SetRotation(glm::vec3(0.0f, glm::radians(45.0f), 0.0f));
     camera->SetNearPlane(0.1f);
 
     dt = 0.0f;
@@ -76,22 +76,29 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     std::vector<std::string> meshPath = {
-        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
-        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",
+        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
+        /*"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",*/
     };
     if (scene->Initialize(meshPath, asyncLoader)) {
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
 
-    octreeBuilder = std::make_unique<OctreeBuilder>();
-    octreeBuilder->Initialize(scene);
-    octreeBuilder->Build(commandPool, commandBuffer);
+    // @TEMP
+    asyncLoader->Wait();
 }
 
 void VoxelApp::Run() {
+    uint64_t frame = 0;
     while (!glfwWindowShouldClose(AppWindow::glfwWindowPtr)) {
         glfwPollEvents();
+
+        if (frame == 1) {
+
+            octreeBuilder = std::make_unique<OctreeBuilder>();
+            octreeBuilder->Initialize(scene);
+            octreeBuilder->Build(commandPool, commandBuffer);
+        }
 
         if (!AppWindow::minimized) {
             Debug::NewFrame();
@@ -122,6 +129,8 @@ void VoxelApp::Run() {
         char buffer[64];
         sprintf_s(buffer, "frameTime: %.2fms", dt * 1000.0f);
         glfwSetWindowTitle(glfwWindowPtr, buffer);
+
+        frame++;
     }
 }
 

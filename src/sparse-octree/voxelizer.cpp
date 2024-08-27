@@ -41,10 +41,8 @@ void Voxelizer::InitializePrepassResources() {
     depthState.enableDepthTest = false;
 
     // Create prepass pipeline
-
     RD::UniformBinding fsBindings[] = {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 4},
-        {RD::BINDING_TYPE_IMAGE, 0, 5},
     };
     ShaderID shaders[3] = {
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
@@ -67,38 +65,13 @@ void Voxelizer::InitializePrepassResources() {
     device->Destroy(shaders[1]);
     device->Destroy(shaders[2]);
 
-    // @TODO Temp
-    RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
-    samplerDesc.addressMode = RD::ADDRESS_MODE_CLAMP_TO_EDGE;
-
-    RD::TextureDescription description = RD::TextureDescription::Initialize(size, size, size);
-    description.format = RD::FORMAT_R8_UNORM;
-    description.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
-    description.textureType = RD::TEXTURE_TYPE_3D;
-    description.samplerDescription = &samplerDesc;
-    texture = device->CreateTexture(&description, "VoxelTexture");
-
     RD::BoundUniform boundedUniform[] = {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 1, gltfScene->vertexBuffer},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 2, gltfScene->drawCommandBuffer},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 3, gltfScene->transformBuffer},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 4, voxelCountBuffer},
-        {RD::BINDING_TYPE_IMAGE, 5, texture},
     };
     prepassSet = device->CreateUniformSet(prepassPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "Prepass Binding");
-
-    RD::UniformBinding csBindings = {
-        .bindingType = RD::BINDING_TYPE_IMAGE,
-        .set = 0,
-        .binding = 0,
-    };
-
-    ShaderID cs = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/clear3d-texture.comp.spv", &csBindings, 1, nullptr, 0);
-    clearTexturePipeline = device->CreateComputePipeline(cs, false, "Clear3DTexture Pipeline");
-    device->Destroy(cs);
-
-    RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture, 0, 0};
-    clearTextureSet = device->CreateUniformSet(clearTexturePipeline, &textureBinding, 1, 0, "ClearTextureBinding");
 }
 
 void Voxelizer::InitializeMainResources() {
@@ -113,6 +86,7 @@ void Voxelizer::InitializeMainResources() {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 4},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 5},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 6},
+        {RD::BINDING_TYPE_IMAGE, 0, 7},
     };
 
     ShaderID shaders[3] = {
@@ -143,6 +117,31 @@ void Voxelizer::InitializeMainResources() {
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
     device->Destroy(shaders[2]);
+    {
+        // @TODO Temp
+        RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
+        samplerDesc.addressMode = RD::ADDRESS_MODE_CLAMP_TO_EDGE;
+
+        RD::TextureDescription description = RD::TextureDescription::Initialize(size, size, size);
+        description.format = RD::FORMAT_R8G8B8A8_UNORM;
+        description.usageFlags = RD::TEXTURE_USAGE_STORAGE_BIT;
+        description.textureType = RD::TEXTURE_TYPE_3D;
+        description.samplerDescription = &samplerDesc;
+        texture = device->CreateTexture(&description, "VoxelTexture");
+
+        RD::UniformBinding csBindings = {
+            .bindingType = RD::BINDING_TYPE_IMAGE,
+            .set = 0,
+            .binding = 0,
+        };
+
+        ShaderID cs = RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/clear3d-texture.comp.spv", &csBindings, 1, nullptr, 0);
+        clearTexturePipeline = device->CreateComputePipeline(cs, false, "Clear3DTexture Pipeline");
+        device->Destroy(cs);
+
+        RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture, 0, 0};
+        clearTextureSet = device->CreateUniformSet(clearTexturePipeline, &textureBinding, 1, 0, "ClearTextureBinding");
+    }
 }
 
 void Voxelizer::InitializeRayMarchResources() {
@@ -292,7 +291,7 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
             {RD::BINDING_TYPE_STORAGE_BUFFER, 4, scene->materialBuffer},
             {RD::BINDING_TYPE_STORAGE_BUFFER, 5, voxelCountBuffer},
             {RD::BINDING_TYPE_STORAGE_BUFFER, 6, voxelFragmentListBuffer},
-        };
+            {RD::BINDING_TYPE_IMAGE, 7, texture}};
         mainSet = device->CreateUniformSet(mainPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "Main Voxelizer Binding");
 
         ExecuteMainPass(cp, cb, waitFence);

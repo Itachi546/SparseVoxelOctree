@@ -27,8 +27,8 @@ class OctreeBuilder {
     std::shared_ptr<Voxelizer> voxelizer;
     std::shared_ptr<RenderScene> scene;
 
-    uint32_t kDims = 128;
-    uint32_t kLevels = static_cast<uint32_t>(std::log2(128) + 1);
+    const uint32_t kDims = 512;
+    const uint32_t kLevels = static_cast<uint32_t>(std::log2(kDims) + 1);
 
     BufferID octreeBuffer, buildInfoBuffer, dispatchIndirectBuffer;
     PipelineID pipelineInitNode, pipelineTagNode, pipelineAllocateNode, pipelineUpdateParams;

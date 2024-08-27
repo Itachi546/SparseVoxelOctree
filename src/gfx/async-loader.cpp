@@ -32,6 +32,12 @@ void AsyncLoader::Start() {
     });
 }
 
+void AsyncLoader::Wait() {
+    while (textureLoadQueue.size() > 0) {
+        std::this_thread::sleep_for(200ms);
+    }
+}
+
 void AsyncLoader::Shutdown() {
     execute = false;
     if (_thread.joinable()) {

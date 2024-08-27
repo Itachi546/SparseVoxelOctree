@@ -24,7 +24,7 @@ class GLTFScene : public RenderScene {
         texturesToUpdate.push_back(texture);
     }
 
-    void UpdateTextures(CommandBufferID commandBuffer);
+    void UpdateTextures(CommandBufferID commandBuffer) override;
 
     void Shutdown() override;
 

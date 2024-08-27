@@ -157,7 +157,9 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
     builder.Initialize(kDims, kLevels);
 
     uint32_t octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
-    LOG("Octree Elm Count: " + std::to_string(octreeElmCount));
+
+    float octreeMemory = (octreeElmCount * sizeof(uint32_t)) / (1024.0f * 1024.0f);
+    LOG("Octree Memory: " + std::to_string(octreeMemory) + "MB");
 
     builder.octree.resize(octreeElmCount);
 
@@ -213,6 +215,7 @@ void OctreeBuilder::Debug(CommandBufferID commandBuffer, const gfx::Camera *came
 }
 
 void OctreeBuilder::Shutdown() {
+    renderer->Shutdown();
     device->Destroy(dispatchIndirectBuffer);
     device->Destroy(octreeBuffer);
     device->Destroy(buildInfoBuffer);

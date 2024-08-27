@@ -28,6 +28,8 @@ class AsyncLoader {
         textureLoadQueue.push(TextureLoadRequest{filename, textureId});
     }
 
+    void Wait();
+
     void Shutdown();
 
   private:

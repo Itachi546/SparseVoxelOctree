@@ -21,6 +21,8 @@ struct RenderScene {
     // Update can be ownership transfer or adding to list of bindless texture
     virtual void AddTexturesToUpdate(TextureID texture) = 0;
 
+    virtual void UpdateTextures(CommandBufferID commandBuffer) = 0;
+
     virtual void Shutdown() = 0;
 
     virtual ~RenderScene() {}

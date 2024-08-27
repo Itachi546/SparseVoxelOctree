@@ -18,8 +18,22 @@ layout(binding = 6, set = 0) writeonly buffer VoxelFragmentBuffer {
     uint voxelFragment[];
 };
 
+layout(rgba8, binding = 7, set = 0) uniform writeonly image3D voxelTexture;
+
 void main() {
     uint index = atomicAdd(voxelCount[1], 1);
     ivec3 vp = ivec3(WorldToTextureSpace(gWorldPos));
     voxelFragment[index] = (vp.x << 20) | (vp.y << 10) | vp.z;
+
+    Material material = materials[gDrawID];
+    vec4 diffuseColor;
+    if (material.albedoMap != INVALID_TEXTURE) {
+        diffuseColor = sampleTextureLOD(material.albedoMap, gUV, 0.0f);
+    } else
+        diffuseColor = vec4(1.0f);
+
+    if (diffuseColor.a < 0.5)
+        discard;
+
+    imageStore(voxelTexture, vp, vec4(diffuseColor.rgb, 1.0f));
 }
