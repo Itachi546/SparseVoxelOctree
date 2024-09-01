@@ -37,6 +37,8 @@ class OctreeBuilder {
     RD *device = nullptr;
     std::shared_ptr<VoxelRenderer> renderer;
 
+    const uint32_t VOXEL_DATA_SIZE = static_cast<uint32_t>(sizeof(uint32_t) * 2);
+
   private:
     void InitializeNode(CommandBufferID commandBuffer);
     void TagNode(CommandBufferID commandBuffer, uint32_t level);

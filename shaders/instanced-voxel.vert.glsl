@@ -26,6 +26,7 @@ layout(push_constant) uniform PushConstant {
 
 layout(location = 0) out vec3 vNormal;
 layout(location = 1) out vec2 vUV;
+layout(location = 2) out flat vec3 vColor;
 
 void main() {
     VertexData vertex = vertices[gl_VertexIndex];
@@ -33,10 +34,13 @@ void main() {
 
     vec3 position = vec3(vertex.px, vertex.py, vertex.pz);
     vec3 normal = vec3(vertex.nx, vertex.ny, vertex.nz);
-    vec3 worldPos = position * data.w + vec3(data.x, data.y, data.z);
+    vec3 worldPos = position * 0.5f + vec3(data.x, data.y, data.z);
 
     vNormal = normal;
     vUV = vec2(vertex.tu, vertex.tv) * 2.0f - 1.0f;
+
+    uint color = uint(data.w);
+    vColor = unpackUnorm4x8(color).rgb;
 
     gl_Position = VP * vec4(worldPos, 1.0f);
 }

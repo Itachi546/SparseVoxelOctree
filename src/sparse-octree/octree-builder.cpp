@@ -57,7 +57,7 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
     voxelizer->Voxelize(commandPool, commandBuffer);
 
     uint32_t voxelCount = voxelizer->voxelCount;
-    uint32_t octreeSize = (voxelCount * kLevels * 3 * sizeof(uint32_t)) / 4;
+    uint32_t octreeSize = (voxelCount * kLevels * 3 * VOXEL_DATA_SIZE) / 4;
     // @TEMP Remove CPU Allocation
     octreeBuffer = device->CreateBuffer(octreeSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "OctreeBuffer");
 
@@ -136,13 +136,16 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
                                     nullptr, 0,
                                     allocateNodeBarrier, static_cast<uint32_t>(std::size(allocateNodeBarrier)));
 
-            AllocateNode(commandBuffer);
+            // Skip this for leaf node
+            if (i != kLevels - 1) {
+                AllocateNode(commandBuffer);
 
-            device->PipelineBarrier(commandBuffer,
-                                    RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT | RD::PIPELINE_STAGE_DRAW_INDIRECT_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                    nullptr, 0,
-                                    updateParamsBarrier, static_cast<uint32_t>(std::size(updateParamsBarrier)));
-            UpdateParams(commandBuffer);
+                device->PipelineBarrier(commandBuffer,
+                                        RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT | RD::PIPELINE_STAGE_DRAW_INDIRECT_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                        nullptr, 0,
+                                        updateParamsBarrier, static_cast<uint32_t>(std::size(updateParamsBarrier)));
+                UpdateParams(commandBuffer);
+            }
         },
                                 &submitInfo);
         device->WaitForFence(&submitInfo.fence, 1, UINT64_MAX);
@@ -156,7 +159,7 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
     CpuOctreeBuilder builder;
     builder.Initialize(kDims, kLevels);
 
-    uint32_t octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
+    uint64_t octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
 
     float octreeMemory = (octreeElmCount * sizeof(uint32_t)) / (1024.0f * 1024.0f);
     LOG("Octree Memory: " + std::to_string(octreeMemory) + "MB");

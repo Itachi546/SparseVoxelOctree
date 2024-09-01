@@ -3,7 +3,7 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "voxelizer.glsl"
 
-layout(r8, set = 0, binding = 0) uniform image3D uTexture;
+layout(rgba8, set = 0, binding = 0) uniform image3D uTexture;
 
 layout(location = 0) in vec2 uv;
 
@@ -90,8 +90,6 @@ bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
         for (int i = 0; i < MAX_ITERATION; ++i) {
             vec3 nearestAxis = step(t, t.yzx) * step(t, t.zxy);
             p += nearestAxis * stepDir;
-            t += nearestAxis * tStep * stepDir;
-
             vec4 val = SampleVoxel(p);
             if (val.a > 0.1f) {
                 vec3 id = p;
@@ -100,9 +98,10 @@ bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
                 float d = max(intersection.x, max(intersection.y, intersection.z));
                 p = r0 + d * rd;
                 out_p = p;
-                n = (p - id - 0.5) * 2.0;
-                n = pow(abs(n), vec3(15.0f)) * sign(n);
+                n = step(t, t.yzx) * step(t, t.zxy); //(p - id - 0.5) * 2.0;
                 n = normalize(n);
+                // n = pow(abs(n), vec3(15.0f)) * sign(n);
+                // n = normalize(n);
                 vec3 ld = normalize(lp - p);
                 col = max(dot(n, ld), 0.1f) * vec3(1.0f, 1.01f, 1.01f) * 5.;
 
@@ -114,6 +113,8 @@ bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
                 // col = vec3(float(i) / float(MAX_ITERATION));
                 return true;
             }
+
+            t += nearestAxis * tStep * stepDir;
 
             if (min(t.x, min(t.y, t.z)) > tMax)
                 break;
@@ -137,7 +138,7 @@ void main() {
         // lpR.xz += rand22(p.xz) * lr;
         // float ao = 1 - CalculateAO(p);
         vec3 ld = normalize(lpR - p);
-        if (Raycast(p + 0.01 * n, ld, _unused, _unused1, _unused2))
+        if (Raycast(p + 0.001 * n, ld, _unused, _unused1, _unused2))
             col *= 0.01f;
         // col *= pow(ao, 3.0f);
     }

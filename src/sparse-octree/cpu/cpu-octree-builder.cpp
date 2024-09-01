@@ -111,7 +111,8 @@ void CpuOctreeBuilder::_ListVoxel(uint32_t nodeIndex, const glm::vec3 &position,
     uint32_t node = octree[nodeIndex];
     if ((node & 0x80000000)) {
         if (level == kLevels - 1) {
-            voxels.push_back({position, halfSize});
+            uint32_t color = node & 0xffffff;
+            voxels.push_back({position, color});
             return;
         }
         uint32_t childIndex = nodeIndex + (node & 0x7fffffff);

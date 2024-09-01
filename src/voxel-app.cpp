@@ -77,7 +77,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     std::vector<std::string> meshPath = {
         "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
-        /*"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",*/
+        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/scene.glb",
     };
     if (scene->Initialize(meshPath, asyncLoader)) {
         scene->PrepareDraws(globalUB);

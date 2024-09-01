@@ -1,5 +1,7 @@
 #version 460
 
+#extension GL_ARB_gpu_shader_int64 : enable
+
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
@@ -7,7 +9,7 @@ layout(binding = 0, set = 0) buffer SparseOctreeBuffer {
 };
 
 layout(binding = 1, set = 0) readonly buffer VoxelFragmentBuffer {
-    uint voxelFragments[];
+    uint64_t voxelFragments[];
 };
 
 layout(push_constant) uniform PushConstants {
@@ -16,12 +18,22 @@ layout(push_constant) uniform PushConstants {
     uint uVoxelDims;
 };
 
-vec3 getPositionFromUint(uint p) {
+vec3 getPositionFromUint(uint64_t voxel) {
     vec3 position;
-    position.x = (p >> 20) & 0x3ff;
-    position.y = (p >> 10) & 0x3ff;
-    position.z = p & 0x3ff;
+    /*
+    position.x = float((p >> 20) & 0x3ff);
+    position.y = float((p >> 10) & 0x3ff);
+    position.z = float(p & 0x3ff);
+    */
+
+    position.x = float(voxel & 0xfff);
+    position.y = float((voxel >> 12) & 0xfff);
+    position.z = float((voxel >> 24) & 0xfff);
     return position - uVoxelDims * 0.5f;
+}
+
+uint getColorFromUint(uint64_t voxel) {
+    return uint((voxel >> 40) & 0xffffff);
 }
 
 void main() {
@@ -53,6 +65,14 @@ void main() {
         node = octree[childIndex];
     }
 
-    if (bFlag)
-        octree[childIndex] |= 0x80000000;
+    const float leafNodeLevel = log2(uVoxelDims);
+    if (uLevel == uint(leafNodeLevel)) {
+        uint col = getColorFromUint(voxelFragments[threadId]);
+        if (bFlag)
+            col |= 0x80000000;
+        atomicExchange(octree[childIndex], col);
+    } else {
+        if (bFlag)
+            octree[childIndex] |= 0x80000000;
+    }
 }

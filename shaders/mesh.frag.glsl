@@ -20,7 +20,7 @@ void main() {
     if (material.albedoMap != INVALID_TEXTURE) {
         diffuseColor = sampleTexture(material.albedoMap, vUV);
     } else
-        diffuseColor = vec4(1.0f);
+        diffuseColor = material.albedo;
     if (diffuseColor.a < 0.5)
         discard;
 
