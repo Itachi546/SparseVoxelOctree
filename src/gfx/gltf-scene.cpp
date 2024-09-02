@@ -70,7 +70,8 @@ void GLTFScene::ParseMaterial(tinygltf::Model *model, MaterialInfo *component, u
 
                 TextureID textureId = device->CreateTexture(&desc, image.uri);
                 textureMap[hash] = textureId;
-                asyncLoader->RequestTextureLoad(texturePath, textureId);
+                asyncLoader->LoadTextureSync(texturePath, textureId, &stagingSubmitInfo);
+                device->UpdateBindlessDescriptor(&textureId, 1);
                 return (uint32_t)textureId.id;
             }
         }
@@ -282,6 +283,11 @@ bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::share
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
 
+    stagingSubmitInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
+    stagingSubmitInfo.commandPool = device->CreateCommandPool(stagingSubmitInfo.queue, "TempCommandPool");
+    stagingSubmitInfo.commandBuffer = device->CreateCommandBuffer(stagingSubmitInfo.commandPool, "TempCommandBuffer");
+    stagingSubmitInfo.fence = device->CreateFence("TempFence");
+
     for (int i = 0; i < filenames.size(); ++i) {
         _meshBasePath = std::filesystem::path(filenames[i]).remove_filename().string();
         if (!LoadFile(filenames[i].c_str(), &meshGroup))
@@ -324,11 +330,7 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
     };
 
     //@TODO Move to transfer queue
-    RD::ImmediateSubmitInfo submitInfo;
-    submitInfo.queue = device->GetDeviceQueue(RD::QUEUE_TYPE_GRAPHICS);
-    submitInfo.commandPool = device->CreateCommandPool(submitInfo.queue, "TempCommandPool");
-    submitInfo.commandBuffer = device->CreateCommandBuffer(submitInfo.commandPool, "TempCommandBuffer");
-    submitInfo.fence = device->CreateFence("TempFence");
+
     for (auto &request : uploadRequests) {
         std::memcpy(stagingBufferPtr, request.data, request.size);
 
@@ -337,14 +339,11 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
                 0, 0, request.size};
             device->CopyBuffer(commandBuffer, stagingBuffer, request.bufferId, &copyRegion);
         },
-                                &submitInfo);
-        device->WaitForFence(&submitInfo.fence, 1, UINT64_MAX);
-        device->ResetFences(&submitInfo.fence, 1);
-        device->ResetCommandPool(submitInfo.commandPool);
+                                &stagingSubmitInfo);
+        device->WaitForFence(&stagingSubmitInfo.fence, 1, UINT64_MAX);
+        device->ResetFences(&stagingSubmitInfo.fence, 1);
+        device->ResetCommandPool(stagingSubmitInfo.commandPool);
     }
-    device->Destroy(submitInfo.fence);
-    device->Destroy(submitInfo.commandPool);
-    device->Destroy(stagingBuffer);
 
     RD::BoundUniform boundedUniform[] = {
         {RD::BINDING_TYPE_UNIFORM_BUFFER, 0, globalUB},
@@ -353,7 +352,12 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 3, transformBuffer},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 4, materialBuffer},
     };
+
     bindingSet = device->CreateUniformSet(renderPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "MeshBindingSet");
+
+    device->Destroy(stagingSubmitInfo.fence);
+    device->Destroy(stagingSubmitInfo.commandPool);
+    device->Destroy(stagingBuffer);
 }
 
 void GLTFScene::Render(CommandBufferID commandBuffer) {

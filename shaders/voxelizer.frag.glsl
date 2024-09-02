@@ -38,10 +38,10 @@ void main() {
 
     ivec3 vp = ivec3(WorldToTextureSpace(gWorldPos));
     // voxelFragment[index] = (vp.x << 20) | (vp.y << 10) | vp.z;
-    voxelFragment[index] = uint64_t(vp.x) |
-                           uint64_t(vp.y) << 12 |
+    voxelFragment[index] = uint64_t(color) << 40 |
                            uint64_t(vp.z) << 24 |
-                           uint64_t(color) << 40;
+                           uint64_t(vp.y) << 12 |
+                           uint64_t(vp.x);
 
     imageStore(voxelTexture, vp, vec4(diffuseColor.rgb, 1.0f));
 }

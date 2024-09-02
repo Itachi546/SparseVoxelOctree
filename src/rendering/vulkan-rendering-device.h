@@ -107,6 +107,8 @@ class VulkanRenderingDevice : public RenderingDevice {
         bindlessTextureToUpdate.push_back(texture);
     }
 
+    void UpdateBindlessDescriptor(TextureID *texture, uint32_t textureCount) override;
+
     void GenerateMipmap(CommandBufferID commandBuffer, TextureID texture) override;
 
     void Destroy(PipelineID pipeline) override;

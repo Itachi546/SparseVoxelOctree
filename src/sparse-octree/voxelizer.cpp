@@ -282,7 +282,7 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
 
     if (voxelCount > 0) {
         // Allocate Buffer
-        uint32_t bufferSize = static_cast<uint32_t>(sizeof(uint32_t)) * voxelCount;
+        uint32_t bufferSize = static_cast<uint32_t>(sizeof(uint64_t)) * voxelCount;
         voxelFragmentListBuffer = device->CreateBuffer(bufferSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "VoxelFragmentList Buffer");
         RD::BoundUniform boundedUniform[] = {
             {RD::BINDING_TYPE_STORAGE_BUFFER, 1, scene->vertexBuffer},

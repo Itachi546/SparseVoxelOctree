@@ -49,4 +49,8 @@ class GLTFScene : public RenderScene {
 
     std::mutex textureUpdateMutex;
     std::vector<TextureID> texturesToUpdate;
+
+    // @NOTE this submitInfo is used for synchronous transfer of texture and upload
+    // buffer resources to the gpu. This is destroyed at the end of PrepareDraws
+    RD::ImmediateSubmitInfo stagingSubmitInfo;
 };

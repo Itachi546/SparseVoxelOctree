@@ -24,11 +24,11 @@ class AsyncLoader {
 
     void Start();
 
-    void RequestTextureLoad(std::string filename, TextureID textureId) {
+    void LoadTextureAsync(std::string filename, TextureID textureId) {
         textureLoadQueue.push(TextureLoadRequest{filename, textureId});
     }
 
-    void Wait();
+    void LoadTextureSync(std::string filename, TextureID textureId, RD::ImmediateSubmitInfo *submitInfo);
 
     void Shutdown();
 
@@ -41,7 +41,7 @@ class AsyncLoader {
 
     BufferID stagingBuffer;
     uint8_t *stagingBufferPtr;
-    RD::ImmediateSubmitInfo submitQueueInfo;
+    RD::ImmediateSubmitInfo transferSubmitInfo;
     RD *device;
     void ProcessQueue(RD *device);
 

@@ -1762,32 +1762,7 @@ void VulkanRenderingDevice::Present() {
 
     VK_CHECK(vkQueuePresentKHR(_queues[0], &presentInfo));
 
-    uint32_t textureUpdateCount = static_cast<uint32_t>(bindlessTextureToUpdate.size());
-    if (textureUpdateCount > 0) {
-        std::vector<VkWriteDescriptorSet> writeSets(textureUpdateCount);
-        std::vector<VkDescriptorImageInfo> imageInfos(textureUpdateCount);
-
-        for (uint32_t i = 0; i < textureUpdateCount; ++i) {
-            VulkanTexture *texture = _textures.Access(bindlessTextureToUpdate[i].id);
-            VkWriteDescriptorSet &writeSet = writeSets[i];
-            writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeSet.pNext = nullptr;
-            writeSet.dstSet = _bindlessDescriptorSet;
-            writeSet.dstBinding = BINDLESS_TEXTURE_BINDING,
-            writeSet.dstArrayElement = (uint32_t)bindlessTextureToUpdate[i].id;
-            writeSet.descriptorCount = 1;
-            writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-            VkDescriptorImageInfo &imageInfo = imageInfos[i];
-            imageInfo.sampler = texture->sampler;
-            imageInfo.imageLayout = texture->currentLayout;
-            imageInfo.imageView = texture->imageView;
-            writeSet.pImageInfo = &imageInfo;
-        }
-
-        vkUpdateDescriptorSets(device, textureUpdateCount, writeSets.data(), 0, nullptr);
-        bindlessTextureToUpdate.clear();
-    }
+    UpdateBindlessDescriptor(bindlessTextureToUpdate.data(), static_cast<uint32_t>(bindlessTextureToUpdate.size()));
 }
 
 void VulkanRenderingDevice::Destroy(BufferID buffer) {
@@ -1803,6 +1778,33 @@ void VulkanRenderingDevice::Destroy(CommandPoolID commandPool) {
     VkCommandPool *vkcmdPool = _commandPools.Access(commandPool.id);
     vkDestroyCommandPool(device, *vkcmdPool, nullptr);
     _commandPools.Release(commandPool.id);
+}
+
+void VulkanRenderingDevice::UpdateBindlessDescriptor(TextureID *bindlessTexture, uint32_t textureCount) {
+    if (textureCount > 0) {
+        std::vector<VkWriteDescriptorSet> writeSets(textureCount);
+        std::vector<VkDescriptorImageInfo> imageInfos(textureCount);
+
+        for (uint32_t i = 0; i < textureCount; ++i) {
+            VulkanTexture *texture = _textures.Access(bindlessTexture[i].id);
+            VkWriteDescriptorSet &writeSet = writeSets[i];
+            writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writeSet.pNext = nullptr;
+            writeSet.dstSet = _bindlessDescriptorSet;
+            writeSet.dstBinding = BINDLESS_TEXTURE_BINDING,
+            writeSet.dstArrayElement = (uint32_t)bindlessTexture[i].id;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+            VkDescriptorImageInfo &imageInfo = imageInfos[i];
+            imageInfo.sampler = texture->sampler;
+            imageInfo.imageLayout = texture->currentLayout;
+            imageInfo.imageView = texture->imageView;
+            writeSet.pImageInfo = &imageInfo;
+        }
+
+        vkUpdateDescriptorSets(device, textureCount, writeSets.data(), 0, nullptr);
+    }
 }
 
 void VulkanRenderingDevice::GenerateMipmap(CommandBufferID commandBuffer, TextureID texture) {

@@ -84,21 +84,15 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     } else
         LOGE("Failed to initialize scene");
 
-    // @TEMP
-    asyncLoader->Wait();
+    octreeBuilder = std::make_unique<OctreeBuilder>();
+    octreeBuilder->Initialize(scene);
+    octreeBuilder->Build(commandPool, commandBuffer);
 }
 
 void VoxelApp::Run() {
     uint64_t frame = 0;
     while (!glfwWindowShouldClose(AppWindow::glfwWindowPtr)) {
         glfwPollEvents();
-
-        if (frame == 1) {
-
-            octreeBuilder = std::make_unique<OctreeBuilder>();
-            octreeBuilder->Initialize(scene);
-            octreeBuilder->Build(commandPool, commandBuffer);
-        }
 
         if (!AppWindow::minimized) {
             Debug::NewFrame();

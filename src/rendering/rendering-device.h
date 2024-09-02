@@ -538,6 +538,7 @@ class RenderingDevice {
 
     virtual void Present() = 0;
 
+    virtual void UpdateBindlessDescriptor(TextureID *bindlessTexture, uint32_t count) = 0;
     virtual void UpdateBindlessTexture(TextureID texture) = 0;
     virtual void GenerateMipmap(CommandBufferID commandBuffer, TextureID texture) = 0;
 
