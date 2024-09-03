@@ -207,7 +207,7 @@ void OctreeBuilder::UpdateParams(CommandBufferID commandBuffer) {
 // @TEMP Remove this
 #include <imgui.h>
 bool raycast = false;
-void OctreeBuilder::Debug(CommandBufferID commandBuffer, const gfx::Camera *camera) {
+void OctreeBuilder::Debug(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera) {
     ImGui::Checkbox("Raycast", &raycast);
     if (raycast) {
         voxelizer->RayMarch(commandBuffer, camera);

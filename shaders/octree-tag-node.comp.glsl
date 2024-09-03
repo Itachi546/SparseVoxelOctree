@@ -58,21 +58,20 @@ void main() {
             break;
         }
 
-        childIndex += node & 0x7FFFFFFF;
-        ivec3 region = ivec3(greaterThan(position, center));
-        childIndex += region.x * 4 + region.y * 2 + region.z;
+        childIndex += node & 0x3FFFFFFF;
+        ivec3 region = ivec3(greaterThanEqual(position, center));
+        childIndex += region.x * 4 + region.y * 2 + region.z * 1;
         center += (region * 2.0 - 1.0) * halfDims;
         node = octree[childIndex];
     }
 
-    const float leafNodeLevel = log2(uVoxelDims);
-    if (uLevel == uint(leafNodeLevel)) {
-        uint col = getColorFromUint(voxelFragments[threadId]);
-        if (bFlag)
-            col |= 0x80000000;
-        atomicExchange(octree[childIndex], col);
-    } else {
-        if (bFlag)
+    if (bFlag) {
+        const float leafNodeLevel = log2(uVoxelDims);
+        if (uLevel == uint(leafNodeLevel)) {
+            uint col = getColorFromUint(voxelFragments[threadId]);
+            col |= 0x40000000;
+            atomicExchange(octree[childIndex], col);
+        } else
             octree[childIndex] |= 0x80000000;
     }
 }

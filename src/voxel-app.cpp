@@ -11,6 +11,7 @@
 #include "gfx/async-loader.h"
 #include "rendering/rendering-utils.h"
 #include "sparse-octree/octree-builder.h"
+#include "sparse-octree/octree-tracer.h"
 
 #include <glm/gtx/component_wise.hpp>
 
@@ -57,8 +58,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     depthAttachment = CreateSwapchainDepthAttachment();
 
-    camera = new gfx::Camera();
-    camera->SetPosition(glm::vec3{64.0f, 32.0f, 64.0f});
+    camera = std::make_shared<gfx::Camera>();
+    camera->SetPosition(glm::vec3{1.5f, 1.5f, 1.5f});
     camera->SetRotation(glm::vec3(0.0f, glm::radians(45.0f), 0.0f));
     camera->SetNearPlane(0.1f);
 
@@ -76,17 +77,21 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     std::vector<std::string> meshPath = {
-        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
-        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/scene.glb",
+        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
+        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/scene.glb",
+        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",
     };
     if (scene->Initialize(meshPath, asyncLoader)) {
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
 
-    octreeBuilder = std::make_unique<OctreeBuilder>();
+    octreeBuilder = std::make_shared<OctreeBuilder>();
     octreeBuilder->Initialize(scene);
     octreeBuilder->Build(commandPool, commandBuffer);
+
+    octreeTracer = std::make_shared<OctreeTracer>();
+    octreeTracer->Initialize(octreeBuilder);
 }
 
 void VoxelApp::Run() {
@@ -156,7 +161,7 @@ void VoxelApp::OnRenderUI() {
 
     float memoryUsage = (float)device->GetMemoryUsage() / (1024.0f * 1024.0f);
     ImGui::Text("GPU Memory Usage: %.2fMB", memoryUsage);
-    ImGui::Combo("Scene Mode", &sceneMode, "Rasterizer\0Raycast\0\0");
+    ImGui::Combo("Scene Mode", &sceneMode, "Rasterizer\0RayCast Octree\0Raycast\0\0");
     ImGuiService::Render(commandBuffer);
 }
 
@@ -208,11 +213,12 @@ void VoxelApp::OnRender() {
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
 
     glm::mat4 VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
-    if (sceneMode == 0) {
+    if (sceneMode == 0)
         scene->Render(commandBuffer);
-    } else {
+    else if (sceneMode == 1)
+        octreeTracer->Trace(commandBuffer, camera);
+    else
         octreeBuilder->Debug(commandBuffer, camera);
-    }
 
     Debug::Render(commandBuffer, VP);
 
@@ -279,6 +285,7 @@ void VoxelApp::UpdateControls() {
 
 VoxelApp::~VoxelApp() {
     octreeBuilder->Shutdown();
+    octreeTracer->Shutdown();
     asyncLoader->Shutdown();
     scene->Shutdown();
     device->Destroy(depthAttachment);

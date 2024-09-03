@@ -19,7 +19,7 @@ class Voxelizer {
 
     void Voxelize(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
-    void RayMarch(CommandBufferID commandBuffer, const gfx::Camera *camera);
+    void RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera);
 
     void Shutdown();
 

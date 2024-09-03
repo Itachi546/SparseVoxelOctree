@@ -65,7 +65,7 @@ void CpuOctreeBuilder::FlagNode(uint32_t level) {
             childIndex += node & 0x7FFFFFFF;
 
             glm::ivec3 region = glm::greaterThan(position, center);
-            childIndex += region.x * 3 + region.y * 2 + region.z;
+            childIndex += region.x * 4 + region.y * 2 + region.z;
 
             center += (glm::vec3(region) * 2.0f - 1.0f) * nodeSize;
             node = octree[childIndex];
@@ -109,13 +109,13 @@ glm::vec3 REGIONS[8] = {
 
 void CpuOctreeBuilder::_ListVoxel(uint32_t nodeIndex, const glm::vec3 &position, float halfSize, uint32_t level, std::vector<glm::vec4> &voxels) {
     uint32_t node = octree[nodeIndex];
+    if ((node & 0x40000000)) {
+        uint32_t color = node & 0xffffff;
+        voxels.push_back({position, color});
+        return;
+    }
     if ((node & 0x80000000)) {
-        if (level == kLevels - 1) {
-            uint32_t color = node & 0xffffff;
-            voxels.push_back({position, color});
-            return;
-        }
-        uint32_t childIndex = nodeIndex + (node & 0x7fffffff);
+        uint32_t childIndex = nodeIndex + (node & 0x3fffffff);
         float childHSize = halfSize * 0.5f;
         for (uint32_t i = 0; i < 8; ++i) {
             glm::vec3 childPos = position + REGIONS[i] * childHSize;

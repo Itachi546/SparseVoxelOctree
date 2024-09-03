@@ -49,6 +49,14 @@ namespace gfx {
             CalculateProjection();
         }
 
+        void SetSpeed(float speed) {
+            mSpeed = speed;
+        }
+
+        void SetSensitivity(float sensitivity) {
+            mSensitivity = sensitivity;
+        }
+
         void SetFOV(float fov) {
             mFov = fov;
             CalculateProjection();

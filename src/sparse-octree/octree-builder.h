@@ -20,7 +20,7 @@ class OctreeBuilder {
     void Build(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
     // @TODO Temp
-    void Debug(CommandBufferID commandBuffer, const gfx::Camera *camera);
+    void Debug(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera);
 
     void Shutdown();
 

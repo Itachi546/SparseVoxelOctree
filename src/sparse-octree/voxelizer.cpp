@@ -302,7 +302,7 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
     device->ResetCommandPool(cp);
 }
 
-void Voxelizer::RayMarch(CommandBufferID commandBuffer, const gfx::Camera *camera) {
+void Voxelizer::RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera) {
 
     raymarchConstants.uInvP = camera->GetInvProjectionMatrix();
     raymarchConstants.uInvV = camera->GetInvViewMatrix();

@@ -8,6 +8,7 @@
 class AsyncLoader;
 struct RenderScene;
 class OctreeBuilder;
+class OctreeTracer;
 
 namespace gfx {
     class Camera;
@@ -40,7 +41,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     using Clock = std::chrono::high_resolution_clock;
 
-    gfx::Camera *camera;
+    std::shared_ptr<gfx::Camera> camera;
 
     float dt;
     float lastFrameTime;
@@ -77,10 +78,11 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     std::shared_ptr<AsyncLoader> asyncLoader;
     std::shared_ptr<RenderScene> scene;
-    std::unique_ptr<OctreeBuilder> octreeBuilder;
+    std::shared_ptr<OctreeBuilder> octreeBuilder;
+    std::shared_ptr<OctreeTracer> octreeTracer;
 
     BufferID globalUB;
     uint8_t *globalUBPtr;
 
-    int sceneMode = 0;
+    int sceneMode = 1;
 };
