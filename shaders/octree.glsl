@@ -66,7 +66,7 @@ bool Octree_RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out v
     t_min = max(t_min, 0.0f);
     float h = t_max;
 
-    uint parent = 0u;
+    uint parent = 1u;
     uint cur = 0u;
     vec3 pos = vec3(1.0f);
     uint idx = 0u;
@@ -82,8 +82,9 @@ bool Octree_RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out v
 
     while (scale < STACK_SIZE) {
         ++iter;
+        uint child_index = idx ^ oct_mask;
         if (cur == 0u)
-            cur = uOctree[parent + (idx ^ oct_mask)];
+            cur = uOctree[parent + child_index];
         // Determine maximum t-value of the cube by evaluating
         // tx(), ty(), and tz() at its corner.
 
@@ -107,7 +108,7 @@ bool Octree_RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out v
                 }
                 h = tc_max;
 
-                parent = cur & 0x3fffffffu;
+                parent += (cur & 0x3fffffffu) + child_index;
 
                 idx = 0u;
                 --scale;

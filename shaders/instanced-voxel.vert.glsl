@@ -34,7 +34,9 @@ void main() {
 
     vec3 position = vec3(vertex.px, vertex.py, vertex.pz);
     vec3 normal = vec3(vertex.nx, vertex.ny, vertex.nz);
-    vec3 worldPos = position * 0.5f + vec3(data.x, data.y, data.z);
+
+    const float scale = 0.5f;
+    vec3 worldPos = position * scale + vec3(data.x, data.y, data.z);
 
     vNormal = normal;
     vUV = vec2(vertex.tu, vertex.tv) * 2.0f - 1.0f;

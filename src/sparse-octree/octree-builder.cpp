@@ -6,10 +6,9 @@
 #include "gfx/render-scene.h"
 #include "rendering/rendering-utils.h"
 #include "voxel-renderer.h"
-
-// @TEMP
-#include "cpu/cpu-octree-builder.h"
 #include "gfx/camera.h"
+#include "cpu-octree-utils.h"
+#include <imgui.h>
 
 void OctreeBuilder::Initialize(std::shared_ptr<RenderScene> scene) {
 
@@ -155,23 +154,19 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
     device->Destroy(submitInfo.commandPool);
     device->Destroy(submitInfo.fence);
 
-    // @TEMP
-    CpuOctreeBuilder builder;
-    builder.Initialize(kDims, kLevels);
-
     uint64_t octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
 
     float octreeMemory = (octreeElmCount * sizeof(uint32_t)) / (1024.0f * 1024.0f);
     LOG("Octree Memory: " + std::to_string(octreeMemory) + "MB");
 
-    builder.octree.resize(octreeElmCount);
-
+    // @TEMP CPU side
+    std::vector<uint32_t> octree(octreeElmCount);
     void *gpuOctreeData = device->MapBuffer(octreeBuffer);
-    std::memcpy(builder.octree.data(), gpuOctreeData, octreeElmCount * sizeof(uint32_t));
-    renderer = std::make_shared<VoxelRenderer>();
+    std::memcpy(octree.data(), gpuOctreeData, octreeElmCount * sizeof(uint32_t));
 
     std::vector<glm::vec4> voxels;
-    builder.ListVoxels(voxels);
+    octree::utils::ListVoxelsFromOctree(octree, voxels, static_cast<float>(kDims));
+    renderer = std::make_shared<VoxelRenderer>();
     renderer->Initialize(voxels);
 }
 
@@ -204,10 +199,8 @@ void OctreeBuilder::UpdateParams(CommandBufferID commandBuffer) {
     device->DispatchCompute(commandBuffer, 1, 1, 1);
 }
 
-// @TEMP Remove this
-#include <imgui.h>
-bool raycast = false;
 void OctreeBuilder::Debug(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera) {
+    static bool raycast = false;
     ImGui::Checkbox("Raycast", &raycast);
     if (raycast) {
         voxelizer->RayMarch(commandBuffer, camera);

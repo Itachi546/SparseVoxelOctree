@@ -28,6 +28,7 @@ class OctreeTracer {
     struct PushConstants {
         glm::mat4 invP;
         glm::mat4 invV;
+        glm::mat4 invM;
         glm::vec4 camPos;
     } pushConstants;
 };

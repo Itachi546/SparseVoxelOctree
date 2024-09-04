@@ -59,7 +59,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     depthAttachment = CreateSwapchainDepthAttachment();
 
     camera = std::make_shared<gfx::Camera>();
-    camera->SetPosition(glm::vec3{1.5f, 1.5f, 1.5f});
+    camera->SetPosition(glm::vec3{32.0f, 80.0f, 0.0f});
     camera->SetRotation(glm::vec3(0.0f, glm::radians(45.0f), 0.0f));
     camera->SetNearPlane(0.1f);
 
@@ -77,9 +77,10 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     std::vector<std::string> meshPath = {
-        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
-        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/scene.glb",
-        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",
+        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
+        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/scene.glb",
+        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/sphere.glb",
+        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",
     };
     if (scene->Initialize(meshPath, asyncLoader)) {
         scene->PrepareDraws(globalUB);

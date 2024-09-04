@@ -84,5 +84,5 @@ struct VoxelApp : AppWindow<VoxelApp> {
     BufferID globalUB;
     uint8_t *globalUBPtr;
 
-    int sceneMode = 1;
+    int sceneMode = 2;
 };

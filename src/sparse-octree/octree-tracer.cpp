@@ -43,8 +43,12 @@ void OctreeTracer::Initialize(std::shared_ptr<OctreeBuilder> builder) {
 }
 
 void OctreeTracer::Trace(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera) {
+    glm::mat4 M = glm::scale(glm::mat4(1.0f), glm::vec3(static_cast<float>(builder->kDims))) *
+                  glm::translate(glm::mat4(1.0f), glm::vec3(-1.5f, -1.5f, -1.5f));
+
     pushConstants.invP = camera->GetInvProjectionMatrix();
     pushConstants.invV = camera->GetInvViewMatrix();
+    pushConstants.invM = glm::inverse(M);
     pushConstants.camPos = glm::vec4(camera->GetPosition(), 0.0f);
 
     RD *device = RD::GetInstance();
