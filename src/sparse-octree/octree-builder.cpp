@@ -16,8 +16,6 @@ void OctreeBuilder::Initialize(std::shared_ptr<RenderScene> scene) {
     // destroy, so that same object can be recycled or instanced can
     // be created without duplicating the pipeline.
     this->scene = scene;
-    voxelizer = std::make_shared<Voxelizer>();
-    voxelizer->Initialize(scene, kDims);
 
     device = RD::GetInstance();
 
@@ -52,7 +50,8 @@ void OctreeBuilder::Initialize(std::shared_ptr<RenderScene> scene) {
 }
 
 void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuffer) {
-
+    std::shared_ptr<Voxelizer> voxelizer = std::make_shared<Voxelizer>();
+    voxelizer->Initialize(scene, kDims);
     voxelizer->Voxelize(commandPool, commandBuffer);
 
     uint32_t voxelCount = voxelizer->voxelCount;
@@ -128,7 +127,7 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
                                     nullptr, 0,
                                     tagNodeBarrier, static_cast<uint32_t>(std::size(tagNodeBarrier)));
 
-            TagNode(commandBuffer, i);
+            TagNode(commandBuffer, i, voxelCount);
 
             device->PipelineBarrier(commandBuffer,
                                     RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -153,21 +152,12 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
     }
     device->Destroy(submitInfo.commandPool);
     device->Destroy(submitInfo.fence);
+    voxelizer->Shutdown();
 
-    uint64_t octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
+    octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
 
     float octreeMemory = (octreeElmCount * sizeof(uint32_t)) / (1024.0f * 1024.0f);
     LOG("Octree Memory: " + std::to_string(octreeMemory) + "MB");
-
-    // @TEMP CPU side
-    std::vector<uint32_t> octree(octreeElmCount);
-    void *gpuOctreeData = device->MapBuffer(octreeBuffer);
-    std::memcpy(octree.data(), gpuOctreeData, octreeElmCount * sizeof(uint32_t));
-
-    std::vector<glm::vec4> voxels;
-    octree::utils::ListVoxelsFromOctree(octree, voxels, static_cast<float>(kDims));
-    renderer = std::make_shared<VoxelRenderer>();
-    renderer->Initialize(voxels);
 }
 
 void OctreeBuilder::InitializeNode(CommandBufferID commandBuffer) {
@@ -176,11 +166,11 @@ void OctreeBuilder::InitializeNode(CommandBufferID commandBuffer) {
     device->DispatchComputeIndirect(commandBuffer, dispatchIndirectBuffer, 0);
 }
 
-void OctreeBuilder::TagNode(CommandBufferID commandBuffer, uint32_t level) {
+void OctreeBuilder::TagNode(CommandBufferID commandBuffer, uint32_t level, uint32_t voxelCount) {
     device->BindPipeline(commandBuffer, pipelineTagNode);
     device->BindUniformSet(commandBuffer, pipelineTagNode, &tagNodeSet, 1);
 
-    uint32_t data[] = {voxelizer->voxelCount, level, kDims};
+    uint32_t data[] = {voxelCount, level, kDims};
     device->BindPushConstants(commandBuffer, pipelineTagNode, RD::SHADER_STAGE_COMPUTE, &data, 0, sizeof(uint32_t) * 3);
 
     uint32_t workGroupSize = RenderingUtils::GetWorkGroupSize(data[0], 32);
@@ -199,19 +189,7 @@ void OctreeBuilder::UpdateParams(CommandBufferID commandBuffer) {
     device->DispatchCompute(commandBuffer, 1, 1, 1);
 }
 
-void OctreeBuilder::Debug(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera) {
-    static bool raycast = false;
-    ImGui::Checkbox("Raycast", &raycast);
-    if (raycast) {
-        voxelizer->RayMarch(commandBuffer, camera);
-    } else {
-        glm::mat4 VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
-        renderer->Render(commandBuffer, VP);
-    }
-}
-
 void OctreeBuilder::Shutdown() {
-    renderer->Shutdown();
     device->Destroy(dispatchIndirectBuffer);
     device->Destroy(octreeBuffer);
     device->Destroy(buildInfoBuffer);
@@ -225,6 +203,4 @@ void OctreeBuilder::Shutdown() {
     device->Destroy(tagNodeSet);
     device->Destroy(allocateNodeSet);
     device->Destroy(updateParamsSet);
-
-    voxelizer->Shutdown();
 }

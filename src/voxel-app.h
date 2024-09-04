@@ -5,10 +5,10 @@
 #include <chrono>
 #include <vector>
 
-class AsyncLoader;
 struct RenderScene;
 class OctreeBuilder;
 class OctreeTracer;
+struct VoxelRenderer;
 
 namespace gfx {
     class Camera;
@@ -76,13 +76,13 @@ struct VoxelApp : AppWindow<VoxelApp> {
     TextureID depthAttachment;
     FenceID renderFence;
 
-    std::shared_ptr<AsyncLoader> asyncLoader;
-    std::shared_ptr<RenderScene> scene;
     std::shared_ptr<OctreeBuilder> octreeBuilder;
     std::shared_ptr<OctreeTracer> octreeTracer;
+    std::shared_ptr<RenderScene> scene;
+    // std::shared_ptr<VoxelRenderer> voxelRenderer;
 
     BufferID globalUB;
     uint8_t *globalUBPtr;
 
-    int sceneMode = 2;
+    int sceneMode = 1;
 };

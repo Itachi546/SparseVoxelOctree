@@ -19,7 +19,7 @@ class Voxelizer {
 
     void Voxelize(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
-    void RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera);
+    // void RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera);
 
     void Shutdown();
 
@@ -28,8 +28,11 @@ class Voxelizer {
 
   private:
     std::shared_ptr<RenderScene> scene;
-    PipelineID prepassPipeline, mainPipeline, clearTexturePipeline, raymarchPipeline;
-    UniformSetID prepassSet, mainSet, clearTextureSet, raymarchSet;
+    PipelineID prepassPipeline, mainPipeline;
+    UniformSetID prepassSet, mainSet;
+
+    // PipelineID clearTexturePipeline, raymarchPipeline;
+    // UniformSetID clearTextureSet, raymarchSet;
 
     RD *device;
 
@@ -37,23 +40,23 @@ class Voxelizer {
     uint32_t *countBufferPtr;
     uint32_t size;
 
-    // @TEMP
-    TextureID texture;
+    // TextureID texture;
     bool enableConservativeRasterization = true;
 
     void InitializePrepassResources();
     void InitializeMainResources();
-    void InitializeRayMarchResources();
+    // void InitializeRayMarchResources();
 
     void DrawVoxelScene(CommandBufferID cb, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount);
 
     void ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceID waitFence);
 
     void ExecuteMainPass(CommandPoolID cp, CommandBufferID cb, FenceID waitFence);
-
+    /*
     struct RayMarchPushConstant {
         glm::mat4 uInvP;
         glm::mat4 uInvV;
         glm::vec4 uCamPos;
     } raymarchConstants;
+    */
 };

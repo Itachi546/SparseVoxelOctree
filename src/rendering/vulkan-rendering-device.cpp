@@ -835,7 +835,6 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
     uint32_t bindingFlag = 0;
 
     std::array<std::vector<VkDescriptorSetLayoutBinding>, MAX_SET_COUNT> setBindings;
-    uint32_t setCount = 0;
     for (uint32_t i = 0; i < shaderCount; ++i) {
         VulkanShader *vkShader = _shaders.Access(shaders[i].id);
         shaderStages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -853,7 +852,6 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
             binding.descriptorType = RD_BINDING_TYPE_TO_VK_DESCRIPTOR_TYPE[layoutDef.bindingType];
             binding.pImmutableSamplers = nullptr;
             binding.stageFlags = vkShader->stage;
-            setCount = std::max(layoutDef.set, setCount);
         }
 
         if (vkShader->pushConstants.size() > 0)
@@ -940,7 +938,6 @@ PipelineID VulkanRenderingDevice::CreateGraphicsPipeline(const ShaderID *shaders
     VulkanPipeline *pipeline = _pipeline.Access(pipelineID);
 
     std::vector<VkDescriptorSetLayout> &setLayouts = pipeline->setLayout;
-    setLayouts.reserve(setCount);
     for (auto &setBinding : setBindings) {
         if (setBinding.size() > 0)
             setLayouts.push_back(CreateDescriptorSetLayout(setBinding.data(), static_cast<uint32_t>(setBinding.size())));
@@ -1770,6 +1767,7 @@ void VulkanRenderingDevice::Destroy(BufferID buffer) {
     if (vkBuffer->mapped) {
         vmaUnmapMemory(vmaAllocator, vkBuffer->allocation);
     }
+    memoryUsage -= vkBuffer->allocation->GetSize();
     vmaDestroyBuffer(vmaAllocator, vkBuffer->buffer, vkBuffer->allocation);
     _buffers.Release(buffer.id);
 }
@@ -1887,6 +1885,10 @@ void VulkanRenderingDevice::Destroy(PipelineID pipeline) {
     vkDestroyPipelineLayout(device, vkPipeline->layout, nullptr);
     for (auto &setLayout : vkPipeline->setLayout)
         vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
+
+    vkPipeline->pipeline = nullptr;
+    vkPipeline->bindlessEnabled = false;
+    vkPipeline->setLayout.clear();
     _pipeline.Release(pipeline.id);
 }
 
@@ -1902,6 +1904,8 @@ void VulkanRenderingDevice::Destroy(ShaderID shaderModule) {
 
 void VulkanRenderingDevice::Destroy(TextureID texture) {
     VulkanTexture *vkTexture = _textures.Access(texture.id);
+    memoryUsage -= vkTexture->allocation->GetSize();
+
     vkDestroySampler(device, vkTexture->sampler, nullptr);
     vkDestroyImageView(device, vkTexture->imageView, nullptr);
     vmaDestroyImage(vmaAllocator, vkTexture->image, vkTexture->allocation);

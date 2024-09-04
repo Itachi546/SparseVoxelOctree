@@ -212,8 +212,10 @@ void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGr
 void GLTFScene::ParseScene(tinygltf::Model *model,
                            tinygltf::Scene *scene,
                            MeshGroup *meshGroup) {
+    glm::mat4 transform = glm::scale(glm::mat4(1.0f), glm::vec3(55.0f));
+    // glm::mat4 transform = glm::mat4(1.0f);
     for (auto node : scene->nodes)
-        ParseNodeHierarchy(model, node, meshGroup, glm::mat4(1.0f));
+        ParseNodeHierarchy(model, node, meshGroup, transform);
 }
 
 bool GLTFScene::LoadFile(const std::string &filename, MeshGroup *meshGroup) {
@@ -308,10 +310,6 @@ void GLTFScene::PrepareDraws(BufferID globalUB) {
 
     uint32_t transformSize = static_cast<uint32_t>(meshGroup.transforms.size() * sizeof(glm::mat4));
     transformBuffer = device->CreateBuffer(transformSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "TransformBuffer");
-    // @TEMP
-    for (auto &transform : meshGroup.transforms) {
-        transform = transform * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
-    }
 
     uint32_t materialSize = static_cast<uint32_t>(meshGroup.materials.size() * sizeof(MaterialInfo));
     materialBuffer = device->CreateBuffer(materialSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT | RD::BUFFER_USAGE_TRANSFER_DST_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "Material Buffer");

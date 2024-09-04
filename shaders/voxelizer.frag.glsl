@@ -19,7 +19,7 @@ layout(binding = 6, set = 0) writeonly buffer VoxelFragmentBuffer {
     uint64_t voxelFragment[];
 };
 
-layout(rgba8, binding = 7, set = 0) uniform writeonly image3D voxelTexture;
+// layout(rgba8, binding = 7, set = 0) uniform writeonly image3D voxelTexture;
 
 void main() {
     uint index = atomicAdd(voxelCount[1], 1);
@@ -43,5 +43,5 @@ void main() {
                            uint64_t(vp.y) << 12 |
                            uint64_t(vp.x);
 
-    imageStore(voxelTexture, vp, vec4(diffuseColor.rgb, 1.0f));
+    // imageStore(voxelTexture, vp, vec4(diffuseColor.rgb, 1.0f));
 }

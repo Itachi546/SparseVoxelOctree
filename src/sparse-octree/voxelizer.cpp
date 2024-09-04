@@ -21,7 +21,7 @@ void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene, uint32_t size) {
 
     InitializePrepassResources();
     InitializeMainResources();
-    InitializeRayMarchResources();
+    // InitializeRayMarchResources();
 }
 
 void Voxelizer::InitializePrepassResources() {
@@ -86,7 +86,7 @@ void Voxelizer::InitializeMainResources() {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 4},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 5},
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 6},
-        {RD::BINDING_TYPE_IMAGE, 0, 7},
+        /*{RD::BINDING_TYPE_IMAGE, 0, 7},*/
     };
 
     ShaderID shaders[3] = {
@@ -117,6 +117,7 @@ void Voxelizer::InitializeMainResources() {
     device->Destroy(shaders[0]);
     device->Destroy(shaders[1]);
     device->Destroy(shaders[2]);
+    /*
     {
         // @TODO Temp
         RD::SamplerDescription samplerDesc = RD::SamplerDescription::Initialize();
@@ -142,8 +143,9 @@ void Voxelizer::InitializeMainResources() {
         RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture, 0, 0};
         clearTextureSet = device->CreateUniformSet(clearTexturePipeline, &textureBinding, 1, 0, "ClearTextureBinding");
     }
+    */
 }
-
+/*
 void Voxelizer::InitializeRayMarchResources() {
     // Create prepass pipeline
     RD::UniformBinding fsBindings[] = {
@@ -183,6 +185,7 @@ void Voxelizer::InitializeRayMarchResources() {
     RD::BoundUniform textureBinding = {RD::BINDING_TYPE_IMAGE, 0, texture, 0, 0};
     raymarchSet = device->CreateUniformSet(raymarchPipeline, &textureBinding, 1, 0, "Raymarch Set");
 }
+*/
 
 void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) {
     RD::RenderingInfo renderingInfo = {
@@ -217,6 +220,7 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
     };
 
     device->ImmediateSubmit([&](CommandBufferID commandBuffer) {
+        /*
         RD::TextureBarrier barrier{
             .texture = texture,
             .srcAccess = 0,
@@ -231,7 +235,6 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
         };
 
         device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_TOP_OF_PIPE_BIT, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, &barrier, 1, nullptr, 0);
-
         device->BindPipeline(commandBuffer, clearTexturePipeline);
         device->BindUniformSet(commandBuffer, clearTexturePipeline, &clearTextureSet, 1);
 
@@ -240,14 +243,15 @@ void Voxelizer::ExecuteVoxelPrepass(CommandPoolID cp, CommandBufferID cb, FenceI
 
         barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
         device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &barrier, 1, nullptr, 0);
+        */
 
         DrawVoxelScene(commandBuffer, prepassPipeline, &prepassSet, 1);
 
         // Transfer image access to shader read
-        barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
-        barrier.dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
+        // barrier.srcAccess = RD::BARRIER_ACCESS_SHADER_WRITE_BIT;
+        // barrier.dstAccess = RD::BARRIER_ACCESS_SHADER_READ_BIT;
 
-        device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &barrier, 1, nullptr, 0);
+        // device->PipelineBarrier(commandBuffer, RD::PIPELINE_STAGE_COMPUTE_SHADER_BIT, RD::PIPELINE_STAGE_ALL_COMMANDS_BIT, &barrier, 1, nullptr, 0);
     },
                             &submitInfo);
 
@@ -291,7 +295,7 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
             {RD::BINDING_TYPE_STORAGE_BUFFER, 4, scene->materialBuffer},
             {RD::BINDING_TYPE_STORAGE_BUFFER, 5, voxelCountBuffer},
             {RD::BINDING_TYPE_STORAGE_BUFFER, 6, voxelFragmentListBuffer},
-            {RD::BINDING_TYPE_IMAGE, 7, texture}};
+            /*{RD::BINDING_TYPE_IMAGE, 7, texture}*/};
         mainSet = device->CreateUniformSet(mainPipeline, boundedUniform, static_cast<uint32_t>(std::size(boundedUniform)), 0, "Main Voxelizer Binding");
 
         ExecuteMainPass(cp, cb, waitFence);
@@ -301,7 +305,7 @@ void Voxelizer::Voxelize(CommandPoolID cp, CommandBufferID cb) {
     device->Destroy(waitFence);
     device->ResetCommandPool(cp);
 }
-
+/*
 void Voxelizer::RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Camera> camera) {
 
     raymarchConstants.uInvP = camera->GetInvProjectionMatrix();
@@ -314,17 +318,19 @@ void Voxelizer::RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Cam
 
     device->Draw(commandBuffer, 6, 1, 0, 0);
 }
+*/
 
 void Voxelizer::Shutdown() {
+    /*
     device->Destroy(clearTexturePipeline);
     device->Destroy(clearTextureSet);
 
     device->Destroy(raymarchPipeline);
     device->Destroy(raymarchSet);
-
+    device->Destroy(texture);
+    */
     device->Destroy(mainPipeline);
     device->Destroy(mainSet);
-    device->Destroy(texture);
     device->Destroy(prepassSet);
     device->Destroy(prepassPipeline);
     device->Destroy(voxelCountBuffer);

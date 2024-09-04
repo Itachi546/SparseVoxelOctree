@@ -21,6 +21,7 @@ vec3 GenerateCameraRay(vec2 uv, mat4 invP, mat4 invV) {
     return normalize(worldPos.xyz);
 }
 
+const vec3 lp = vec3(0.0f, 512.0f, 0.0f);
 void main() {
     vec3 r0 = uCamPos.xyz;
     vec3 rd = GenerateCameraRay(uv, uInvP, uInvV);
@@ -33,10 +34,17 @@ void main() {
 
     vec3 col = vec3(0.0f);
     if (Octree_RayMarchLeaf(r0, rd, outPos, outColor, outNormal, outIter)) {
-        col = outColor;
+        vec3 p = outPos;
+        vec3 ld = normalize(lp - p);
+        col = max(dot(outNormal, ld), 0.1f) * vec3(1.0f, 1.01f, 1.01f) * 5.;
+
+        vec3 h = normalize(-rd + ld);
+        vec3 spec = pow(max(dot(outNormal, h), 0.0f), 16.0f) * vec3(1.);
+        col += spec;
+        col *= outColor;
     }
 
-    // col /= (1.0f + col);
+    col /= (1.0f + col);
     col = pow(col, vec3(0.4545));
     fragColor = vec4(col, 1.0f);
 }

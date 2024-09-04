@@ -12,6 +12,8 @@
 #include "rendering/rendering-utils.h"
 #include "sparse-octree/octree-builder.h"
 #include "sparse-octree/octree-tracer.h"
+#include "sparse-octree/voxel-renderer.h"
+#include "sparse-octree/cpu-octree-utils.h"
 
 #include <glm/gtx/component_wise.hpp>
 
@@ -61,6 +63,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     camera = std::make_shared<gfx::Camera>();
     camera->SetPosition(glm::vec3{32.0f, 80.0f, 0.0f});
     camera->SetRotation(glm::vec3(0.0f, glm::radians(45.0f), 0.0f));
+    camera->SetSpeed(160.0f);
     camera->SetNearPlane(0.1f);
 
     dt = 0.0f;
@@ -69,19 +72,15 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
 
-    asyncLoader = std::make_shared<AsyncLoader>();
     scene = std::make_shared<GLTFScene>();
 
+    std::shared_ptr<AsyncLoader> asyncLoader = std::make_shared<AsyncLoader>();
     asyncLoader->Initialize(scene);
-    asyncLoader->Start();
 
-    // const std::string meshPath = "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/NewSponza/NewSponza_Main_glTF_002.gltf";
     std::vector<std::string> meshPath = {
         "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
-        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/scene.glb",
-        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/primitives/sphere.glb",
-        //"C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/dragon/dragon.glb",
     };
+
     if (scene->Initialize(meshPath, asyncLoader)) {
         scene->PrepareDraws(globalUB);
     } else
@@ -93,6 +92,20 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
     octreeTracer = std::make_shared<OctreeTracer>();
     octreeTracer->Initialize(octreeBuilder);
+    /*
+    // This is done to render the octree by traversing it on the cpu
+    // It is used to compare the raytraced output with the cpu generated
+    uint32_t octreeElmCount = octreeBuilder->octreeElmCount;
+    std::vector<uint32_t> octree(octreeElmCount);
+    void *gpuOctreeData = device->MapBuffer(octreeBuilder->octreeBuffer);
+    std::memcpy(octree.data(), gpuOctreeData, octreeElmCount * sizeof(uint32_t));
+    std::vector<glm::vec4> voxels;
+    octree::utils::ListVoxelsFromOctree(octree, voxels, static_cast<float>(octreeBuilder->kDims));
+
+    voxelRenderer = std::make_shared<VoxelRenderer>();
+    voxelRenderer->Initialize(voxels);
+    */
+    asyncLoader->Shutdown();
 }
 
 void VoxelApp::Run() {
@@ -109,7 +122,6 @@ void VoxelApp::Run() {
             OnRender();
             device->PrepareSwapchain(commandBuffer, RD::TEXTURE_LAYOUT_PRESENT_SRC);
 
-            std::static_pointer_cast<GLTFScene>(scene)->UpdateTextures(commandBuffer);
             // Draw UI
             device->EndCommandBuffer(commandBuffer);
             device->Submit(commandBuffer, renderFence);
@@ -162,7 +174,7 @@ void VoxelApp::OnRenderUI() {
 
     float memoryUsage = (float)device->GetMemoryUsage() / (1024.0f * 1024.0f);
     ImGui::Text("GPU Memory Usage: %.2fMB", memoryUsage);
-    ImGui::Combo("Scene Mode", &sceneMode, "Rasterizer\0RayCast Octree\0Raycast\0\0");
+    ImGui::Combo("Scene Mode", &sceneMode, "Triangle Scene\0RayCast Octree\0CpuVoxelizer\0\0");
     ImGuiService::Render(commandBuffer);
 }
 
@@ -218,8 +230,10 @@ void VoxelApp::OnRender() {
         scene->Render(commandBuffer);
     else if (sceneMode == 1)
         octreeTracer->Trace(commandBuffer, camera);
-    else
-        octreeBuilder->Debug(commandBuffer, camera);
+
+    else {
+        // voxelRenderer->Render(commandBuffer, VP);
+    }
 
     Debug::Render(commandBuffer, VP);
 
@@ -285,10 +299,11 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
+    scene->Shutdown();
     octreeBuilder->Shutdown();
     octreeTracer->Shutdown();
-    asyncLoader->Shutdown();
-    scene->Shutdown();
+    // voxelRenderer->Shutdown();
+
     device->Destroy(depthAttachment);
     device->Destroy(commandPool);
     device->Destroy(globalUB);
