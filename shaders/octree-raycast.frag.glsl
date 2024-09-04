@@ -38,11 +38,12 @@ void main() {
         vec3 ld = normalize(lp - p);
         col = max(dot(outNormal, ld), 0.1f) * vec3(1.0f, 1.01f, 1.01f) * 5.;
 
-        vec3 h = normalize(-rd + ld);
-        vec3 spec = pow(max(dot(outNormal, h), 0.0f), 16.0f) * vec3(1.);
-        col += spec;
+        // vec3 h = normalize(-rd + ld);
+        //  vec3 spec = pow(max(dot(outNormal, h), 0.0f), 16.0f) * vec3(1.);
+        //  col += spec;
         col *= outColor;
     }
+    // col = vec3(outIter / 1000.0);
 
     col /= (1.0f + col);
     col = pow(col, vec3(0.4545));

@@ -39,5 +39,6 @@ build/
 *.ini
 
 assets/models/
-assets/SPIRV/
+assets/SPIRV
 *.org
+todo.md
