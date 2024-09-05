@@ -43,7 +43,7 @@ struct VoxelApp : AppWindow<VoxelApp> {
 
     std::shared_ptr<gfx::Camera> camera;
 
-    float dt;
+    float dt, dtAvg;
     float lastFrameTime;
 
     // Debug Variables

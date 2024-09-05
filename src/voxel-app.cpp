@@ -110,6 +110,8 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
 
 void VoxelApp::Run() {
     uint64_t frame = 0;
+    dtAvg = 0.0f;
+    char buffer[64];
     while (!glfwWindowShouldClose(AppWindow::glfwWindowPtr)) {
         glfwPollEvents();
 
@@ -137,8 +139,9 @@ void VoxelApp::Run() {
         float currentTime = static_cast<float>(glfwGetTime());
         dt = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
+        dtAvg = (dtAvg + dt) * 0.5f;
 
-        char buffer[64];
+        std::memset(buffer, 0, sizeof(char) * 64);
         sprintf_s(buffer, "frameTime: %.2fms", dt * 1000.0f);
         glfwSetWindowTitle(glfwWindowPtr, buffer);
 

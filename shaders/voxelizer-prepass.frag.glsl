@@ -6,6 +6,10 @@
 
 layout(location = 0) in vec3 gPos01;
 
+layout(push_constant) uniform PushConstant {
+    layout(offset = 8) uint uVoxelResolution;
+};
+
 layout(binding = 4, set = 0) writeonly buffer VoxelFragmentCountBuffer {
     uint voxelCount[];
 };

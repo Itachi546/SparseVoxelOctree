@@ -22,7 +22,7 @@ class OctreeTracer {
   private:
     PipelineID pipeline;
     UniformSetID uniformSet;
-
+    
     std::shared_ptr<OctreeBuilder> builder;
 
     struct PushConstants {

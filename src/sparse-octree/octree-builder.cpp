@@ -51,7 +51,7 @@ void OctreeBuilder::Initialize(std::shared_ptr<RenderScene> scene) {
 
 void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuffer) {
     std::shared_ptr<Voxelizer> voxelizer = std::make_shared<Voxelizer>();
-    voxelizer->Initialize(scene, kDims);
+    voxelizer->Initialize(scene, kResolution);
     voxelizer->Voxelize(commandPool, commandBuffer);
 
     uint32_t voxelCount = voxelizer->voxelCount;
@@ -170,7 +170,7 @@ void OctreeBuilder::TagNode(CommandBufferID commandBuffer, uint32_t level, uint3
     device->BindPipeline(commandBuffer, pipelineTagNode);
     device->BindUniformSet(commandBuffer, pipelineTagNode, &tagNodeSet, 1);
 
-    uint32_t data[] = {voxelCount, level, kDims};
+    uint32_t data[] = {voxelCount, level, kResolution};
     device->BindPushConstants(commandBuffer, pipelineTagNode, RD::SHADER_STAGE_COMPUTE, &data, 0, sizeof(uint32_t) * 3);
 
     uint32_t workGroupSize = RenderingUtils::GetWorkGroupSize(data[0], 32);

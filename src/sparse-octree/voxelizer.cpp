@@ -6,8 +6,8 @@
 #include "gfx/camera.h"
 #include "rendering/rendering-utils.h"
 
-void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene, uint32_t size) {
-    this->size = size;
+void Voxelizer::Initialize(std::shared_ptr<RenderScene> scene, uint32_t resolution) {
+    this->voxelResolution = resolution;
     this->scene = scene;
 
     device = RD::GetInstance();
@@ -31,7 +31,10 @@ void Voxelizer::InitializePrepassResources() {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 3},
     };
 
-    RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(float)) * 2};
+    RD::PushConstant pushConstant[] = {
+        {0, static_cast<uint32_t>(sizeof(float)) * 2},
+        {8, static_cast<uint32_t>(sizeof(uint32_t))},
+    };
 
     std::shared_ptr<GLTFScene>
         gltfScene = std::static_pointer_cast<GLTFScene>(scene);
@@ -49,8 +52,8 @@ void Voxelizer::InitializePrepassResources() {
     };
     ShaderID shaders[3] = {
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.geom.spv", nullptr, 0, &pushConstant, 1),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.geom.spv", nullptr, 0, &pushConstant[0], 1),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), &pushConstant[1], 1),
     };
     prepassPipeline = device->CreateGraphicsPipeline(shaders,
                                                      (uint32_t)std::size(shaders),
@@ -91,11 +94,15 @@ void Voxelizer::InitializeMainResources() {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 6},
         /*{RD::BINDING_TYPE_IMAGE, 0, 7},*/
     };
-    RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(float)) * 2};
+    RD::PushConstant pushConstant[] = {
+        {0, static_cast<uint32_t>(sizeof(float)) * 2},
+        {8, static_cast<uint32_t>(sizeof(uint32_t))},
+    };
+
     ShaderID shaders[3] = {
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.geom.spv", nullptr, 0, &pushConstant, 1),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.geom.spv", nullptr, 0, &pushConstant[0], 1),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), &pushConstant[1], 1),
     };
 
     RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
@@ -192,8 +199,8 @@ void Voxelizer::InitializeRayMarchResources() {
 
 void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipeline, UniformSetID *uniformSet, uint32_t uniformSetCount) {
     RD::RenderingInfo renderingInfo = {
-        .width = size,
-        .height = size,
+        .width = voxelResolution,
+        .height = voxelResolution,
         .layerCount = 1,
         .colorAttachmentCount = 0,
         .pColorAttachments = nullptr,
@@ -213,6 +220,7 @@ void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipelin
         std::max({aabb.max.x, aabb.max.y, aabb.max.z}),
     };
     device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_GEOMETRY, extents, 0, sizeof(float) * 2);
+    device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_FRAGMENT, &voxelResolution, 8, sizeof(uint32_t));
 
     device->BindIndexBuffer(commandBuffer, scene->indexBuffer);
     uint32_t drawCount = static_cast<uint32_t>(scene->meshGroup.drawCommands.size());
@@ -320,7 +328,7 @@ void Voxelizer::RayMarch(CommandBufferID commandBuffer, std::shared_ptr<gfx::Cam
 
     raymarchConstants.uInvP = camera->GetInvProjectionMatrix();
     raymarchConstants.uInvV = camera->GetInvViewMatrix();
-    raymarchConstants.uCamPos = glm::vec4(camera->GetPosition(), 0.0f);
+    raymarchConstants.uCamPos = glm::vec4(camera->GetPosition(), size);
 
     device->BindPipeline(commandBuffer, raymarchPipeline);
     device->BindUniformSet(commandBuffer, raymarchPipeline, &raymarchSet, 1);

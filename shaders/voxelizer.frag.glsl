@@ -19,6 +19,10 @@ layout(binding = 6, set = 0) writeonly buffer VoxelFragmentBuffer {
     uint64_t voxelFragment[];
 };
 
+layout(push_constant) uniform PushConstant {
+    layout(offset = 8) uint uVoxelResolution;
+};
+
 // layout(rgba8, binding = 7, set = 0) uniform writeonly image3D voxelTexture;
 
 void main() {
@@ -36,7 +40,7 @@ void main() {
 
     uint color = packUnorm4x8(diffuseColor);
 
-    ivec3 vp = ivec3(gPos01 * VOXEL_GRID_SIZE);
+    ivec3 vp = ivec3(gPos01 * uVoxelResolution);
     // voxelFragment[index] = (vp.x << 20) | (vp.y << 10) | vp.z;
     voxelFragment[index] = uint64_t(color) << 40 |
                            uint64_t(vp.z) << 24 |

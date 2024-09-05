@@ -1,5 +1,3 @@
-const float VOXEL_GRID_SIZE = 1024.0f;
-
 uint FindDominantAxis(vec3 n) {
     vec3 axisWeight = abs(n);
     uint dominantAxis = axisWeight.x > axisWeight.y ? 0 : 1;
@@ -20,19 +18,19 @@ vec3 ProjectAlongDominantAxis(vec3 p, uint dominantAxis) {
 // clipping which is discarded by the rasterizer. Our goal
 // is to maximize the number of triangle generated within
 // the viewport
-vec3 ToVoxelSpace(vec3 p) {
-    return p / (VOXEL_GRID_SIZE * 0.5);
+vec3 ToVoxelSpace(vec3 p, float voxelResolution) {
+    return p / (voxelResolution * 0.5);
 }
 
 // p is in range -VOXEL_GRID_SIZE * 0.5, VOXEL_GRID_SIZE * 0.5
 // return in range 0 to VOXEL_GRID_SIZE
-vec3 WorldToTextureSpace(vec3 p) {
-    return p + VOXEL_GRID_SIZE * 0.5;
+vec3 WorldToTextureSpace(vec3 p, float voxelResolution) {
+    return p + voxelResolution * 0.5;
 }
 
-bool IsInsideCube(ivec3 textureCoord) {
+bool IsInsideCube(ivec3 textureCoord, int voxelResolution) {
     if (textureCoord.x >= 0 && textureCoord.y >= 0 && textureCoord.z >= 0 &&
-        textureCoord.x < VOXEL_GRID_SIZE && textureCoord.y < VOXEL_GRID_SIZE && textureCoord.z < VOXEL_GRID_SIZE)
+        textureCoord.x < voxelResolution && textureCoord.y < voxelResolution && textureCoord.z < voxelResolution)
         return true;
     return false;
 }

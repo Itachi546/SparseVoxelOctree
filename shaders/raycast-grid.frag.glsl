@@ -13,7 +13,8 @@ layout(push_constant) uniform PushConstants {
     mat4 uInvP;
     mat4 uInvV;
 
-    vec4 uCamPos;
+    vec3 uCamPos;
+    float uVoxelResolution;
 };
 
 vec3 GenerateCameraRay(vec2 uv, mat4 invP, mat4 invV) {
@@ -23,8 +24,8 @@ vec3 GenerateCameraRay(vec2 uv, mat4 invP, mat4 invV) {
 }
 
 vec4 SampleVoxel(vec3 p) {
-    ivec3 textureCoord = ivec3(WorldToTextureSpace(p));
-    if (IsInsideCube(textureCoord)) {
+    ivec3 textureCoord = ivec3(WorldToTextureSpace(p, uVoxelResolution));
+    if (IsInsideCube(textureCoord, int(uVoxelResolution))) {
         vec4 val = imageLoad(uTexture, textureCoord);
         return val;
     }
@@ -73,7 +74,7 @@ const float lr = 10.0f;
 
 const int MAX_ITERATION = 1024;
 bool Raycast(vec3 r0, vec3 rd, out vec3 out_p, out vec3 n, out vec3 col) {
-    float halfSize = VOXEL_GRID_SIZE * 0.5f;
+    float halfSize = uVoxelResolution * 0.5f;
     vec2 tBox = BoxIntersection(r0, rd, vec3(halfSize));
     col = vec3(0.5f);
     tBox.x = max(tBox.x, 0.0f);

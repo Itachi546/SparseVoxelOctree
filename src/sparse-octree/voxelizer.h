@@ -15,7 +15,7 @@ namespace gfx {
 class Voxelizer {
 
   public:
-    void Initialize(std::shared_ptr<RenderScene> scene, uint32_t size);
+    void Initialize(std::shared_ptr<RenderScene> scene, uint32_t voxelResolution);
 
     void Voxelize(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
@@ -38,7 +38,7 @@ class Voxelizer {
 
     BufferID voxelCountBuffer;
     uint32_t *countBufferPtr;
-    uint32_t size;
+    uint32_t voxelResolution;
 
     // TextureID texture;
     bool enableConservativeRasterization = true;
@@ -56,7 +56,8 @@ class Voxelizer {
     struct RayMarchPushConstant {
         glm::mat4 uInvP;
         glm::mat4 uInvV;
-        glm::vec4 uCamPos;
+        glm::vec3 uCamPos;
+        float voxelResolution;
     } raymarchConstants;
     */
 };
