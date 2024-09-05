@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 
 #include "rendering/rendering-device.h"
+#include "math-utils.h"
 
 struct Vertex {
     glm::vec3 position;
@@ -45,6 +46,7 @@ struct MeshGroup {
     std::vector<MaterialInfo> materials;
     std::vector<std::string> names;
     std::vector<RD::DrawElementsIndirectCommand> drawCommands;
+    std::vector<AABB> aabb;
 
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;

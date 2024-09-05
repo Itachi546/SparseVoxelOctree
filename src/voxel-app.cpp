@@ -61,10 +61,10 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     depthAttachment = CreateSwapchainDepthAttachment();
 
     camera = std::make_shared<gfx::Camera>();
-    camera->SetPosition(glm::vec3{32.0f, 80.0f, 0.0f});
+    camera->SetPosition(glm::vec3{0.0f, 10.0f, 0.0f});
     camera->SetRotation(glm::vec3(0.0f, glm::radians(45.0f), 0.0f));
-    camera->SetSpeed(160.0f);
     camera->SetNearPlane(0.1f);
+    camera->SetFarPlane(1000.0f);
 
     dt = 0.0f;
     lastFrameTime = static_cast<float>(glfwGetTime());
@@ -78,7 +78,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     asyncLoader->Initialize(scene);
 
     std::vector<std::string> meshPath = {
-        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/Sponza/Sponza.gltf",
+        "C:/Users/Dell/OneDrive/Documents/3D-Assets/Models/sponza/sponza.gltf",
     };
 
     if (scene->Initialize(meshPath, asyncLoader)) {
@@ -174,7 +174,7 @@ void VoxelApp::OnRenderUI() {
 
     float memoryUsage = (float)device->GetMemoryUsage() / (1024.0f * 1024.0f);
     ImGui::Text("GPU Memory Usage: %.2fMB", memoryUsage);
-    ImGui::Combo("Scene Mode", &sceneMode, "Triangle Scene\0RayCast Octree\0CpuVoxelizer\0\0");
+    // ImGui::Combo("Scene Mode", &sceneMode, "Triangle Scene\0RayCast Octree\0CpuVoxelizer\0\0");
     ImGuiService::Render(commandBuffer);
 }
 
@@ -226,14 +226,14 @@ void VoxelApp::OnRender() {
     device->SetScissor(commandBuffer, 0, 0, (uint32_t)windowSize.x, (uint32_t)windowSize.y);
 
     glm::mat4 VP = camera->GetProjectionMatrix() * camera->GetViewMatrix();
-    if (sceneMode == 0)
-        scene->Render(commandBuffer);
-    else if (sceneMode == 1)
-        octreeTracer->Trace(commandBuffer, camera);
+    // if (sceneMode == 0)
+    // scene->Render(commandBuffer);
+    // else if (sceneMode == 1)
+    octreeTracer->Trace(commandBuffer, camera);
 
-    else {
-        // voxelRenderer->Render(commandBuffer, VP);
-    }
+    // else {
+    //  voxelRenderer->Render(commandBuffer, VP);
+    //}
 
     Debug::Render(commandBuffer, VP);
 

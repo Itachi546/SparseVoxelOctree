@@ -31,7 +31,10 @@ void Voxelizer::InitializePrepassResources() {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 3},
     };
 
-    std::shared_ptr<GLTFScene> gltfScene = std::static_pointer_cast<GLTFScene>(scene);
+    RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(float)) * 2};
+
+    std::shared_ptr<GLTFScene>
+        gltfScene = std::static_pointer_cast<GLTFScene>(scene);
 
     RD::RasterizationState rasterizationState = RD::RasterizationState::Create();
     rasterizationState.enableConservative = enableConservativeRasterization;
@@ -46,7 +49,7 @@ void Voxelizer::InitializePrepassResources() {
     };
     ShaderID shaders[3] = {
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.geom.spv", nullptr, 0, nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.geom.spv", nullptr, 0, &pushConstant, 1),
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer-prepass.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
     };
     prepassPipeline = device->CreateGraphicsPipeline(shaders,
@@ -88,10 +91,10 @@ void Voxelizer::InitializeMainResources() {
         {RD::BINDING_TYPE_STORAGE_BUFFER, 0, 6},
         /*{RD::BINDING_TYPE_IMAGE, 0, 7},*/
     };
-
+    RD::PushConstant pushConstant = {0, static_cast<uint32_t>(sizeof(float)) * 2};
     ShaderID shaders[3] = {
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.vert.spv", vsBindings, (uint32_t)std::size(vsBindings), nullptr, 0),
-        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.geom.spv", nullptr, 0, nullptr, 0),
+        RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.geom.spv", nullptr, 0, &pushConstant, 1),
         RenderingUtils::CreateShaderModuleFromFile("assets/SPIRV/voxelizer.frag.spv", fsBindings, (uint32_t)std::size(fsBindings), nullptr, 0),
     };
 
@@ -203,6 +206,13 @@ void Voxelizer::DrawVoxelScene(CommandBufferID commandBuffer, PipelineID pipelin
 
     device->BindPipeline(commandBuffer, pipeline);
     device->BindUniformSet(commandBuffer, pipeline, uniformSet, uniformSetCount);
+
+    AABB aabb = std::static_pointer_cast<GLTFScene>(scene)->GetBoundingBox();
+    float extents[2] = {
+        std::min({aabb.min.x, aabb.min.y, aabb.min.z}),
+        std::max({aabb.max.x, aabb.max.y, aabb.max.z}),
+    };
+    device->BindPushConstants(commandBuffer, pipeline, RD::SHADER_STAGE_GEOMETRY, extents, 0, sizeof(float) * 2);
 
     device->BindIndexBuffer(commandBuffer, scene->indexBuffer);
     uint32_t drawCount = static_cast<uint32_t>(scene->meshGroup.drawCommands.size());

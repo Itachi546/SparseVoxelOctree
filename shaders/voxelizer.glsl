@@ -1,4 +1,4 @@
-const float VOXEL_GRID_SIZE = 2048.0f;
+const float VOXEL_GRID_SIZE = 1024.0f;
 
 uint FindDominantAxis(vec3 n) {
     vec3 axisWeight = abs(n);

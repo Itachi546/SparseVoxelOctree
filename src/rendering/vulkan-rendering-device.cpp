@@ -680,7 +680,7 @@ void VulkanRenderingDevice::Initialize(void *platformData) {
     // Initialize Resource Pools
     _shaders.Initialize(64, "ShaderPool");
     _pipeline.Initialize(64, "PipelinePool");
-    _textures.Initialize(64, "TexturePool");
+    _textures.Initialize(128, "TexturePool");
     _buffers.Initialize(64, "BufferPool");
     _uniformSets.Initialize(64, "UniformSetPool");
     _commandPools.Initialize(16, "CommandPool");

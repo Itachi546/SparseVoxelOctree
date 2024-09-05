@@ -43,7 +43,6 @@ void main() {
         //  col += spec;
         col *= outColor;
     }
-    // col = vec3(outIter / 1000.0);
 
     col /= (1.0f + col);
     col = pow(col, vec3(0.4545));

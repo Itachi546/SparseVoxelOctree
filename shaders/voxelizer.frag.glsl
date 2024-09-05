@@ -7,7 +7,7 @@
 #include "material.glsl"
 #include "voxelizer.glsl"
 
-layout(location = 0) in vec3 gWorldPos;
+layout(location = 0) in vec3 gPos01;
 layout(location = 1) in vec2 gUV;
 layout(location = 2) in flat uint gDrawID;
 
@@ -36,7 +36,7 @@ void main() {
 
     uint color = packUnorm4x8(diffuseColor);
 
-    ivec3 vp = ivec3(WorldToTextureSpace(gWorldPos));
+    ivec3 vp = ivec3(gPos01 * VOXEL_GRID_SIZE);
     // voxelFragment[index] = (vp.x << 20) | (vp.y << 10) | vp.z;
     voxelFragment[index] = uint64_t(color) << 40 |
                            uint64_t(vp.z) << 24 |

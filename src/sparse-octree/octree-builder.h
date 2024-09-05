@@ -23,7 +23,7 @@ class OctreeBuilder {
 
     std::shared_ptr<RenderScene> scene;
 
-    const uint32_t kDims = 2048;
+    const uint32_t kDims = 1024;
     const uint32_t kLevels = static_cast<uint32_t>(std::log2(kDims) + 1);
 
     BufferID octreeBuffer, buildInfoBuffer, dispatchIndirectBuffer;

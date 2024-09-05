@@ -28,6 +28,10 @@ class GLTFScene : public RenderScene {
 
     void Shutdown() override;
 
+    AABB GetBoundingBox() {
+        return boundingBox;
+    }
+
     virtual ~GLTFScene() {}
 
   private:
@@ -53,4 +57,6 @@ class GLTFScene : public RenderScene {
     // @NOTE this submitInfo is used for synchronous transfer of texture and upload
     // buffer resources to the gpu. This is destroyed at the end of PrepareDraws
     RD::ImmediateSubmitInfo stagingSubmitInfo;
+
+    AABB boundingBox;
 };

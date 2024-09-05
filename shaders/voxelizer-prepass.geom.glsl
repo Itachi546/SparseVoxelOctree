@@ -6,7 +6,11 @@
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;
 
-layout(location = 0) out vec3 gWorldPos;
+layout(location = 0) out vec3 gPos01;
+
+layout(push_constant) uniform PushConstant {
+    float minExtent, maxExtent;
+};
 
 void main() {
 
@@ -19,10 +23,10 @@ void main() {
 
     for (int i = 0; i < 3; ++i) {
         // Convert to clipspace position, project it along dominant axis
-        gWorldPos = gl_in[i].gl_Position.xyz;
+        vec3 pos01 = ((gl_in[i].gl_Position.xyz - minExtent) / (maxExtent - minExtent));
+        gPos01 = pos01;
 
-        vec3 voxelSpacePos = ToVoxelSpace(gWorldPos);
-        vec3 projectedPosition = ProjectAlongDominantAxis(voxelSpacePos, dominantAxis);
+        vec3 projectedPosition = ProjectAlongDominantAxis(pos01 * 2.0f - 1.0f, dominantAxis);
         gl_Position = vec4(projectedPosition, 1.0f);
         EmitVertex();
     }

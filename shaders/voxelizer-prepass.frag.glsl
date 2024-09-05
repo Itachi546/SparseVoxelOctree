@@ -4,7 +4,7 @@
 
 #include "voxelizer.glsl"
 
-layout(location = 0) in vec3 gWorldPos;
+layout(location = 0) in vec3 gPos01;
 
 layout(binding = 4, set = 0) writeonly buffer VoxelFragmentCountBuffer {
     uint voxelCount[];

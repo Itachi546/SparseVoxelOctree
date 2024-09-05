@@ -158,9 +158,13 @@ bool GLTFScene::ParseMesh(tinygltf::Model *model, tinygltf::Mesh &mesh, MeshGrou
             assert(0);
         }
 
-        glm::vec3 minExtent = glm::vec3(positionAccessor.minValues[0], positionAccessor.minValues[1], positionAccessor.minValues[2]);
-        glm::vec3 maxExtent = glm::vec3(positionAccessor.maxValues[0], positionAccessor.maxValues[1], positionAccessor.maxValues[2]);
+        glm::vec3 minExtent = transform * glm::vec4(positionAccessor.minValues[0], positionAccessor.minValues[1], positionAccessor.minValues[2], 1.0f);
+        glm::vec3 maxExtent = transform * glm::vec4(positionAccessor.maxValues[0], positionAccessor.maxValues[1], positionAccessor.maxValues[2], 1.0f);
 
+        //glm::vec3 minBound = glm::min(minExtent, maxExtent);
+        //glm::vec3 maxBound = glm::max(minExtent, maxExtent);
+
+        meshGroup->aabb.push_back({minExtent, maxExtent});
         meshGroup->transforms.push_back(transform);
         RD::DrawElementsIndirectCommand drawCommand = {};
         drawCommand.count = indexCount;
@@ -212,7 +216,7 @@ void GLTFScene::ParseNodeHierarchy(tinygltf::Model *model, int nodeIndex, MeshGr
 void GLTFScene::ParseScene(tinygltf::Model *model,
                            tinygltf::Scene *scene,
                            MeshGroup *meshGroup) {
-    glm::mat4 transform = glm::scale(glm::mat4(1.0f), glm::vec3(55.0f));
+    glm::mat4 transform = glm::mat4(1.0f);
     // glm::mat4 transform = glm::mat4(1.0f);
     for (auto node : scene->nodes)
         ParseNodeHierarchy(model, node, meshGroup, transform);
@@ -295,6 +299,14 @@ bool GLTFScene::Initialize(const std::vector<std::string> &filenames, std::share
         if (!LoadFile(filenames[i].c_str(), &meshGroup))
             return false;
     }
+
+    boundingBox.min = glm::vec3(FLT_MAX);
+    boundingBox.max = glm::vec3(-FLT_MAX);
+    for (auto &aabb : meshGroup.aabb) {
+        boundingBox.min = glm::min(boundingBox.min, aabb.min);
+        boundingBox.max = glm::max(boundingBox.max, aabb.max);
+    }
+
     return true;
 }
 
