@@ -80,6 +80,7 @@ bool Octree_RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out v
     uint scale = STACK_SIZE - 1;
     float scale_exp2 = 0.5f; // exp2( scale - STACK_SIZE )
 
+    float ray_scale = 0.0025f;
     while (scale < STACK_SIZE) {
         ++iter;
         uint child_index = idx ^ oct_mask;
@@ -92,6 +93,9 @@ bool Octree_RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out v
         float tc_max = min(min(t_corner.x, t_corner.y), t_corner.z);
 
         if ((cur & 0x80000000u) != 0 && t_min <= t_max) {
+            if (tc_max * ray_scale >= scale_exp2)
+                break; //
+
             // INTERSECT
             float tv_max = min(t_max, tc_max);
             float half_scale_exp2 = scale_exp2 * 0.5f;
