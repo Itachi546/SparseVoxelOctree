@@ -20,7 +20,7 @@ void AsyncLoader::Initialize(std::shared_ptr<RenderScene> scene) {
     transferSubmitInfo.commandBuffer = device->CreateCommandBuffer(transferSubmitInfo.commandPool, "Async Transfer Command Buffer");
     transferSubmitInfo.fence = device->CreateFence("Async Transfer Fence");
 
-    stagingBuffer = device->CreateBuffer(64 * 1024 * 1024, RD::BUFFER_USAGE_TRANSFER_SRC_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "Texture Copy Staging Buffer");
+    stagingBuffer = device->CreateBuffer(MB(64), RD::BUFFER_USAGE_TRANSFER_SRC_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "Texture Copy Staging Buffer");
     stagingBufferPtr = device->MapBuffer(stagingBuffer);
 }
 

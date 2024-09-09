@@ -71,7 +71,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     frameData.uLightPosition = glm::vec3(0.0f, 32.0f, 32.0f);
     origin = glm::vec3(32.0f);
     target = glm::vec3(0.0f);
-
+    /*
     scene = std::make_shared<GLTFScene>();
 
     std::shared_ptr<AsyncLoader> asyncLoader = std::make_shared<AsyncLoader>();
@@ -85,7 +85,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
         scene->PrepareDraws(globalUB);
     } else
         LOGE("Failed to initialize scene");
-
+    */
     octreeBuilder = std::make_shared<OctreeBuilder>();
     octreeBuilder->Initialize(scene);
     octreeBuilder->Build(commandPool, commandBuffer);
@@ -105,7 +105,7 @@ VoxelApp::VoxelApp() : AppWindow("Voxel Application", glm::vec2{1360.0f, 769.0f}
     voxelRenderer = std::make_shared<VoxelRenderer>();
     voxelRenderer->Initialize(voxels);
     */
-    asyncLoader->Shutdown();
+    // asyncLoader->Shutdown();
 }
 
 void VoxelApp::Run() {
@@ -175,7 +175,7 @@ void VoxelApp::OnRenderUI() {
     glm::vec3 camPos = camera->GetPosition();
     ImGui::Text("Camera Position: %.2f %.2f %.2f", camPos.x, camPos.y, camPos.z);
 
-    float memoryUsage = (float)device->GetMemoryUsage() / (1024.0f * 1024.0f);
+    float memoryUsage = InMB(device->GetMemoryUsage());
     ImGui::Text("GPU Memory Usage: %.2fMB", memoryUsage);
     // ImGui::Combo("Scene Mode", &sceneMode, "Triangle Scene\0RayCast Octree\0CpuVoxelizer\0\0");
     ImGuiService::Render(commandBuffer);
@@ -302,7 +302,7 @@ void VoxelApp::UpdateControls() {
 }
 
 VoxelApp::~VoxelApp() {
-    scene->Shutdown();
+    // scene->Shutdown();
     octreeBuilder->Shutdown();
     octreeTracer->Shutdown();
     // voxelRenderer->Shutdown();

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "rendering/rendering-device.h"
-
+#include "voxelizer.h"
 #include <glm/glm.hpp>
 
 #include <memory>
@@ -12,10 +11,11 @@ namespace gfx {
     class Camera;
 };
 
-class Voxelizer {
+class SceneVoxelizer : public Voxelizer {
 
   public:
-    void Initialize(std::shared_ptr<RenderScene> scene, uint32_t voxelResolution);
+    SceneVoxelizer(std::shared_ptr<RenderScene> scene);
+    void Initialize(uint32_t voxelResolution);
 
     void Voxelize(CommandPoolID commandPool, CommandBufferID commandBuffer);
 
@@ -23,8 +23,7 @@ class Voxelizer {
 
     void Shutdown();
 
-    uint32_t voxelCount = 0;
-    BufferID voxelFragmentListBuffer;
+    ~SceneVoxelizer() {}
 
   private:
     std::shared_ptr<RenderScene> scene;

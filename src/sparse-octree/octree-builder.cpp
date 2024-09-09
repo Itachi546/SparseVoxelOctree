@@ -2,7 +2,10 @@
 
 #include "octree-builder.h"
 
-#include "voxelizer.h"
+#include "voxelizer/voxelizer.h"
+#include "voxelizer/scene-voxelizer.h"
+#include "voxelizer/terrain-voxelizer.h"
+
 #include "gfx/render-scene.h"
 #include "rendering/rendering-utils.h"
 #include "voxel-renderer.h"
@@ -50,14 +53,15 @@ void OctreeBuilder::Initialize(std::shared_ptr<RenderScene> scene) {
 }
 
 void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuffer) {
-    std::shared_ptr<Voxelizer> voxelizer = std::make_shared<Voxelizer>();
-    voxelizer->Initialize(scene, kResolution);
+    std::shared_ptr<Voxelizer> voxelizer = std::make_shared<TerrainVoxelizer>();
+    voxelizer->Initialize(kResolution);
     voxelizer->Voxelize(commandPool, commandBuffer);
 
     uint32_t voxelCount = voxelizer->voxelCount;
-    uint32_t octreeSize = (voxelCount * kLevels * 3 * VOXEL_DATA_SIZE) / 4;
-    // @TEMP Remove CPU Allocation
-    octreeBuffer = device->CreateBuffer(octreeSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "OctreeBuffer");
+    uint32_t octreeSize = (voxelCount * kLevels * VOXEL_DATA_SIZE) / 3;
+
+    octreeBuffer = device->CreateBuffer(octreeSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "OctreeBuffer");
+    LOG("Allocated Octree Memory: " + std::to_string(InMB(octreeSize)) + "MB");
 
     buildInfoBuffer = device->CreateBuffer(sizeof(uint32_t) * 3, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_CPU, "OctreeBuildInfoBuffer");
     uint32_t *buildInfoPtr = (uint32_t *)device->MapBuffer(buildInfoBuffer);
@@ -78,7 +82,7 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
     {
         RD::BoundUniform boundUniforms[] = {
             {RD::BINDING_TYPE_STORAGE_BUFFER, 0, octreeBuffer},
-            {RD::BINDING_TYPE_STORAGE_BUFFER, 1, voxelizer->voxelFragmentListBuffer},
+            {RD::BINDING_TYPE_STORAGE_BUFFER, 1, voxelizer->voxelFragmentBuffer},
         };
         tagNodeSet = device->CreateUniformSet(pipelineTagNode, boundUniforms, static_cast<uint32_t>(std::size(boundUniforms)), 0, "TagNodeSet");
     }
@@ -156,8 +160,8 @@ void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuff
 
     octreeElmCount = buildInfoPtr[0] + buildInfoPtr[1];
 
-    float octreeMemory = (octreeElmCount * sizeof(uint32_t)) / (1024.0f * 1024.0f);
-    LOG("Octree Memory: " + std::to_string(octreeMemory) + "MB");
+    float octreeMemory = InMB(octreeElmCount * sizeof(uint32_t));
+    LOG("Actual Octree Memory: " + std::to_string(octreeMemory) + "MB");
 }
 
 void OctreeBuilder::InitializeNode(CommandBufferID commandBuffer) {

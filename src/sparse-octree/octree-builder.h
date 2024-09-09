@@ -4,9 +4,7 @@
 
 #include "rendering/rendering-device.h"
 
-class Voxelizer;
 struct RenderScene;
-struct VoxelRenderer;
 
 namespace gfx {
     class Camera;

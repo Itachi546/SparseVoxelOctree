@@ -71,3 +71,17 @@ inline uint32_t DJB2Hash(const std::string &message) {
     }
     return hashv;
 }
+
+inline float InMB(uint64_t size) {
+    return float(size) / (1024.0f * 1024.0f);
+}
+
+inline float InKB(uint64_t size) {
+    return float(size) / 1024.0f;
+}
+
+inline uint32_t MB(uint32_t size) {
+    return size * 1024 * 1024;
+}
+
+inline uint32_t KB(uint32_t size) { return size * 1024; }
