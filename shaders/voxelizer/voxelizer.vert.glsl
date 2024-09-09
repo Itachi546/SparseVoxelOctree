@@ -3,7 +3,12 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_ARB_shader_draw_parameters : enable
 
-#include "meshdata.glsl"
+#include "../meshdata.glsl"
+
+layout(location = 0) out vec3 vWorldPos;
+layout(location = 1) out vec2 vUV;
+layout(location = 2) out flat uint vDrawID;
+
 
 void main() {
     MeshDrawCommand drawCommand = drawCommands[gl_DrawID];
@@ -14,5 +19,10 @@ void main() {
     mat4 worldTransform = transforms[drawCommand.drawId];
 
     vec4 worldPos = worldTransform * vec4(position, 1.0f);
+
+    vWorldPos = worldPos.xyz;
+    vUV = vec2(vertex.tu, vertex.tv);
+    vDrawID = drawCommand.drawId;
+
     gl_Position = worldPos;
 }

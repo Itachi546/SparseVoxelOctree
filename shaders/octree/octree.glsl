@@ -80,7 +80,7 @@ bool Octree_RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out v
     uint scale = STACK_SIZE - 1;
     float scale_exp2 = 0.5f; // exp2( scale - STACK_SIZE )
 
-    float ray_scale = 0.0025f;
+    float ray_scale = 0.0f; // 0.0025f;
     while (scale < STACK_SIZE) {
         ++iter;
         uint child_index = idx ^ oct_mask;

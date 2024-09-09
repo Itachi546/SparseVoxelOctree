@@ -21,7 +21,7 @@ class OctreeBuilder {
 
     std::shared_ptr<RenderScene> scene;
 
-    const uint32_t kResolution = 512;
+    const uint32_t kResolution = 4096;
     const uint32_t kLevels = static_cast<uint32_t>(std::log2(kResolution) + 1);
 
     BufferID octreeBuffer, buildInfoBuffer, dispatchIndirectBuffer;
@@ -29,7 +29,7 @@ class OctreeBuilder {
     UniformSetID initNodeSet, tagNodeSet, allocateNodeSet, updateParamsSet;
 
     RD *device = nullptr;
-    const uint32_t VOXEL_DATA_SIZE = static_cast<uint32_t>(sizeof(uint32_t) * 2);
+    const uint32_t VOXEL_DATA_SIZE = static_cast<uint32_t>(sizeof(uint32_t));
     uint32_t octreeElmCount = 0;
 
   private:

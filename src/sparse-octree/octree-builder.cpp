@@ -53,12 +53,13 @@ void OctreeBuilder::Initialize(std::shared_ptr<RenderScene> scene) {
 }
 
 void OctreeBuilder::Build(CommandPoolID commandPool, CommandBufferID commandBuffer) {
-    std::shared_ptr<Voxelizer> voxelizer = std::make_shared<TerrainVoxelizer>();
+    //std::shared_ptr<Voxelizer> voxelizer = std::make_shared<TerrainVoxelizer>();
+    std::shared_ptr<Voxelizer> voxelizer = std::make_shared<SceneVoxelizer>(scene);
     voxelizer->Initialize(kResolution);
     voxelizer->Voxelize(commandPool, commandBuffer);
 
     uint32_t voxelCount = voxelizer->voxelCount;
-    uint32_t octreeSize = (voxelCount * kLevels * VOXEL_DATA_SIZE) / 3;
+    uint32_t octreeSize = (voxelCount * kLevels * VOXEL_DATA_SIZE * 4) / 3;
 
     octreeBuffer = device->CreateBuffer(octreeSize, RD::BUFFER_USAGE_STORAGE_BUFFER_BIT, RD::MEMORY_ALLOCATION_TYPE_GPU, "OctreeBuffer");
     LOG("Allocated Octree Memory: " + std::to_string(InMB(octreeSize)) + "MB");
