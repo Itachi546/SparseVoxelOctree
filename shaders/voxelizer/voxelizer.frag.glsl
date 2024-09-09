@@ -4,7 +4,7 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 
 #define ENABLE_BINDLESS_SET
-#include "material.glsl"
+#include "../material.glsl"
 #include "voxelizer.glsl"
 
 layout(location = 0) in vec3 gPos01;
